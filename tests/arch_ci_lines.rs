@@ -355,12 +355,21 @@ fn sync(text: &str) -> Vec<String> {
                 "gh workflow run ci.yml",
                 "the PR's checks are started by a dispatch",
             ),
+            (
+                "  group: sync-main-into-beta\n  cancel-in-progress: false\n",
+                "one sync at a time, and one in progress is never cancelled (#958)",
+            ),
+            (
+                SYNC_GROUP_STATED,
+                "the header says what the group does to a run queued behind the stage R wait (#958)",
+            ),
         ],
         &mut errors,
     );
     errors.extend(sync_stage_r(text));
     errors.extend(sync_stage_r_reads(text));
     errors.extend(sync_stage_r_judge(text));
+    errors.extend(sync_stage_r_wait(text));
     for (refused, why) in [
         ("git rebase", "the sync picks, it never rebases"),
         (
@@ -408,7 +417,10 @@ const SYNC_STAGE_R: &str = r#"      - name: Start the PR's CI
       # token may raise), so the trampoline never hears of it: the step takes the run's id from the dispatch's
       # own answer (no other run can share it), waits for that run to complete and dispatches the
       # judge on main with the id. It holds no key and judges nothing; a refused dispatch, or a run
-      # not completed in 40 minutes, fails the job where a person sees it.
+      # not completed in 40 minutes, fails the job where a person sees it. The wait is bounded by
+      # the clock (budget, each poll's own timeout and one interval end inside the step's 45
+      # minutes) and a poll that fails or hangs is read as not completed yet, so every way out of
+      # the wait that is not `completed` prints the hand command with the run's id.
       - name: Start the PR's stage R and its judge
         if: steps.pick.outputs.push == 'true'
         timeout-minutes: 45
@@ -424,15 +436,19 @@ const SYNC_STAGE_R: &str = r#"      - name: Start the PR's CI
           fi
           echo "stage R run ${run} on ${SYNC_BRANCH}"
           status=""
-          for _ in $(seq 1 160); do
-            status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"
+          budget=2400
+          while [ "$SECONDS" -lt "$budget" ]; do
+            if ! status="$(timeout 60 gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run}" --jq '.status')"; then
+              status="unread (its last poll failed)"
+            fi
             if [ "$status" = completed ]; then break; fi
             sleep 15
           done
           if [ "$status" != completed ]; then
-            echo "::error::stage R run ${run} is ${status} after 40 minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
+            echo "::error::stage R run ${run} is ${status:-unread} after $((SECONDS / 60)) minutes; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
             exit 1
           fi
+          echo "stage R run ${run} completed; its judge, by hand if the next line fails: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}"
           gh workflow run sibling-judge.yml --repo "$GITHUB_REPOSITORY" --ref main -f run_id="$run"
 "#;
 
@@ -483,6 +499,9 @@ enum Definition {
     Steps(&'static str),
     /// Never defined in the file: the runner's own.
     Runner,
+    /// Never defined in the file: bash's own (`SECONDS`, the seconds since the step's shell
+    /// started, which the wait's budget reads; an assignment anywhere would restart the clock).
+    Shell,
 }
 
 /// Every variable the pinned dispatch steps read, with where it is defined; the test
@@ -491,6 +510,7 @@ enum Definition {
 const SYNC_STAGE_R_READS: &[(&str, Definition)] = &[
     ("GH_TOKEN", Definition::Steps("${{ github.token }}")),
     ("GITHUB_REPOSITORY", Definition::Runner),
+    ("SECONDS", Definition::Shell),
     ("SYNC_BRANCH", Definition::Workflow("sync/main-into-beta")),
 ];
 
@@ -633,11 +653,16 @@ fn sync_stage_r_reads(text: &str) -> Vec<String> {
                     ));
                 }
             }
-            Definition::Runner => {
+            Definition::Runner | Definition::Shell => {
                 if !found.is_empty() {
                     errors.push(format!(
-                        "sync: `{name}`, which the stage R dispatch (#97) reads, is defined ({}); it is the runner's own, defined nowhere in the file",
-                        lines()
+                        "sync: `{name}`, which the stage R dispatch (#97) reads, is defined ({}); it is the {}'s own, defined nowhere in the file",
+                        lines(),
+                        if matches!(defined, Definition::Shell) {
+                            "shell"
+                        } else {
+                            "runner"
+                        }
                     ));
                 }
             }
@@ -673,7 +698,7 @@ fn sync_stage_r_reads(text: &str) -> Vec<String> {
 /// normalized (#97's third fold, the form #819 pins its macro file by). Whoever changes the
 /// workflow deliberately reads the change, then sets this to the digest the failure prints, in
 /// the same diff.
-const SYNC_FILE_DIGEST: u64 = 0xac0e_61cb_3cb9_3d05;
+const SYNC_FILE_DIGEST: u64 = 0xc63a_c1d6_ac8b_0910;
 
 /// The sync workflow's text moved from its digest.
 fn sync_digest_refusals(text: &str) -> Vec<String> {
@@ -982,6 +1007,269 @@ fn sync_stage_r_judge(text: &str) -> Vec<String> {
         );
     }
     errors
+}
+
+/// The header's sentence on the sync's concurrency group (#958): since fix-97c the one job ends
+/// with the stage R wait, so a run that pushed picks holds the group for up to the step's 45
+/// minutes; GitHub keeps one pending run per group, so a third push to main in that window
+/// replaces the queued second run, which then reads `cancelled` in Actions. Nothing is lost (the
+/// newest run finds every commit beta lacks); the sentence is where a reader of that run looks.
+const SYNC_GROUP_STATED: &str = "# only the newest waits and each one it replaced shows as cancelled. A cancelled sync run under\n# a newer one is the group's, not a failure: the newest run finds every commit beta lacks.\n";
+
+/// The integer after `key` on a line of `step` (`budget=2400`, `sleep 15`, `timeout 60 gh`,
+/// `timeout-minutes: 45`), each occurrence; a figure that is no plain integer (`sleep 2m`,
+/// `budget="$B"`) is `None`: unreadable, so refused.
+fn figures(step: &str, key: &str) -> Vec<Option<u64>> {
+    step.lines()
+        .filter(|line| !line.trim_start().starts_with('#'))
+        .flat_map(|line| {
+            line.match_indices(key)
+                .filter(|(at, _)| {
+                    !line[..*at]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+                })
+                .map(|(at, _)| {
+                    let rest = &line[at + key.len()..];
+                    let word: String = rest
+                        .chars()
+                        .take_while(|c| !c.is_whitespace() && *c != ';' && *c != ')')
+                        .collect();
+                    word.parse::<u64>().ok()
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// The stage R wait ends with its re-judge line (#958). Until then one failed status poll ended
+/// the step under `set -e` (160 calls, each able to answer a 5xx) and 160 polls of 15 s plus the
+/// API's time could pass the step's 45 minutes, either way with no line naming the hand command;
+/// and no guard read the loop's figures (the cap guard's give-up rule reads `gh run watch` waits
+/// alone). The rules, each refused by name: the loop is bounded by the clock, not by a count; the
+/// poll is the condition of an `if !`, so its failure is read as not completed yet, and runs
+/// under its own `timeout`, so a call that hangs is one failed poll; the budget, one poll's
+/// timeout and one interval end at or under the step's `timeout-minutes` less two minutes; and
+/// every `::error::` after the run's id is known carries the judge's hand command with that id.
+fn sync_stage_r_wait(text: &str) -> Vec<String> {
+    const MARGIN: u64 = 120;
+    let mut errors = Vec::new();
+    let Some(at) = text.find("      - name: Start the PR's stage R and its judge\n") else {
+        return vec!["sync: no step `Start the PR's stage R and its judge` (#958)".to_owned()];
+    };
+    let step = &text[at..];
+    let mut refuse = |what: &str| errors.push(format!("sync: the stage R wait {what} (#958)"));
+    if !step.contains("          while [ \"$SECONDS\" -lt \"$budget\" ]; do\n") {
+        refuse("is not `while [ \"$SECONDS\" -lt \"$budget\" ]; do`: the wait is bounded by the clock, whatever a poll costs");
+    }
+    if step.contains("seq ") {
+        refuse("counts its polls (`seq `): a count bounds no time, each poll taking what the API takes");
+    }
+    let polls: Vec<&str> = step
+        .lines()
+        .filter(|line| line.contains("/actions/runs/${run}\""))
+        .collect();
+    if polls.is_empty() {
+        refuse("polls no run by the id the dispatch answered");
+    }
+    for poll in &polls {
+        if !poll.trim_start().starts_with("if ! status=\"$(timeout ") {
+            refuse(&format!(
+                "polls outside `if ! status=\"$(timeout N gh api ...)\"; then` (`{}`): a poll that fails ends the step under `set -e`, and one that hangs spends its timeout, with no re-judge line",
+                poll.trim()
+            ));
+        }
+    }
+    if !step.contains("              status=\"unread (its last poll failed)\"\n") {
+        refuse("gives a failed poll no status: it is read as not completed yet, by name");
+    }
+    let one = |key: &str, what: &str, errors: &mut Vec<String>| -> Option<u64> {
+        match figures(step, key).as_slice() {
+            [Some(n)] => Some(*n),
+            found => {
+                errors.push(format!(
+                    "sync: the stage R wait has {} `{key}` ({what}), {found:?}; it has one, a plain integer (#958)",
+                    found.len()
+                ));
+                None
+            }
+        }
+    };
+    let minutes = one("timeout-minutes: ", "the step's bound", &mut errors);
+    let budget = one("budget=", "the wait's seconds", &mut errors);
+    let poll = one("timeout ", "one poll's seconds", &mut errors);
+    let interval = one("sleep ", "the interval's seconds", &mut errors);
+    if let (Some(minutes), Some(budget), Some(poll), Some(interval)) =
+        (minutes, budget, poll, interval)
+    {
+        let worst = budget + poll + interval;
+        if worst + MARGIN > minutes * 60 {
+            errors.push(format!(
+                "sync: the stage R wait can run {worst} s (budget {budget} + one poll {poll} + one interval {interval}), past the step's {minutes} minutes less {MARGIN} s: the step would be killed before its re-judge line (#958)"
+            ));
+        }
+    }
+    let known = step.find("echo \"stage R run ${run} on ").unwrap_or(0);
+    for line in step[known..].lines().filter(|l| l.contains("::error::")) {
+        if !line.contains("gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}") {
+            errors.push(format!(
+                "sync: the stage R wait fails without its re-judge line (`{}`): every failure after the run's id is known names the hand command with the id (#958)",
+                line.trim()
+            ));
+        }
+    }
+    errors
+}
+
+/// #958's plants on the wait, each refused by its rule's name and seen by the pin: the count
+/// back (`seq 1 200`), the poll back under bare `set -e`, the poll's own timeout dropped, each
+/// figure moved past the step's bound or made unreadable, the failure's line without its hand
+/// command; and the header's sentence on the group removed, or a run in progress cancelled.
+#[test]
+fn the_sync_stage_r_wait_is_bounded_by_the_clock_and_ends_with_its_rejudge_line_958() {
+    let text = read(SYNC_FILE);
+    assert!(
+        sync_stage_r_wait(&text).is_empty(),
+        "{:?}",
+        sync_stage_r_wait(&text)
+    );
+    let poll = "            if ! status=\"$(timeout 60 gh api \"repos/${GITHUB_REPOSITORY}/actions/runs/${run}\" --jq '.status')\"; then\n              status=\"unread (its last poll failed)\"\n            fi\n";
+    let bare = "            status=\"$(gh api \"repos/${GITHUB_REPOSITORY}/actions/runs/${run}\" --jq '.status')\"\n";
+    let clock = "          while [ \"$SECONDS\" -lt \"$budget\" ]; do\n";
+    let hand = "; once it completes: gh workflow run sibling-judge.yml --repo ${GITHUB_REPOSITORY} --ref main -f run_id=${run}\"\n";
+    for needle in [
+        poll,
+        clock,
+        hand,
+        "          budget=2400\n",
+        "            sleep 15\n",
+    ] {
+        assert_eq!(text.matches(needle).count(), 1, "{needle}");
+    }
+    let plants: Vec<(&str, String, &str)> = vec![
+        (
+            "the count back, at 200 polls",
+            text.replace(clock, "          for _ in $(seq 1 200); do\n"),
+            "counts its polls",
+        ),
+        (
+            "the poll back under bare set -e",
+            text.replace(poll, bare),
+            "polls outside `if ! status=",
+        ),
+        (
+            "the poll's own timeout dropped",
+            text.replace(
+                "$(timeout 60 gh api \"repos/${GITHUB_REPOSITORY}/actions/runs/",
+                "$(gh api \"repos/${GITHUB_REPOSITORY}/actions/runs/",
+            ),
+            "polls outside `if ! status=",
+        ),
+        (
+            "a failed poll's status dropped",
+            text.replace(
+                "              status=\"unread (its last poll failed)\"\n",
+                "              true\n",
+            ),
+            "gives a failed poll no status",
+        ),
+        (
+            "the budget at the step's 45 minutes",
+            text.replace("          budget=2400\n", "          budget=2700\n"),
+            "can run 2775 s",
+        ),
+        (
+            "the budget inside the margin",
+            text.replace("          budget=2400\n", "          budget=2520\n"),
+            "can run 2595 s",
+        ),
+        (
+            "the interval at ten minutes",
+            text.replace("            sleep 15\n", "            sleep 600\n"),
+            "can run 3060 s",
+        ),
+        (
+            "a poll allowed five minutes",
+            text.replace("$(timeout 60 gh api", "$(timeout 300 gh api"),
+            "can run 2715 s",
+        ),
+        (
+            "the step's bound lowered to the budget",
+            text.replace(
+                "        timeout-minutes: 45\n",
+                "        timeout-minutes: 40\n",
+            ),
+            "past the step's 40 minutes",
+        ),
+        (
+            "an interval that is no plain integer",
+            text.replace("            sleep 15\n", "            sleep 2m\n"),
+            "has 1 `sleep ` (the interval's seconds), [None]",
+        ),
+        (
+            "a second budget",
+            text.replace(
+                "          budget=2400\n",
+                "          budget=2400\n          budget=9000\n",
+            ),
+            "has 2 `budget=`",
+        ),
+        (
+            "the failure's line without its hand command",
+            text.replace(hand, "\"\n"),
+            "fails without its re-judge line",
+        ),
+    ];
+    for (what, planted, needle) in plants {
+        assert_ne!(planted, text, "{what}: the plant changed nothing");
+        let errors = sync_stage_r_wait(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains(needle) && e.contains("(#958)")),
+            "{what}: {errors:?}"
+        );
+        assert!(
+            sync(&planted).iter().any(|e| e.contains(needle)),
+            "{what}: sync() did not carry it"
+        );
+        assert!(
+            sync_stage_r(&planted)
+                .iter()
+                .any(|e| e.contains("not `SYNC_STAGE_R` byte for byte")),
+            "{what}: the pin did not see it"
+        );
+    }
+    let group: Vec<(&str, String, &str)> = vec![
+        (
+            "the header's sentence removed",
+            text.replace(SYNC_GROUP_STATED, ""),
+            "the header says what the group does",
+        ),
+        (
+            "a sync in progress cancelled by the next",
+            text.replace(
+                "  cancel-in-progress: false\n",
+                "  cancel-in-progress: true\n",
+            ),
+            "one in progress is never cancelled",
+        ),
+    ];
+    for (what, planted, needle) in group {
+        assert_ne!(planted, text, "{what}: the plant changed nothing");
+        let errors = sync(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains(needle) && e.contains("(#958)")),
+            "{what}: {errors:?}"
+        );
+        assert!(
+            !sync_digest_refusals(&planted).is_empty(),
+            "{what}: the digest did not see it"
+        );
+    }
 }
 
 #[test]
