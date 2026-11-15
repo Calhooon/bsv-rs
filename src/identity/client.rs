@@ -589,7 +589,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// settings, so no certifier is dropped as untrusted (#737, the list).
     ///
     /// If `override_with_contacts` is true, a stored contact of the key
-    /// answers alone, before any lookup.
+    /// answers alone, before any lookup; over a cold contacts cache the
+    /// wallet's basket is loaded for it, and a failed listing is the
+    /// caller's error, as the reference throws it for a boolean option
+    /// (`IdentityClient.ts:331-334`, `:398` at `ts-stack@edf6e03`; #959).
     ///
     /// # Example
     /// ```rust,ignore
@@ -609,7 +612,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         if override_with_contacts {
             // The contact read's own rule ahead of it (`IdentityClient.ts:575`, #818b)
             door_args::contact_key(identity_key)?;
-            if let Ok(Some(contact)) = self.contacts_manager.get_contact(identity_key).await {
+            // A failed cold listing is the caller's error, as the reference
+            // throws it for a boolean option (`IdentityClient.ts:331-334`,
+            // `:398`; #959's fold)
+            if let Some(contact) = self.contacts_manager.get_contact(identity_key).await? {
                 return Ok(vec![contact.to_displayable_identity()]);
             }
         }

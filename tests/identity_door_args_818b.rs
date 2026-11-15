@@ -26,6 +26,9 @@
 #![cfg(feature = "identity")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+#[path = "support/identity_reveal_wallet.rs"]
+mod identity_reveal_wallet;
+
 use bsv_rs::identity::{IdentityClient, IdentityQuery};
 use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
@@ -80,6 +83,14 @@ impl OverlayLookupFacilitator for Recording {
 type Asked = Arc<Mutex<Vec<Value>>>;
 
 fn client_answering(outputs: Vec<OutputListItem>) -> (IdentityClient<ProtoWallet>, Asked) {
+    client_over(ProtoWallet::new(None), outputs)
+}
+
+/// A client over `wallet`, its lookup the recording facilitator's.
+fn client_over<W: bsv_rs::wallet::WalletInterface + Clone>(
+    wallet: W,
+    outputs: Vec<OutputListItem>,
+) -> (IdentityClient<W>, Asked) {
     let asked = Arc::new(Mutex::new(Vec::new()));
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Recording(asked.clone(), outputs))),
@@ -91,7 +102,7 @@ fn client_answering(outputs: Vec<OutputListItem>) -> (IdentityClient<ProtoWallet
         ..Default::default()
     }));
     (
-        IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver),
+        IdentityClient::with_resolver(wallet, Default::default(), resolver),
         asked,
     )
 }
@@ -146,11 +157,23 @@ where
     Fut: std::future::Future<Output = bsv_rs::Result<T>>,
     T: std::fmt::Debug,
 {
+    key_door_over(column, client, door).await
+}
+
+/// `key_door` over the client `make` builds for each cell.
+async fn key_door_over<W, M, F, Fut, T>(column: &str, make: M, door: F) -> usize
+where
+    W: bsv_rs::wallet::WalletInterface + Clone,
+    M: Fn() -> (IdentityClient<W>, Asked),
+    F: Fn(IdentityClient<W>, String) -> Fut,
+    Fut: std::future::Future<Output = bsv_rs::Result<T>>,
+    T: std::fmt::Debug,
+{
     let cases = cases("key_");
     let mut differ = Vec::new();
     for case in &cases {
         let subject = case["subject"].as_str().unwrap().to_string();
-        let (client, asked) = client();
+        let (client, asked) = make();
         let got = door(client, subject.clone()).await;
         let asked = asked.lock().unwrap().clone();
         if let Err(why) = agrees(&got, asked.len(), &case[column]) {
@@ -180,12 +203,24 @@ async fn resolve_by_identity_key_refuses_a_key_the_wallet_door_refuses_before_an
 }
 
 /// With contacts the contacts manager's rule comes ahead, in its words:
-/// an upper-case or padded key the wallet admits is refused there.
+/// an upper-case or padded key the wallet admits is refused there. The
+/// wallet answers an empty contacts listing, as the recorder's double did
+/// (`listOutputs: 1` on each accepted cell): since #959 the door loads the
+/// basket over a cold cache, and since its fold a listing that fails is
+/// the caller's error (`tests/contacts_replay.rs`), where a `ProtoWallet`'s
+/// refused listing was dropped.
 #[tokio::test]
 async fn with_contacts_the_contact_rule_refuses_ahead_in_its_words_818b() {
-    let n = key_door("resolve_with_contacts", |client, key| async move {
-        client.resolve_by_identity_key(&key, true).await
-    })
+    let n = key_door_over(
+        "resolve_with_contacts",
+        || {
+            client_over(
+                identity_reveal_wallet::Counting::answering_contacts(9),
+                vec![],
+            )
+        },
+        |client, key| async move { client.resolve_by_identity_key(&key, true).await },
+    )
     .await;
     assert_eq!(n, 17);
 }

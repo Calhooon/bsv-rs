@@ -25,14 +25,15 @@
 //! answer in order since the eighth fold) and what the update and the removal sign, send, refuse (alone and in pairs) and
 //! cache, with up to three contacts cached and up to two faults in a step
 //! (since #959 up to four, every member of the record compared, and the
-//! cold-cache save, update and read by key replayed as a caller composes
-//! them, a plain read ahead of the call);
+//! cold-cache save, update and read by key replayed as any other step, the
+//! manager loading the basket itself, as the reference's does);
 //! they do not hold a step with three or more faults, a cache of five or more
 //! contacts, the replay's stated reading (the load's concurrent reads,
-//! compared by count), a member value the validator rewrites (three cells
-//! recorded and held as they stand by the replay file's `_stated_959`
-//! test; the cold cache's three, a cold add, read by key and update, by
-//! the three `_stated_959` tests here),
+//! compared by count), a member value the validator rewrites beyond the two
+//! directed sequences of #959's conforming lane and the three cells #991's
+//! fold recorded (held by the replay file's
+//! `a_save_caches_the_validated_record_959`; the cold cache's three are a
+//! cold add here and a cold read by key and update there),
 //! `search_contacts` (no reference twin; `get_contacts_by_tag` is held by
 //! a test of its own since #959), or the twelve lines
 //! listed in `docs/lanes/fix-contacts.md` under "The bound".
@@ -61,6 +62,16 @@ fn vector() -> Value {
 
 fn case(name: &str) -> Value {
     vector()["cases"][name].clone()
+}
+
+/// A recorded case's wallet calls, whole, in the double's names.
+fn recorded_calls(name: &str) -> Vec<String> {
+    case(name)["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| snake(c.as_str().unwrap()))
+        .collect()
 }
 
 fn identity_key() -> String {
@@ -134,6 +145,7 @@ fn assert_reference_failed(name: &str, call: &str) {
 #[tokio::test]
 async fn an_add_whose_hmac_fails_returns_the_wallets_error_contacts() {
     let wallet = Counting::of_scalar(9);
+    *wallet.listed.lock().unwrap() = Some(empty());
     wallet.fail.lock().unwrap().push(wallet_call!(create_hmac));
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     let err = manager
@@ -142,6 +154,8 @@ async fn an_add_whose_hmac_fails_returns_the_wallets_error_contacts() {
         .unwrap_err();
     assert_eq!(err, failed(wallet_call!(create_hmac)));
     assert_reference_failed("add_hmac_fails", "createHmac");
+    // The cold save's load ahead of the HMAC, as recorded (#959).
+    assert_eq!(wallet.calls(), recorded_calls("add_hmac_fails"));
     assert!(manager
         .get_contact(&identity_key())
         .await
@@ -161,11 +175,11 @@ async fn an_add_whose_listing_fails_returns_the_wallets_error_contacts() {
         .unwrap_err();
     assert_eq!(err, failed(wallet_call!(list_outputs)));
     assert_reference_failed("add_list_fails", "listOutputs");
-    assert!(manager
-        .get_contact(&identity_key())
-        .await
-        .unwrap()
-        .is_none());
+    // The listing that failed is the cold save's load, the one call made,
+    // as recorded; the cache is left cold (#959).
+    assert_eq!(wallet.calls(), recorded_calls("add_list_fails"));
+    assert_eq!(manager.cached_count().await, 0);
+    assert!(!manager.is_cache_initialized().await);
     assert!(!wallet.calls().contains(&wallet_call!(create_action)));
 }
 
@@ -348,14 +362,10 @@ async fn an_update_whose_signable_transaction_is_not_the_requested_one_is_aborte
         );
         assert_eq!(recorded["sign_action"], json!([]), "{mode}");
         // The reference's cold `saveContact` loads the basket before its
-        // tagged listing (`:529-531`), a stated residue not ported: its
-        // leading listOutputs is the one call this crate does not make.
-        let recorded_calls = recorded["calls"].as_array().unwrap();
-        assert_eq!(recorded_calls[0], json!("listOutputs"), "{mode}");
-        let expected: Vec<String> = recorded_calls[1..]
-            .iter()
-            .map(|c| snake(c.as_str().unwrap()))
-            .collect();
+        // tagged listing (`:529-531`), and so does `add_contact` since
+        // #959: the leading listOutputs is made here too.
+        let expected = recorded_calls(&format!("update_{mode}"));
+        assert_eq!(expected[0], "list_outputs", "{mode}");
         assert_eq!(calls, expected, "{mode}");
         assert_eq!(
             wallet.aborts.lock().unwrap()[0].reference,
@@ -381,16 +391,15 @@ fn replay_step(sequence: &str, step: usize, op: &str) -> Value {
     step
 }
 
-/// STATED, held as it stands (#959's D6; the captain's ruling: conformed to
-/// the reference before the cut by a later lane, which turns this test
-/// over). A save over a cold cache asks the wallet one listing, the tagged
-/// one: the reference's cold `saveContact` loads the whole basket ahead of
-/// it (`ContactsManager.ts:529-531`), recorded as `cold_save_959`'s
-/// opening step.
+/// #959's D6, the pin #991's fold held as it stood
+/// (`a_cold_add_makes_no_listing_of_the_basket_stated_959`), turned over: a
+/// save over a cold cache loads the whole basket ahead of its own calls, as
+/// the reference's cold `saveContact` does (`ContactsManager.ts:529-531`).
+/// The expected call list is the reference's, recorded as `cold_save_959`'s
+/// opening step: the whole basket (`locking scripts`, no tag), then the
+/// HMAC and the tagged listing.
 #[tokio::test]
-async fn a_cold_add_makes_no_listing_of_the_basket_stated_959() {
-    // The reference: two listings, the whole basket (`locking scripts`,
-    // no tag) and then the tagged one.
+async fn a_cold_add_lists_the_basket_ahead_of_its_own_calls_959() {
     let recorded = replay_step("cold_save_959", 0, "save");
     assert_eq!(recorded["outcome"], json!({ "ok": true }));
     assert_eq!(recorded["calls"][0], "listOutputs");
@@ -410,91 +419,19 @@ async fn a_cold_add_makes_no_listing_of_the_basket_stated_959() {
     let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
     assert!(!manager.is_cache_initialized().await);
     manager.add_contact(contact("Bob Example")).await.unwrap();
-    // Today: one listing, the tagged one, after the HMAC. The reference's
-    // answer is the two asserted above, the basket's load leading; the
-    // conforming lane makes this list the recorded one.
-    let calls = wallet.calls();
-    assert_eq!(calls[0], wallet_call!(create_hmac), "{calls:?}");
-    let listings = wallet.list_args.lock().unwrap().clone();
-    assert_eq!(listings.len(), 1, "{calls:?}");
-    assert_eq!(listings[0].tags.as_ref().map(Vec::len), Some(1));
-    let expected: Vec<String> = recorded["calls"].as_array().unwrap()[1..]
+    // The recorded list, whole: the basket's load leading.
+    let expected: Vec<String> = recorded["calls"]
+        .as_array()
+        .unwrap()
         .iter()
         .map(|c| snake(c.as_str().unwrap()))
         .collect();
-    assert_eq!(calls, expected);
-}
-
-/// STATED, held as it stands (#959's D6, the cold read by key). Over a cold
-/// cache `get_contact` answers `None` for a key the basket holds and asks
-/// the wallet nothing: the reference's `getContacts(identityKey)` loads the
-/// basket and answers the contact (`ContactsManager.ts:331-338`), recorded
-/// as `cold_read_by_key_959`'s read of a held key.
-#[tokio::test]
-async fn a_cold_get_contact_answers_none_for_a_key_the_basket_holds_stated_959() {
-    // The reference: the load, then the one contact.
-    let recorded = replay_step("cold_read_by_key_959", 4, "by_key");
-    assert_eq!(recorded["outcome"], json!({ "ok": true }));
-    assert_eq!(recorded["calls"][0], "listOutputs");
-    assert_eq!(recorded["answer"].as_array().unwrap().len(), 1);
-
-    let (wallet, _) = listing_a_contact(0).await;
-    let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
-    let before = wallet.calls().len();
-    // Today: `None`, and no wallet call. The reference's answer is the
-    // contact (asserted above); the conforming lane makes this `Some`.
-    assert!(manager
-        .get_contact(&identity_key())
-        .await
-        .unwrap()
-        .is_none());
-    let asked = wallet.calls()[before..].to_vec();
-    assert!(asked.is_empty(), "{asked:?}");
-    assert!(!manager.is_cache_initialized().await);
-    // The control: the basket holds the key, read once the cache is warm.
-    manager.list_contacts_with_refresh(false).await.unwrap();
-    let held = manager.get_contact(&identity_key()).await.unwrap().unwrap();
-    assert_eq!(held.name, "Bob Example");
-}
-
-/// STATED, held as it stands (#959's D6, the cold update). Over a cold
-/// cache `update_contact` refuses `ContactNotFound` for a key the basket
-/// holds and asks the wallet nothing: the reference has one door,
-/// `saveContact`, which loads the basket and replaces the held contact
-/// (`ContactsManager.ts:529-533`), recorded as `cold_save_959`'s update.
-#[tokio::test]
-async fn a_cold_update_refuses_contact_not_found_for_a_key_the_basket_holds_stated_959() {
-    // The reference: the load leading, the save succeeding, the held
-    // output spent (signAction asked).
-    let recorded = replay_step("cold_save_959", 6, "update");
-    assert_eq!(recorded["outcome"], json!({ "ok": true }));
-    assert_eq!(recorded["calls"][0], "listOutputs");
-    assert!(recorded["calls"]
-        .as_array()
-        .unwrap()
-        .contains(&json!("signAction")));
-
-    let (wallet, _) = listing_a_contact(0).await;
-    let manager = ContactsManager::new(wallet.clone(), ContactsManagerConfig::default());
-    let before = wallet.calls().len();
-    // Today: `ContactNotFound`, and no wallet call. The reference's answer
-    // is `ok` (asserted above); the conforming lane makes this the update.
-    let err = manager
-        .update_contact(&identity_key(), contact("Bob Updated"))
-        .await
-        .unwrap_err();
-    assert_eq!(err, Error::ContactNotFound(identity_key()));
-    let asked = wallet.calls()[before..].to_vec();
-    assert!(asked.is_empty(), "{asked:?}");
-    // The control: the basket holds the key, found once the cache is warm
-    // (the refusal is then no longer `ContactNotFound`; this double's
-    // listing carries no BEEF to spend from).
-    manager.list_contacts_with_refresh(false).await.unwrap();
-    assert!(manager
-        .get_contact(&identity_key())
-        .await
-        .unwrap()
-        .is_some());
+    assert_eq!(wallet.calls(), expected);
+    let listings = wallet.list_args.lock().unwrap().clone();
+    assert_eq!(listings.len(), 2);
+    assert_eq!(listings[0].tags, None, "the load asks the whole basket");
+    assert_eq!(listings[1].tags.as_ref().map(Vec::len), Some(1));
+    assert!(manager.is_cache_initialized().await);
 }
 
 #[tokio::test]
@@ -748,7 +685,7 @@ fn listing_token_times(count: usize) -> Counting {
 /// token refused, a lookup of 100 outputs read (the update's 100 matches
 /// refused as several, the removal spending the leading one) and one of 101
 /// refused before any output is read. The update's call count is the
-/// reference's less its cold load (`:529-531`, a stated residue). #904's
+/// reference's, its cold load included (`:529-531`; #959). #904's
 /// third fold, the sweep: six mutants of `find_existing` and
 /// `remove_contact` (`> 100` as `==` or `>=` at both, the guard and the arm
 /// for no match) passed every test until then.
@@ -767,7 +704,7 @@ async fn the_lookups_bounds_and_another_identitys_token_are_the_references_conta
         .await
         .unwrap_err();
     assert_eq!(err, Error::IdentityError(words("update_other_identity")));
-    assert_eq!(wallet.calls().len(), calls("update_other_identity") - 1);
+    assert_eq!(wallet.calls().len(), calls("update_other_identity"));
     assert!(!wallet.calls().contains(&wallet_call!(create_action)));
 
     for (count, name) in [(100, "update_listing_100"), (101, "update_listing_101")] {
@@ -778,7 +715,7 @@ async fn the_lookups_bounds_and_another_identitys_token_are_the_references_conta
             .await
             .unwrap_err();
         assert_eq!(err, Error::IdentityError(words(name)), "{name}");
-        assert_eq!(wallet.calls().len(), calls(name) - 1, "{name}");
+        assert_eq!(wallet.calls().len(), calls(name), "{name}");
         assert_eq!(case(name)["sign_action_count"], json!(0), "{name}");
     }
 
@@ -895,19 +832,14 @@ async fn the_cache_writes_touch_their_own_entry_alone_with_two_contacts_cached_c
         json!({ "error": "listOutputs failed", "cause": null })
     );
     // The cache the reference's `#invalidate` leaves: nothing held, not
-    // initialized (this crate's adds leave it uninitialized, so the plain read
-    // below loads on both sides; the entries are what tells them apart).
+    // initialized, so the plain read below loads on both sides (a read by
+    // key here would load too since #959, and fail with the listing).
     assert_eq!(
         manager.cached_count().await,
         0,
         "a failed forced refresh kept the cache"
     );
     assert!(!manager.is_cache_initialized().await);
-    assert!(manager
-        .get_contact(&carol().identity_key)
-        .await
-        .unwrap()
-        .is_none());
     wallet.fail.lock().unwrap().clear();
     *wallet.listed.lock().unwrap() = Some(empty());
     let read = manager.list_contacts_with_refresh(false).await.unwrap();
@@ -1257,8 +1189,8 @@ async fn clear_cache_leaves_the_next_plain_read_to_list_again_904() {
 /// before the signature (`:700-725`, `:847-850`). The removal's error is the
 /// wrapper alone (#904's stated residue), so its pairs are pinned by the
 /// recorded wrapper and call list, the cause the reference's recorded beside
-/// it. The update's call list is the reference's less its cold load
-/// (`:529-531`, the stated residue).
+/// it. The update's call list is the reference's, its cold load included
+/// (`:529-531`; #959).
 #[tokio::test]
 async fn two_faults_at_once_are_refused_in_the_references_order_contacts() {
     let cells: [(&str, &'static str, &'static str, bool); 11] = [
@@ -1345,17 +1277,12 @@ async fn two_faults_at_once_are_refused_in_the_references_order_contacts() {
         } else {
             manager.remove_contact(&identity_key()).await.unwrap_err()
         };
-        let mut recorded_calls: Vec<String> = recorded["calls"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| snake(c.as_str().unwrap()))
-            .collect();
+        let recorded_calls = recorded_calls(name);
         if update {
             let words = recorded["outcome"]["error"].as_str().unwrap();
             assert_eq!(recorded["outcome"]["cause"], Value::Null, "{name}");
             assert_eq!(err, Error::IdentityError(words.into()), "{name}");
-            assert_eq!(recorded_calls.remove(0), "list_outputs", "{name}");
+            assert_eq!(recorded_calls[0], "list_outputs", "{name}");
         } else {
             assert_eq!(recorded["outcome"]["error"], wrapper, "{name}");
             assert_eq!(err, Error::IdentityError(wrapper.into()), "{name}");

@@ -263,7 +263,11 @@ macro_rules! basket {
                 args: ListOutputsArgs,
                 _o: Option<&str>,
             ) -> bsv_rs::Result<ListOutputsResult> {
-                self.enter("listOutputs")?;
+                if self.enter("listOutputs")?.iter().any(|m| m == "hang") {
+                    // A listing that never answers (#959's cold path):
+                    // this crate's tests alone arm it, no recording does.
+                    std::future::pending::<()>().await;
+                }
                 let tags = args.tags.clone().unwrap_or_default();
                 self.note(json!({
                     "call": "listOutputs",

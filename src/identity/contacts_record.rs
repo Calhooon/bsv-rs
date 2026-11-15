@@ -242,9 +242,15 @@ pub(super) fn record_of(contact: &Contact) -> Result<ContactRecord> {
 }
 
 /// The `Contact` a validated record reads as: `notes` and `tags` taken back
-/// out of `metadata`, `added_at` the caller's.
+/// out of `metadata`, `added_at` the caller's. `record_of` of the answer is
+/// the record again (#959: the cache holds what the validator returned,
+/// `ContactsManager.ts:527`, `:566`): an empty `metadata` object stays one,
+/// empty `tags` stay inside it, and a `metadata` holding `notes` and `tags`
+/// alone reads as none, the two members writing it back.
 pub(super) fn contact_of(record: ContactRecord, added_at: u64) -> Contact {
+    let held = record.metadata.is_some();
     let mut meta = record.metadata.unwrap_or_default();
+    let before = meta.len();
     let notes = match meta.remove("notes") {
         Some(Value::String(notes)) => Some(notes),
         Some(other) => {
@@ -254,16 +260,19 @@ pub(super) fn contact_of(record: ContactRecord, added_at: u64) -> Contact {
         None => None,
     };
     let tags = match meta.remove("tags") {
-        Some(Value::Array(items)) if items.iter().all(Value::is_string) => items
-            .into_iter()
-            .filter_map(|item| item.as_str().map(str::to_string))
-            .collect(),
+        Some(Value::Array(items)) if !items.is_empty() && items.iter().all(Value::is_string) => {
+            items
+                .into_iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect()
+        }
         Some(other) => {
             meta.insert("tags".into(), other);
             Vec::new()
         }
         None => Vec::new(),
     };
+    let emptied = meta.is_empty() && before != 0;
     let mut contact = Contact::new(record.name, record.identity_key)
         .with_added_at(added_at)
         .with_tags(tags)
@@ -273,7 +282,7 @@ pub(super) fn contact_of(record: ContactRecord, added_at: u64) -> Contact {
         .with_abbreviated_key(record.abbreviated_key);
     contact.avatar_url = (!record.avatar_url.is_empty()).then_some(record.avatar_url);
     contact.notes = notes;
-    contact.metadata = (!meta.is_empty()).then_some(Value::Object(meta));
+    contact.metadata = (held && !emptied).then_some(Value::Object(meta));
     contact
 }
 

@@ -185,11 +185,12 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// ).await?;
     /// ```
     pub async fn add_contact(&self, contact: Contact) -> Result<()> {
-        // The reference's record, validated before any wallet call
-        // (`saveContact`, `ContactsManager.ts:527-528`; #544). Every wallet
-        // failure is the caller's, as `saveContact` lets it through, and the
-        // cache is written after the chain alone (`:536-566`; #904).
+        // `saveContact` (`ContactsManager.ts:527-566`): the record validated
+        // before any wallet call (#544), the basket loaded when the cache
+        // is cold (`:529-531`; #959), every wallet failure the caller's,
+        // and the validated record cached after the chain alone (#904).
         let record = record::record_of(&contact)?;
+        self.ensure_loaded().await?;
         let tag = self.create_identity_tag(&record.identity_key).await?;
         let existing = self
             .contact_outputs(
@@ -214,8 +215,19 @@ impl<W: WalletInterface> ContactsManager<W> {
                     .await?
             }
         }
-        self.cache.write().await.save(contact);
+        let cached = record::contact_of(record, contact.added_at);
+        self.cache.write().await.save(cached);
         Ok(())
+    }
+
+    /// The basket loaded when the cache is cold, as the reference's save
+    /// and read by key load it (`ContactsManager.ts:529-531`, `:331-338`);
+    /// the listing's failure the caller's, the cache left cold (#959).
+    async fn ensure_loaded(&self) -> Result<()> {
+        if self.cache.read().await.initialized {
+            return Ok(());
+        }
+        self.list_contacts_with_refresh(false).await.map(drop)
     }
 
     /// Generate a random key ID for contact encryption.
@@ -226,39 +238,51 @@ impl<W: WalletInterface> ContactsManager<W> {
 
     /// Get a contact by identity key.
     ///
+    /// Over a cold cache the wallet's basket is loaded ahead of the read, as the
+    /// reference's `getContacts(identityKey)` loads it
+    /// (`ContactsManager.ts:331-338`; #959), and a failed listing is the
+    /// caller's error. A text that is no canonical compressed key answers
+    /// `None` and asks the wallet nothing (the reference throws there,
+    /// `:316-317`; stated).
+    ///
     /// # Arguments
     /// * `identity_key` - The hex-encoded public key of the contact
     ///
     /// # Returns
     /// The contact if found, or None if not found.
     pub async fn get_contact(&self, identity_key: &str) -> Result<Option<Contact>> {
+        if contact_identity_key(identity_key).is_err() {
+            return Ok(None);
+        }
+        self.ensure_loaded().await?;
         let cache = self.cache.read().await;
         Ok(cache.get(identity_key).cloned())
     }
 
     /// Update an existing contact.
     ///
-    /// This method updates both the in-memory cache and the blockchain.
-    /// It finds the existing contact output, spends it, and creates a new
-    /// output with the updated contact data atomically.
+    /// Finds the existing contact output, spends it, and creates a new
+    /// output with the updated contact data atomically; the cache is
+    /// written after the chain. Over a cold cache the updates are validated
+    /// and the basket loaded ahead of the save, as the reference's `saveContact` does
+    /// (`ContactsManager.ts:527-531`; #959).
     ///
     /// # Arguments
     /// * `identity_key` - The identity key of the contact to update
     /// * `updates` - The updated contact data
     ///
     /// # Errors
-    /// Returns an error if the contact is not found in cache.
+    /// `ContactNotFound` if the loaded cache lacks the contact (this
+    /// crate's own refusal); a wallet failure as it came.
     pub async fn update_contact(&self, identity_key: &str, updates: Contact) -> Result<()> {
-        // Verify contact exists in cache
-        {
-            let cache = self.cache.read().await;
-            if cache.get(identity_key).is_none() {
-                return Err(Error::ContactNotFound(identity_key.to_string()));
-            }
+        if !self.cache.read().await.initialized {
+            record::record_of(&updates)?;
+            self.ensure_loaded().await?;
         }
-
-        // Use add_contact which handles the update-if-exists flow
-        // It will find the existing output by tag and spend/replace it
+        if self.cache.read().await.get(identity_key).is_none() {
+            return Err(Error::ContactNotFound(identity_key.to_string()));
+        }
+        // `add_contact` finds the existing output by tag and replaces it.
         self.add_contact(updates).await
     }
 
