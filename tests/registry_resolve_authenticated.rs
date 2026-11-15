@@ -1,5 +1,5 @@
-//! The registry resolves return a definition only when they can
-//! authenticate it as its named operator's: `resolve_basket`,
+//! The registry resolves return no unsigned definition and none locked
+//! by a key not its operator's: `resolve_basket`,
 //! `resolve_protocol` and `resolve_certificate` return no definition locked
 //! by a key that is not its operator's, nor one its operator's own key locks
 //! without the operator's signature; the lookup is still asked, and a lookup
