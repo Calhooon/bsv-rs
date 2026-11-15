@@ -392,7 +392,7 @@ fn published(json: &str) -> OutputListItem {
         json.as_bytes(),
     );
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, locking)).unwrap();
     // Proven by a block of its own, the evidence the identity parsers'

@@ -18,7 +18,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code
 
 use bsv_rs::script::LockingScript;
-use bsv_rs::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::transaction::{Beef, Transaction, TransactionInput, TransactionOutput, Txid};
 
 fn out(v: u64) -> TransactionOutput {
     TransactionOutput::new(v, LockingScript::from_binary(&[0x51]).unwrap())
@@ -26,20 +26,28 @@ fn out(v: u64) -> TransactionOutput {
 
 fn source(tag: u8) -> Transaction {
     let mut t = Transaction::new();
-    t.inputs_mut()
-        .push(TransactionInput::new(format!("{tag:02x}").repeat(32), 0));
+    t.inputs_mut().push(TransactionInput::new(
+        (format!("{tag:02x}").repeat(32)).parse().unwrap(),
+        0,
+    ));
     t.outputs_mut().push(out(1000 + u64::from(tag)));
     t
 }
 
 /// A transaction of two inputs naming `text`, linked to sources 1 and 2.
+/// Since #845 a text that does not parse is no `Txid` and cannot be held:
+/// such an input names no txid, and its outpoint is its source's id, as the
+/// serializer read the unparsed text until then.
 fn child(text: &str) -> (Transaction, [String; 2]) {
     let mut c = Transaction::new();
     let mut ids = [String::new(), String::new()];
     for (k, tag) in [1u8, 2].into_iter().enumerate() {
         let s = source(tag);
         ids[k] = s.id();
-        let mut i = TransactionInput::new(text.into(), 0);
+        let mut i = TransactionInput {
+            source_txid: Txid::from_hex(text).ok(),
+            ..TransactionInput::default()
+        };
         i.source_transaction = Some(Box::new(s));
         c.inputs_mut().push(i);
     }

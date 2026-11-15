@@ -55,7 +55,7 @@ fn op_true() -> LockingScript {
 fn spend(spends: &[(String, u32)], outputs: usize) -> Transaction {
     let mut tx = Transaction::new();
     for (txid, vout) in spends {
-        let mut input = TransactionInput::new(txid.clone(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.inputs_mut().push(input);
     }

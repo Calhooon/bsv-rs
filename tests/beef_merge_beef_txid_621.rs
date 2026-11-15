@@ -334,7 +334,8 @@ fn held_with_its_source_link(source: &Beef) -> Option<(Beef, String, usize)> {
     source.txs.iter().find_map(|t| {
         let mut child = Transaction::from_binary(t.raw_tx()?).ok()?;
         let (at, parent) = child.inputs().iter().enumerate().find_map(|(at, input)| {
-            let parent = source.find_txid(input.source_txid.as_deref()?)?;
+            let named = input.source_txid.map(|t| t.to_string())?;
+            let parent = source.find_txid(&named)?;
             Some((at, Transaction::from_binary(parent.raw_tx()?).ok()?))
         })?;
         child.inputs_mut()[at].source_transaction = Some(Box::new(parent));

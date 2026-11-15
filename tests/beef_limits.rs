@@ -18,7 +18,7 @@ use bsv_rs::transaction::{
 fn chain_beef(n: usize) -> (Beef, String) {
     let lock = LockingScript::from_binary(&[0x51]).expect("OP_TRUE");
     let mut funding = Transaction::new();
-    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    let mut input = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::new());
     funding.inputs_mut().push(input);
     funding
@@ -31,7 +31,7 @@ fn chain_beef(n: usize) -> (Beef, String) {
         .expect("the bytes are one transaction");
     for _ in 1..n {
         let mut tx = Transaction::new();
-        let mut input = TransactionInput::new(prev, 0);
+        let mut input = TransactionInput::new(prev.parse().unwrap(), 0);
         input.unlocking_script = Some(UnlockingScript::new());
         tx.inputs_mut().push(input);
         tx.outputs_mut()

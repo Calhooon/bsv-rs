@@ -28,7 +28,7 @@ const ELEMENT: usize = 1_000_000;
 /// `version` spending its output 0 with `unlock`.
 fn child_of(lock: &[u8], unlock: Script, version: u32) -> Transaction {
     let mut parent = Transaction::new();
-    let mut funding = TransactionInput::new("aa".repeat(32), 0);
+    let mut funding = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     funding.unlocking_script = Some(UnlockingScript::new());
     parent.inputs_mut().push(funding);
     parent.outputs_mut().push(TransactionOutput::new(
@@ -37,7 +37,7 @@ fn child_of(lock: &[u8], unlock: Script, version: u32) -> Transaction {
     ));
     parent.merkle_path = Some(MerklePath::from_coinbase_txid(&parent.id(), 800_000));
 
-    let mut input = TransactionInput::new(parent.id(), 0);
+    let mut input = TransactionInput::new(parent.txid(), 0);
     input.unlocking_script = Some(UnlockingScript::from_script(unlock));
     input.source_transaction = Some(Box::new(parent));
     let mut child = Transaction::new();

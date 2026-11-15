@@ -78,7 +78,7 @@ fn bump(txid: &str) -> MerklePath {
 /// proven by a path of its own.
 fn root(fill: &str, sats: u64, outs: usize) -> Transaction {
     let mut t = Transaction::new();
-    let mut i = TransactionInput::new(fill.repeat(32), 0);
+    let mut i = TransactionInput::new(fill.repeat(32).parse().unwrap(), 0);
     i.unlocking_script = unlock(&[]);
     t.add_input(i).unwrap();
     for _ in 0..outs {
@@ -112,7 +112,7 @@ fn link(
 ) -> TransactionInput {
     let named = named.unwrap_or_else(|| src.id());
     let mut i = TransactionInput::with_source_transaction(src, vout);
-    i.source_txid = Some(named);
+    i.source_txid = Some(named.parse().unwrap());
     i.unlocking_script = unlocking.and_then(unlock);
     i
 }
@@ -432,8 +432,11 @@ async fn a_named_txid_of_another_reachable_transaction_is_refused_at_verify_848(
 async fn a_txid_text_in_upper_case_over_its_own_source_is_signed_and_verified_848() {
     for cell in ["upper_matching", "upper_matching_proven"] {
         let tx = build(cell);
-        let named = tx.inputs()[0].source_txid.clone().unwrap();
-        assert_eq!(named, named.to_uppercase(), "{cell}: held as given");
+        // Held as a `Txid` since #845 (as given, in upper case, until then):
+        // the same id as its source's.
+        let named = tx.inputs()[0].source_txid.unwrap();
+        let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
+        assert_eq!(named, source.txid(), "{cell}: the source's id");
         assert_eq!(verify(&tx).await, Ok(true), "{cell}");
         let (answer, calls, _, _) = sign(tx).await;
         assert_eq!((answer, calls), (Ok(()), 1), "{cell}");
@@ -484,7 +487,7 @@ async fn a_descriptor_source_is_still_signed_848() {
             source.inputs().is_empty() && source.merkle_path.is_none(),
             "{door}"
         );
-        assert_ne!(Some(source.id()), tx.inputs()[0].source_txid, "{door}");
+        assert_ne!(Some(source.txid()), tx.inputs()[0].source_txid, "{door}");
         assert_eq!(tx.sign().await, Ok(()), "{door}");
         assert!(tx.inputs()[0].unlocking_script.is_some(), "{door}");
         assert_eq!(
@@ -505,16 +508,16 @@ async fn a_descriptor_source_is_still_signed_848() {
         .ends_with(VERIFY_WORDS));
 }
 
-/// A text that is not 64 hex digits is outside #848: the serializer writes
-/// the linked source's hash, so nothing disagrees and `sign` runs.
+/// A text that is not 64 hex digits is outside #848, and since #845 it is
+/// no `Txid`: refused where it enters, never held beside a source. The
+/// input then names no txid, the serializer writes the linked source's
+/// hash, nothing disagrees and `sign` runs.
 #[tokio::test]
 async fn a_txid_text_that_does_not_parse_is_not_a_mismatch_848() {
-    let tx = child(vec![link(
-        root("11", 1000, 1),
-        Some("zz".to_string()),
-        0,
-        Some(&[]),
-    )]);
+    assert!("zz".parse::<bsv_rs::transaction::Txid>().is_err());
+    let mut input = link(root("11", 1000, 1), None, 0, Some(&[]));
+    input.source_txid = None;
+    let tx = child(vec![input]);
     let (answer, calls, _, _) = sign(tx).await;
     assert_eq!((answer, calls), (Ok(()), 1));
 }

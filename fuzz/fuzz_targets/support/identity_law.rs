@@ -8,10 +8,10 @@
 
 use std::collections::HashMap;
 
-use bsv_rs::primitives::{from_hex, sha256d, to_hex};
+use bsv_rs::primitives::{sha256d, to_hex};
 use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{
-    Beef, Transaction, TransactionInput, TransactionOutput, TransactionParts,
+    Beef, Transaction, TransactionInput, TransactionOutput, TransactionParts, Txid,
 };
 
 /// Edits per input, at most.
@@ -35,15 +35,10 @@ fn var_int(out: &mut Vec<u8>, n: u64) {
     }
 }
 
-/// The input's outpoint txid when its `source_txid` is hex of exactly 32
-/// bytes (internal order), the serializer's `Named` arm.
+/// The input's outpoint txid when it holds a `source_txid` (internal
+/// order), the serializer's `Named` arm.
 fn named(input: &TransactionInput) -> Option<[u8; 32]> {
-    let mut b: [u8; 32] = from_hex(input.source_txid.as_deref()?)
-        .ok()?
-        .try_into()
-        .ok()?;
-    b.reverse();
-    Some(b)
+    input.source_txid.map(|txid| *txid.as_wire_bytes())
 }
 
 /// The fields' bytes, by the serializer's rule (#869's second fold): an
@@ -255,7 +250,7 @@ fn edit(tx: &mut Transaction, op: u8, b: &mut Bytes<'_>) -> &'static str {
             "set_lock_time"
         }
         2 if room => {
-            let txid = to_hex(&[b.next(); 32]);
+            let txid = Txid::from_display_bytes([b.next(); 32]);
             tx.inputs_mut().push(TransactionInput::new(txid, b.u32()));
             "inputs_mut().push"
         }
@@ -322,15 +317,18 @@ fn edit(tx: &mut Transaction, op: u8, b: &mut Bytes<'_>) -> &'static str {
             "a linked source's set_lock_time"
         }
         12 if !tx.inputs().is_empty() => {
-            // A txid text the serializer cannot read (#869's second fold):
-            // the outpoint is then the linked source's hash, or zeros.
+            // A txid text the serializer could not read (#869's second
+            // fold) is no `Txid` since #845: refused at the door, the input
+            // names none and the outpoint is the linked source's hash, or
+            // zeros.
             let i = usize::from(b.next()) % tx.inputs().len();
             let text = match b.next() % 3 {
                 0 => "zz".repeat(32),
                 1 => String::new(),
                 _ => "ab".repeat(31),
             };
-            tx.inputs_mut()[i].source_txid = Some(text);
+            assert!(Txid::from_hex(&text).is_err(), "{text:?} read as a txid");
+            tx.inputs_mut()[i].source_txid = Txid::from_hex(&text).ok();
             "inputs_mut()[i].source_txid odd"
         }
         13 if room && !tx.inputs().is_empty() => {
@@ -347,8 +345,7 @@ fn edit(tx: &mut Transaction, op: u8, b: &mut Bytes<'_>) -> &'static str {
             if let Some(source) = linked {
                 let mut other = *source;
                 other.set_lock_time(other.lock_time() ^ (b.u32() | 1));
-                let mut input = TransactionInput::new(String::new(), 0);
-                input.source_transaction = Some(Box::new(other));
+                let input = TransactionInput::with_source_transaction(other, 0);
                 tx.inputs_mut().push(input);
             }
             let text = match b.next() % 3 {
@@ -357,7 +354,7 @@ fn edit(tx: &mut Transaction, op: u8, b: &mut Bytes<'_>) -> &'static str {
                 _ => to_hex(&[b.next(); 32]),
             };
             for input in tx.inputs_mut().iter_mut() {
-                input.source_txid = Some(text.clone());
+                input.source_txid = Txid::from_hex(&text).ok();
             }
             "every input's source_txid one text"
         }

@@ -21,7 +21,7 @@ fn stop(chain: ChainParams, coin: u32, tip_height: u32) -> Stop {
 #[cfg(test)]
 fn stop_with_evaluation(evaluation: Evaluation, coin: u32, tip_height: u32) -> Stop {
     let mut parent = Transaction::new();
-    let mut input = TransactionInput::new("aa".repeat(32), 0);
+    let mut input = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::new());
     parent.add_input(input).unwrap();
     parent

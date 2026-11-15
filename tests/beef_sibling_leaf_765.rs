@@ -41,7 +41,7 @@ const HEIGHT: u32 = 964_422;
 fn tx(inputs: &[(&str, u32)], sats: u64) -> Transaction {
     let mut t = Transaction::new();
     for (txid, vout) in inputs {
-        let mut input = TransactionInput::new(txid.to_string(), *vout);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), *vout);
         input.unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
         t.inputs_mut().push(input);
     }

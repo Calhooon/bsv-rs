@@ -95,7 +95,7 @@ fn an_hmac_verify_policy_hashes_as_it_compares_908() {
 /// caller holds an `InputVerified`. The spending transaction is one input of
 /// the zero outpoint with an empty unlocking script, no output, lock time 0.
 fn verified(locking_script: &[u8]) -> InputVerified {
-    let mut input = TransactionInput::new("00".repeat(32), 0);
+    let mut input = TransactionInput::new("00".repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_binary(&[]).unwrap());
     let spending = Transaction::with_params(2, vec![input], vec![], 0).to_binary();
     verify_input(

@@ -266,7 +266,7 @@ fn the_batch_door_answers_as_the_per_call_door_on_every_vector_beef_817() {
 
 /// A transaction spending `source`:0 with one output.
 fn spending(source: &str) -> Transaction {
-    let mut input = TransactionInput::new(source.to_string(), 0);
+    let mut input = TransactionInput::new(source.parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
     tx.add_input(input).unwrap();

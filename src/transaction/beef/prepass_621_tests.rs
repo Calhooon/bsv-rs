@@ -90,7 +90,7 @@ fn by_hand_53() -> Transaction {
     Transaction::with_params(
         1,
         vec![crate::transaction::TransactionInput::new(
-            FRESH.to_string(),
+            FRESH.parse().unwrap(),
             0,
         )],
         vec![crate::transaction::TransactionOutput::new(

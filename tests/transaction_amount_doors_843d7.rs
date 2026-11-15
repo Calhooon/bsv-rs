@@ -184,7 +184,7 @@ fn with_second_input(v: &Value, linked: bool, unlocking: bool) -> Transaction {
     let s = &v["transaction"]["second_input"];
     let mut tx = base(v);
     let mut input = TransactionInput::new(
-        s["txid"].as_str().unwrap().to_string(),
+        s["txid"].as_str().unwrap().parse().unwrap(),
         s["vout"].as_u64().unwrap() as u32,
     );
     input.sequence = s["sequence"].as_u64().unwrap() as u32;
@@ -448,7 +448,8 @@ fn to_ef_on_an_input_that_names_no_txid_refuses_as_the_reference_843d7() {
                 let mut tx = unnamed_base(&v, false, 0);
                 place_unnamed(&mut tx, 0, "source_other_output", TWO_53);
                 let s = &v["transaction"]["second_input"];
-                let mut input = TransactionInput::new(s["txid"].as_str().unwrap().to_string(), 0);
+                let mut input =
+                    TransactionInput::new(s["txid"].as_str().unwrap().parse().unwrap(), 0);
                 input.unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
                 tx.inputs_mut().push(input);
                 tx
@@ -546,7 +547,10 @@ fn the_three_orders_the_strength_read_named_are_the_references_843d7() {
 /// The recorder's `namedInput`: the vector's `walk.named_txid`, output 0,
 /// linked to `source`, `OP_1` its unlocking script unless absent.
 fn named_input(v: &Value, source: Transaction, unlocking: bool) -> TransactionInput {
-    let mut input = TransactionInput::new(v["walk"]["named_txid"].as_str().unwrap().to_string(), 0);
+    let mut input = TransactionInput::new(
+        v["walk"]["named_txid"].as_str().unwrap().parse().unwrap(),
+        0,
+    );
     if unlocking {
         input.unlocking_script = Some(UnlockingScript::from_hex("51").unwrap());
     }
@@ -768,7 +772,7 @@ impl WalkCase {
         let op1 = || LockingScript::from_hex("51").unwrap();
         let input = |named: bool, source: Transaction| {
             let mut input = if named {
-                let mut input = TransactionInput::new(named_txid.to_string(), 0);
+                let mut input = TransactionInput::new(named_txid.parse().unwrap(), 0);
                 input.source_transaction = Some(Box::new(source));
                 input
             } else {
@@ -1043,7 +1047,7 @@ impl Plan {
             .inputs
             .iter()
             .map(|i| {
-                let mut input = TransactionInput::new(i.txid.clone(), i.vout);
+                let mut input = TransactionInput::new(i.txid.parse().unwrap(), i.vout);
                 input.unlocking_script = Some(UnlockingScript::from_binary(&i.unlocking).unwrap());
                 input.sequence = i.sequence;
                 if !i.named {
@@ -1250,7 +1254,9 @@ fn the_writer_is_the_nodes_serializer_stated_843d7() {
 
     // tx-00026 rebuilt from its fields is the node oracle's bytes.
     let mut input = TransactionInput::new(
-        "067d582185c18f53921ccac596df15c55ed0cda02723bce8fb4bc6aff2246363".to_string(),
+        "067d582185c18f53921ccac596df15c55ed0cda02723bce8fb4bc6aff2246363"
+            .parse()
+            .unwrap(),
         0,
     );
     input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());

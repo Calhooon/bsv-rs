@@ -50,7 +50,7 @@ impl Actions {
         if tx.inputs().is_empty() {
             let mut funding = Transaction::new();
             funding
-                .add_input(TransactionInput::new("11".repeat(32), 0))
+                .add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
                 .unwrap();
             let value = args.outputs.iter().flatten().map(|o| o.satoshis).sum();
             funding

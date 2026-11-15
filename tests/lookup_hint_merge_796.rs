@@ -75,7 +75,7 @@ fn beef_of(name: &str) -> (Vec<u8>, String) {
         _ => 3,
     };
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+    tx.add_input(TransactionInput::new("11".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(
         satoshis,

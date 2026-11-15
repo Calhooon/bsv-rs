@@ -39,7 +39,7 @@ pub fn accepting_wire_action(call: WalletCall, mut case: Case) -> Case {
     use bsv_rs::script::{LockingScript, UnlockingScript};
     use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
     let mut parent = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::new());
     parent.add_input(input).unwrap();
     parent

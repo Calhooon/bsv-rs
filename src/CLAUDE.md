@@ -44,7 +44,7 @@ The crate root re-exports commonly used types for ergonomic imports:
 |--------|------------|
 | `primitives` | `PrivateKey`, `PublicKey`, `Signature`, `SymmetricKey`, `BigNumber`, `sha256`, `sha256d`, `hash160`, `to_hex`, `from_hex` |
 | `script` | `Script`, `ScriptChunk`, `Address`, `LockingScript`, `UnlockingScript` |
-| `transaction` | `Transaction`, `TransactionInput`, `TransactionOutput`, `TransactionParts`, `TransactionPartsMut` (#869's fold), `ChangeDistribution` |
+| `transaction` | `Transaction`, `TransactionInput`, `TransactionOutput`, `TransactionParts`, `TransactionPartsMut` (#869's fold), `Txid` (#845), `ChangeDistribution` |
 | `wallet` | `KeyDeriver`, `KeyDeriverApi`, `CachedKeyDeriver`, `CacheConfig`, `ProtoWallet`, `Protocol`, `Counterparty`, `SecurityLevel` |
 | `messages` | `sign`, `verify`, `encrypt`, `decrypt` |
 | `compat` | `Mnemonic`, `Language`, `WordCount` |

@@ -66,7 +66,7 @@ const SERVICE: &str = "ls_freeform_815";
 fn beef_of(name: &str) -> (Vec<u8>, String) {
     let satoshis = if name == "A" { 1 } else { 2 };
     let mut tx = Transaction::new();
-    tx.add_input(TransactionInput::new("15".repeat(32), 0))
+    tx.add_input(TransactionInput::new("15".repeat(32).parse().unwrap(), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(
         satoshis,

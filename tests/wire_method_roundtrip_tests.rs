@@ -1217,7 +1217,7 @@ mod action_tests {
         // #487: use a framed source so this remains a serialization test,
         // rather than an inputBEEF argument refusal before transmission.
         let mut source = Transaction::new();
-        let mut funding = TransactionInput::new(hex::encode(sample_txid()), 0);
+        let mut funding = TransactionInput::new(hex::encode(sample_txid()).parse().unwrap(), 0);
         funding.unlocking_script = Some(UnlockingScript::new());
         source.add_input(funding).unwrap();
         source

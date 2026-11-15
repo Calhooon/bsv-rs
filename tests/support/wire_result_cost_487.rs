@@ -19,7 +19,7 @@ impl WalletWire for Fixed {
 
 pub fn fixture(mib: usize, bind_output: bool) -> (CreateActionArgs, Vec<u8>) {
     let mut parent = Transaction::new();
-    let mut input = TransactionInput::new("11".repeat(32), 0);
+    let mut input = TransactionInput::new("11".repeat(32).parse().unwrap(), 0);
     input.unlocking_script = Some(UnlockingScript::new());
     parent.add_input(input).unwrap();
     parent

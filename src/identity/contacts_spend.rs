@@ -35,7 +35,7 @@ pub(super) fn input_outpoint(tx: &Transaction, index: usize) -> Result<String> {
         .inputs()
         .get(index)
         .ok_or_else(|| refused("Contact transaction input is malformed"))?;
-    let embedded = input.source_transaction.as_ref().map(|t| t.id());
+    let embedded = input.source_transaction.as_ref().map(|t| t.txid());
     if let (Some(named), Some(embedded)) = (&input.source_txid, &embedded) {
         if named != embedded {
             return Err(refused("Contact transaction input source mismatch"));
@@ -43,9 +43,7 @@ pub(super) fn input_outpoint(tx: &Transaction, index: usize) -> Result<String> {
     }
     let txid = input
         .source_txid
-        .clone()
         .or(embedded)
-        .filter(|t| t.len() == 64 && t.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
         .ok_or_else(|| refused("Contact transaction input has no canonical source ID"))?;
     Ok(format!("{txid}.{}", input.source_output_index))
 }

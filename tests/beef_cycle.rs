@@ -69,7 +69,7 @@ fn bounded<T: Send + 'static>(name: &str, f: impl FnOnce() -> T + Send + 'static
 fn tx(spends: &[&str]) -> Transaction {
     let mut t = Transaction::new();
     for txid in spends {
-        let mut input = TransactionInput::new(txid.to_string(), 0);
+        let mut input = TransactionInput::new(txid.parse().unwrap(), 0);
         input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
         t.inputs_mut().push(input);
     }
@@ -346,7 +346,7 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
         let last = ids[n - 1].clone();
         let renamed = beef
             .edit_tx(&ids[0], |tx| {
-                tx.inputs_mut()[0].source_txid = Some(last.clone());
+                tx.inputs_mut()[0].source_txid = Some(last.parse().unwrap());
                 tx.id()
             })
             .unwrap();

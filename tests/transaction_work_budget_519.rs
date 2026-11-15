@@ -21,7 +21,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let mut parent = Transaction::new();
-        let mut dummy = TransactionInput::new("aa".repeat(32), 0);
+        let mut dummy = TransactionInput::new("aa".repeat(32).parse().unwrap(), 0);
         dummy.set_unlocking_script(UnlockingScript::new());
         parent.add_input(dummy).unwrap();
         for _ in 0..3 {

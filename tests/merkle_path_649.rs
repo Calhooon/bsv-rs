@@ -131,7 +131,7 @@ fn one_leaf(shape: &Shape) -> MerklePath {
 fn unproven() -> Transaction {
     let mut tx = Transaction::new();
     tx.inputs_mut()
-        .push(TransactionInput::new("11".repeat(32), 0));
+        .push(TransactionInput::new("11".repeat(32).parse().unwrap(), 0));
     let lock = LockingScript::from_binary(&[0x51]).unwrap();
     tx.outputs_mut().push(TransactionOutput::new(1, lock));
     tx

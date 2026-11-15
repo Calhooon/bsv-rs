@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::input::TransactionInput;
 use super::output::TransactionOutput;
 use super::transaction::Transaction;
+use super::Txid;
 use crate::script::{LockingScript, UnlockingScript};
 use crate::Result;
 
@@ -211,12 +212,11 @@ impl Transaction {
 /// held as given and a text the writer could not read was written as 32 zero
 /// bytes, so `"zz"`, `"abcd"` and `""` were one transaction.
 fn input_from_json(index: usize, ij: &InputJson) -> Result<TransactionInput> {
-    let txid = &ij.txid;
-    if txid.len() != 64 || !txid.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(crate::Error::TransactionError(format!(
+    let txid = Txid::from_hex(&ij.txid).map_err(|_| {
+        crate::Error::TransactionError(format!(
             "Invalid txid of input {index}: expected 64 hex digits"
-        )));
-    }
+        ))
+    })?;
     let unlocking_script = if ij.unlocking_script.is_empty() {
         None
     } else {
@@ -225,7 +225,7 @@ fn input_from_json(index: usize, ij: &InputJson) -> Result<TransactionInput> {
 
     Ok(TransactionInput {
         source_transaction: None,
-        source_txid: Some(txid.to_ascii_lowercase()),
+        source_txid: Some(txid),
         source_output_index: ij.vout,
         unlocking_script,
         unlocking_script_template: None,
@@ -327,7 +327,9 @@ mod tests {
         tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
-                "3c8edde27cb9a9132c22038dac4391496be9db16fd21351565cc1006966fdad5".to_string(),
+                "3c8edde27cb9a9132c22038dac4391496be9db16fd21351565cc1006966fdad5"
+                    .parse()
+                    .unwrap(),
             ),
             source_output_index: 0,
             unlocking_script: Some(UnlockingScript::from_hex("00").unwrap()),
@@ -338,7 +340,9 @@ mod tests {
         tx.inputs_mut().push(TransactionInput {
             source_transaction: None,
             source_txid: Some(
-                "a2a55ecc61f418e300888b1f82eaf84024496b34e3e538f3d32d342fd753adab".to_string(),
+                "a2a55ecc61f418e300888b1f82eaf84024496b34e3e538f3d32d342fd753adab"
+                    .parse()
+                    .unwrap(),
             ),
             source_output_index: 2,
             unlocking_script: Some(UnlockingScript::from_hex("5151").unwrap()),
@@ -419,7 +423,7 @@ mod tests {
         assert_eq!(tx.inputs().len(), 1);
         assert_eq!(tx.outputs().len(), 1);
         assert_eq!(
-            tx.inputs()[0].source_txid.as_deref().unwrap(),
+            tx.inputs()[0].source_txid.unwrap(),
             "3c8edde27cb9a9132c22038dac4391496be9db16fd21351565cc1006966fdad5"
         );
         assert_eq!(tx.inputs()[0].source_output_index, 0);

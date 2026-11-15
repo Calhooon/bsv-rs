@@ -241,7 +241,7 @@ fn signed_two_input_spend() -> (Vec<u8>, Vec<(u64, LockingScript)>) {
         PrivateKey::from_hex(&"22".repeat(32)).unwrap(),
     ];
     let mut funding = Transaction::new();
-    let mut mined = TransactionInput::new("33".repeat(32), 0);
+    let mut mined = TransactionInput::new("33".repeat(32).parse().unwrap(), 0);
     mined.unlocking_script = Some(UnlockingScript::new());
     funding.add_input(mined).unwrap();
     for (key, sats) in keys.iter().zip([10_000u64, 20_000]) {
