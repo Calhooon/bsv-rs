@@ -102,6 +102,7 @@ const CUTS_NO_TEXT: &[(&str, &str, &str)] = &[
         WRITES,
     ),
     ("script/templates/pushdrop_wallet.rs", "lock_with_wallet", SENDS),
+    ("script/templates/pushdrop_wallet_unlock.rs", "unlock_with_wallet", SENDS),
     ("storage/downloader.rs", "resolve download download", URLS),
     ("storage/uploader.rs", "find_file find_file renew_file renew_file", URLS),
     (
