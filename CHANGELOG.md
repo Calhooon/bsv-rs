@@ -49,14 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The fix. `set` (and `batch_set`, through it) answers `Error::KvStoreInvalidValue` for an empty value, beside the empty key's refusal, before the wallet is asked anything. Every other value writes the same token as before.
 - Honest calls, by run. 20,000 honest `set` calls (keys and values of a mixed alphabet, tags or none, 1,240 with an empty value, 1,279 with a protocol option), each made with this change and without it: 1,240 answer differently, every one an empty value (the refusal, where the wallet was asked to write a token), and the other 18,760 ask the wallet to write the same bytes and answer the same, one digest.
 - The tests. `tests/kvstore_global_tests.rs` `an_empty_value_is_refused_before_the_wallet_is_asked`: `set` with and without tags, and `batch_set`, the refusal; a wallet that refuses its identity key (the first call `set` makes) shows no call was made, and a signing wallet is asked to write nothing. RED without the change (the wallet was asked).
-- Migration. No signature moved. `set(key, "", ..)` and `batch_set` with an empty value now return `Err(Error::KvStoreInvalidValue)` where they wrote a token. Where code set an empty value to clear a key, remove the key:
-
-  ```rust
-  match store.remove(key, None).await {
-      Ok(_) | Err(Error::KvStoreKeyNotFound(_)) => {}
-      Err(e) => return Err(e),
-  }
-  ```
+- Migration. No signature moved. `set(key, "", ..)` and `batch_set` with an empty value now return `Err(Error::KvStoreInvalidValue)` where they wrote a token. Where code set an empty value to clear a key, it removes the key, as the interpreter's entry above shows (`remove`, with `KvStoreKeyNotFound` read as already clear).
 
 ### Fixed: the SLAP and SHIP discoveries admit a host only from an advertisement its identity's linked key signed and locks, as the reference's do (#544's discovery sites, ported from beta `a21d02ad`)
 
@@ -76,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Not in this patch. #544's location and envelope checks (an `https` location alone, the canonical envelope, the integers' encodings) and its one-host-per-location rule are beta's.
 - Migration. No signature moved. An advertisement its host did not sign, or one for another file, no longer names a host.
 
-### Honest input, by run
+### Honest input, by run: the KVStore interpreter, the two discoveries and the storage downloader (the three entries of #544's ported sites above)
 
 A differential of 20,000 honest inputs per door kind (the kvstore tokens of both forms, with and without tags, through `interpret_script` with no context, a matching and a missing one, and `interpret`; `create_signed_overlay_admin_token` advertisements through both discoveries; signed UHRP advertisements, some `http`, some expired, through `resolve`), made by each build's own writers from fixed seeds: the inputs' and the answers' digests are equal on the published `0.8.9` (`origin/main`) and on this release without the entry GHSA-4mcm-g5xq-jv3r's change; with it, the discoveries' and the downloader's answers stay equal, and of the kvstore inputs every one of the earlier form (10,008) reads no entry and every canonical one (9,992) reads as before. A second one, of 20,000 honest kvstore inputs (half written by `GlobalKVStore::set` itself, a sixteenth of those with a `protocol_id` option; half in the canonical form; a sixteenth of each written for an empty value), read the same four ways on this release's first three commits: the inputs are byte-equal on both builds, and the answers of 1,872 differ from `0.8.9`'s, every one of the two kinds the kvstore Migration names (629 written with a protocol option, 1,243 for an empty value), each of them now no entry, and no other input's.
 
