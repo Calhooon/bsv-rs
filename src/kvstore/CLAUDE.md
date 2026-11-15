@@ -17,7 +17,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
 | `local.rs` | LocalKVStore implementation with MockWallet tests | ~1743 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~826 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`) before the wallet is asked | ~838 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~609 |
 | `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged; on this line it answers `true` for untagged and namespace tokens their controller signed, which `verify_signature` answers `false` (`tests/kvstore_legacy_signature_verdict.rs`) | 94 |
 | `token_validation.rs` | The interpreter's authentication of a token (crate-internal; #544's interpreter site) | ~110 |
@@ -129,6 +129,7 @@ Public key-value store using the overlay network.
 - **History building**: Uses `SyncHistorian` to traverse transaction ancestry for entry history
 - **Overlay broadcast**: Broadcasts tokens via `TopicBroadcaster`
 - **Batch operations**: `batch_get`, `batch_set`, `batch_remove` for multi-key operations
+- **Empty value refused**: `set` and `batch_set` answer `Error::KvStoreInvalidValue` for an empty value before the wallet is asked, as `LocalKVStore` and the reference do (an empty value's token is no entry)
 
 ### Methods
 

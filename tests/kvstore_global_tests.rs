@@ -2109,6 +2109,52 @@ async fn a_token_signed_over_an_empty_value_is_no_entry_544() {
     );
 }
 
+/// `set` refuses an empty value before it asks the wallet anything, as the
+/// reference's `validateKVStoreValue` and `LocalKVStore::set` do: the first
+/// call `set` makes is the wallet's identity key, which the first wallet
+/// refuses, so the answer shows no call was made; a signing wallet is asked
+/// to write nothing, through `set` and `batch_set`.
+#[tokio::test]
+async fn an_empty_value_is_refused_before_the_wallet_is_asked() {
+    for tags in [None, Some(vec!["t".to_string()])] {
+        let options = KVStoreSetOptions {
+            tags,
+            ..Default::default()
+        };
+        let refusing = GlobalKVStore::new(
+            MockWallet::new().with_get_public_key_error(),
+            KVStoreConfig::default(),
+        );
+        assert_eq!(
+            refusing.set("k", "", Some(options.clone())).await,
+            Err(Error::KvStoreInvalidValue)
+        );
+        let wallet = MockWallet::signing(&PrivateKey::random());
+        let written = wallet.written.clone();
+        let config = KVStoreConfig::default();
+        let resolver = LookupResolver::new(LookupResolverConfig {
+            network_preset: NetworkPreset::Local,
+            facilitator: Some(Arc::new(EmptyLookupFacilitator)),
+            slap_trackers: Some(Vec::new()),
+            host_overrides: Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec![format!("https://set-empty-{}.invalid", key_hosts())],
+            )])),
+            ..Default::default()
+        });
+        let store = GlobalKVStore::with_resolver(wallet, config, NetworkPreset::Local, resolver);
+        assert_eq!(
+            store.set("k", "", Some(options)).await,
+            Err(Error::KvStoreInvalidValue)
+        );
+        assert_eq!(
+            store.batch_set(&[("k", "")]).await,
+            Err(Error::KvStoreInvalidValue)
+        );
+        assert!(written.lock().unwrap().is_empty());
+    }
+}
+
 /// A lookup host that answers every question with the same outputs.
 struct AnsweringLookupFacilitator(Vec<OutputListItem>);
 
