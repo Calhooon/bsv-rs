@@ -82,7 +82,7 @@ use sha2::{Digest, Sha256};
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::{to_hex, Reader, Writer};
-use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
+use crate::script::{p2sh_redeem::Redeem, LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError, MockChainTracker};
@@ -2448,18 +2448,17 @@ impl BeefIndex {
             .enumerate()
             .skip(from as usize)
         {
-            // The clock between inputs (bsv-low #591): one transaction of
-            // many inputs is no longer one uninterruptible step.
+            // The clock between inputs (bsv-low #591): a transaction of many inputs yields.
             if vin > from as usize && spent() {
                 return Ok(Some(vin as u32));
             }
             let script_error =
                 |message: String| refuse(input.at, Some(vin as u32), SpendRefusal::Script(message));
-            let locking_script = LockingScript::from_binary(&source.script)
-                .map_err(|e| script_error(e.to_string()))?;
-            let unlocking_script = UnlockingScript::from_binary(&body.raw[input.script.clone()])
-                .map_err(|e| script_error(e.to_string()))?;
-            let mut spend = Spend::with_transaction(TxSpendParams {
+            let parsed = |e: crate::Error| script_error(e.to_string());
+            let raw = &body.raw[input.script.clone()];
+            let locking_script = LockingScript::from_binary(&source.script).map_err(parsed)?;
+            let unlocking_script = UnlockingScript::from_binary(raw).map_err(parsed)?;
+            let params = TxSpendParams {
                 transaction: shared.clone(),
                 input_index: vin,
                 source_satoshis: source.satoshis,
@@ -2467,9 +2466,10 @@ impl BeefIndex {
                 unlocking_script,
                 memory_limit: None,
                 work_limit,
-            })
-            .map_err(|e| script_error(e.to_string()))?;
-            match spend.validate() {
+            };
+            let step = Redeem::of(&source.script, raw, &params, true);
+            let spend = Spend::with_transaction(params).map_err(parsed)?;
+            match Redeem::judge(step, spend, |_| {}).0 {
                 Ok(true) => {}
                 Ok(false) => return Err(script_error("the script did not succeed".to_string())),
                 Err(e) => {

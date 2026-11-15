@@ -1671,7 +1671,7 @@ impl Transaction {
         fee_model: Option<&dyn super::FeeModel>,
     ) -> Result<bool> {
         use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-        use crate::script::{Spend, TxSpendParams};
+        use crate::script::{p2sh_redeem::Redeem, Spend, TxSpendParams};
 
         let by_txid = self.reachable_by_txid();
         let overflow = || crate::Error::TransactionError("Input satoshis overflow".to_string());
@@ -1805,21 +1805,19 @@ impl Transaction {
                     ))
                 })?;
 
-                let mut spend = Spend::with_transaction(TxSpendParams {
+                let (lock, unlock) = (locking_script.to_binary(), unlocking_script.to_binary());
+                let params = TxSpendParams {
                     transaction: shared.clone(),
                     input_index: vin,
                     source_satoshis,
-                    locking_script: LockingScript::from_script(crate::script::Script::from_binary(
-                        &locking_script.to_binary(),
-                    )?),
-                    unlocking_script: UnlockingScript::from_script(
-                        crate::script::Script::from_binary(&unlocking_script.to_binary())?,
-                    ),
+                    locking_script: LockingScript::from_binary(&lock)?,
+                    unlocking_script: UnlockingScript::from_binary(&unlock)?,
                     memory_limit: None,
                     work_limit: None,
-                })?;
-
-                spend.validate().map_err(|e| {
+                };
+                let step = Redeem::of(&lock, &unlock, &params, true);
+                let spend = Spend::with_transaction(params)?;
+                Redeem::judge(step, spend, |_| {}).0.map_err(|e| {
                     crate::Error::TransactionError(format!(
                         "Script validation failed for input {}: {}",
                         vin, e.message

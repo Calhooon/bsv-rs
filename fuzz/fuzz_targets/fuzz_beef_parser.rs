@@ -2,10 +2,86 @@
 #![allow(deprecated)]
 use std::collections::HashMap;
 
+use bsv_rs::primitives::bsv::sighash::{TxInput, TxOutput};
+use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+use bsv_rs::transaction::beef_stream::{ChainTip, Hash32, Headers};
 use bsv_rs::transaction::{
-    verify_stream_structure, Beef, BeefLimits, Kind, MerklePath, Transaction, Verdict,
+    verify_stream, verify_stream_structure, Beef, BeefLimits, Kind, MerklePath, Transaction,
+    Verdict,
 };
 use libfuzzer_sys::fuzz_target;
+
+/// Every root carried, at a tip past every chain's Genesis: the reader runs
+/// the scripts of whatever the bytes prove.
+struct EveryRoot;
+impl Headers for EveryRoot {
+    fn carries(&self, _: u64, _: &Hash32) -> bool {
+        true
+    }
+    fn mining_tip(&self) -> Option<ChainTip> {
+        Some(ChainTip {
+            height: 900_099,
+            median_time_past: 1_700_000_000,
+            genesis_height: 620_538,
+            csv_height: 419_328,
+            next_block_time: None,
+        })
+    }
+}
+
+/// The node's pay-to-script-hash step built by hand for input `vin` of `tx`
+/// spending `lock` (GHSA-fr33-7jw7-mwwh): `None` for another shape, else
+/// whether the last push, run as a script on the pushes before it, succeeds.
+fn redeem_by_hand(tx: &Transaction, vin: usize, lock: &[u8], satoshis: u64) -> Option<bool> {
+    if !(lock.len() == 23 && lock[..2] == [0xa9, 0x14] && lock[22] == 0x87) {
+        return None;
+    }
+    let input = &tx.inputs[vin];
+    let script = Script::from_binary(&input.unlocking_script.as_ref()?.to_binary()).ok()?;
+    let mut chunks = script.chunks();
+    if !script.is_push_only() || script.truncated_push().is_some() {
+        return Some(false);
+    }
+    let last = chunks.pop()?;
+    let redeem = match last.op {
+        0x4f => vec![0x81],
+        0x51..=0x60 => vec![last.op - 0x50],
+        _ => last.data.unwrap_or_default(),
+    };
+    let other_inputs = (tx.inputs.iter().enumerate())
+        .filter(|(i, _)| *i != vin)
+        .map(|(_, i)| TxInput {
+            txid: i.get_source_txid_bytes().unwrap_or([0; 32]),
+            output_index: i.source_output_index,
+            script: Vec::new(),
+            sequence: i.sequence,
+        })
+        .collect();
+    let outputs = (tx.outputs.iter())
+        .map(|o| TxOutput {
+            satoshis: o.satoshis.unwrap_or(0),
+            script: o.locking_script.to_binary(),
+        })
+        .collect();
+    let mut spend = Spend::new(SpendParams {
+        source_txid: input.get_source_txid_bytes().ok()?,
+        source_output_index: input.source_output_index,
+        source_satoshis: satoshis,
+        locking_script: LockingScript::from_binary(&redeem).ok()?,
+        transaction_version: tx.version as i32,
+        other_inputs,
+        outputs,
+        input_index: vin,
+        unlocking_script: UnlockingScript::from_chunks(chunks),
+        input_sequence: input.sequence,
+        lock_time: tx.lock_time,
+        memory_limit: None,
+        work_limit: None,
+    });
+    spend.set_require_push_only(true);
+    spend.set_utxo_after_chronicle(false);
+    Some(spend.validate().is_ok())
+}
 
 fuzz_target!(|data: &[u8]| {
     // A raw entry is refused in a held kind exactly when the strict parse
@@ -125,4 +201,43 @@ fuzz_target!(|data: &[u8]| {
         }
     }
     let _ = Transaction::from_atomic_beef(data);
+
+    // The reader that runs scripts, every root carried: a valid verdict
+    // spends a coin locked by `a9 14 <20 bytes> 87` only where the node's
+    // pay-to-script-hash step, built by hand, succeeds (GHSA-fr33-7jw7-mwwh).
+    if let (Ok(Verdict::Valid { .. }), Ok(beef)) = (
+        verify_stream(data, &EveryRoot, None),
+        Beef::from_binary(data),
+    ) {
+        let parsed = |e: &bsv_rs::transaction::BeefTx| {
+            (e.tx().cloned()).or_else(|| Transaction::from_binary(e.raw_tx()?).ok())
+        };
+        for tx in beef
+            .txs
+            .iter()
+            .filter(|e| !e.has_proof())
+            .filter_map(parsed)
+        {
+            for (vin, input) in tx.inputs.iter().enumerate() {
+                let source = (input.source_txid.as_deref())
+                    .and_then(|id| beef.find_txid(id))
+                    .and_then(parsed);
+                let Some(coin) = source.and_then(|s| {
+                    let output = s.outputs.get(input.source_output_index as usize)?;
+                    Some((
+                        output.locking_script.to_binary(),
+                        output.satoshis.unwrap_or(0),
+                    ))
+                }) else {
+                    continue;
+                };
+                let step = redeem_by_hand(&tx, vin, &coin.0, coin.1);
+                assert_ne!(
+                    step,
+                    Some(false),
+                    "a P2SH-shaped coin spent valid without its step"
+                );
+            }
+        }
+    }
 });
