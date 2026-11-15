@@ -22,7 +22,7 @@
 //! assert!(beef.is_valid(false));
 //!
 //! // Find a transaction
-//! if let Some(tx) = beef.find_txid("abc123...") {
+//! if let Some(tx) = beef.find_txid("abc123...".parse()?) {
 //!     println!("Found transaction");
 //! }
 //!
@@ -37,6 +37,7 @@ use crate::Result;
 
 use super::beef_stream::{atomic_unreached, display_hex, Kind};
 use super::beef_tx::{BeefTx, BEEF_V2};
+use super::txid::Txid;
 
 // The Atomic BEEF writer (#798's closure; the transaction door's subject-last form, 0.8.8's fold).
 #[path = "beef_atomic.rs"]
@@ -47,25 +48,28 @@ mod in_memory;
 mod index;
 mod merge_entry;
 mod merge_graph;
+// The rows and the doors to them, held by the compiler (#843b).
+mod rows;
 #[path = "beef_writable.rs"]
 mod writable;
 use super::merkle_path::MerklePath;
 use super::transaction::{outpoint_txid_name, Transaction};
 use collect::AfterFrame;
 
-/// Result of sorting transactions in a BEEF.
+/// Result of sorting transactions in a BEEF; each list holds [`Txid`]s
+/// since #843b (their display text until then).
 #[derive(Debug, Clone, Default)]
 pub struct SortResult {
     /// TXIDs of inputs that are missing from the BEEF.
-    pub missing_inputs: Vec<String>,
+    pub missing_inputs: Vec<Txid>,
     /// TXIDs of transactions that are not valid (no proof and don't chain to proofs).
-    pub not_valid: Vec<String>,
+    pub not_valid: Vec<Txid>,
     /// TXIDs of valid transactions.
-    pub valid: Vec<String>,
+    pub valid: Vec<Txid>,
     /// TXIDs of transactions that have missing inputs.
-    pub with_missing_inputs: Vec<String>,
+    pub with_missing_inputs: Vec<Txid>,
     /// TXIDs of txid-only transactions.
-    pub txid_only: Vec<String>,
+    pub txid_only: Vec<Txid>,
 }
 
 /// Result of BEEF validation.
@@ -101,30 +105,21 @@ pub struct BeefLimits {
 /// - A list of transactions (full or txid-only)
 ///
 /// Transactions must be sorted in dependency order (oldest first).
-#[derive(Debug, Clone)]
+///
+/// The entries and the BUMPs are read through [`txs`](Self::txs) and
+/// [`bumps`](Self::bumps) and changed through the doors alone (#843b): the
+/// txid index, the sort and wire marks and every entry's BUMP position are
+/// always those of the rows held (`beef/rows.rs`). `Clone` and `Debug` are
+/// written there.
 pub struct Beef {
-    /// Merkle paths (BUMPs) for proving transactions.
-    pub bumps: Vec<MerklePath>,
-    /// Transactions in the BEEF.
-    pub txs: Vec<BeefTx>,
     /// BEEF format version (V1 or V2).
     pub version: u32,
-    /// For Atomic BEEF, the target transaction ID.
-    pub atomic_txid: Option<String>,
-    /// Index of txids to BeefTx for fast lookup.
-    txid_index: HashMap<String, usize>,
-    /// The entry count the index was last true for: a count that moved is a
-    /// hand edit of `txs` (#817, `beef/index.rs`).
-    indexed_len: usize,
-    /// Two entries of one txid seen when last indexed: `edit_tx` then keeps
-    /// the old key, the other entry found (#817's second fold).
-    holds_twins: bool,
-    /// Whether the transactions need sorting.
-    needs_sort: bool,
-    /// The entries as a reader read them, untouched since: the reference's
-    /// `toBinary` writes such a BEEF's bytes as read (`Beef.ts:360-364`,
-    /// `:1268-1270`), so `merge_beef` walks it unsorted (#621's second fold).
-    wire_order: bool,
+    /// For Atomic BEEF, the target transaction ID: a [`Txid`] since #843b,
+    /// so a text that is no txid cannot be held.
+    pub atomic_txid: Option<Txid>,
+    /// The entries, the BUMPs and what is derived from them, every field
+    /// private to `rows.rs`' `sealed` module.
+    rows: rows::Rows,
 }
 
 impl Beef {
@@ -135,58 +130,32 @@ impl Beef {
 
     /// Creates a new empty BEEF with the specified version.
     pub fn with_version(version: u32) -> Self {
-        Self {
-            bumps: Vec::new(),
-            txs: Vec::new(),
-            version,
-            atomic_txid: None,
-            txid_index: HashMap::new(),
-            indexed_len: 0,
-            holds_twins: false,
-            needs_sort: true,
-            wire_order: false,
-        }
-    }
-
-    /// Marks the BEEF as needing re-sort.
-    fn mark_mutated(&mut self) {
-        self.needs_sort = true;
-        self.wire_order = false;
-    }
-
-    /// Holds the entries as they stand for writing, without the dependency
-    /// sort [`to_binary`](Self::to_binary) runs when a BEEF needs one: the
-    /// ancestry a transaction door collects is written in the order it was
-    /// collected, each entry's sources above it and the subject last
-    /// (BRC-62's rule), as the reference's transaction door writes what it
-    /// collects without a sort (`ts-stack@edf6e03` `Transaction.ts:
-    /// 1787-1839`, its `toBEEF`). A BEEF a caller assembles by hand keeps
-    /// the sort, as the reference's `Beef.toBinary` — and this crate's —
-    /// still sort it.
-    pub(crate) fn hold_order(&mut self) {
-        self.needs_sort = false;
+        Self::of_rows(version, Vec::new(), Vec::new(), false)
     }
 
     /// Finds a MerklePath that contains the given txid at level 0: the LAST
     /// such BUMP when several hold it, as the reference's `findBump` answers
     /// from its index (`Beef.ts:570-585` at `ts-stack@edf6e03`, a `Map.set`
-    /// over the BUMPs in order). Until #732 the earliest.
-    pub fn find_bump(&self, txid: &str) -> Option<&MerklePath> {
-        self.bumps.iter().rev().find(|b| b.contains(txid))
+    /// over the BUMPs in order). Until #732 the earliest. A leaf's hash is
+    /// text (`MerklePath` is unchanged by #843b) and is compared with the
+    /// txid's display text, 64 lower-case hex digits, as held.
+    pub fn find_bump(&self, txid: Txid) -> Option<&MerklePath> {
+        let text = txid.to_string();
+        self.bumps().iter().rev().find(|b| b.contains(&text))
     }
 
     /// Finds a transaction and links each input that has no source
     /// transaction to the one this BEEF holds under its txid, as
     /// `Beef.findTransactionForSigning` does (`Beef.ts:615-631` at
     /// `ts-stack@edf6e03`); until #603 the inputs were left unlinked.
-    pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction> {
+    pub fn find_transaction_for_signing(&self, txid: Txid) -> Option<Transaction> {
         let mut tx = self.find_txid(txid)?.tx()?.clone();
         // Through the linking door, which keeps the copy's caches where the
         // input names its txid (#869's second fold).
         for i in 0..tx.inputs().len() {
             let input = &tx.inputs()[i];
             if input.source_transaction.is_none() {
-                let held = outpoint_txid_name(input).and_then(|t| self.find_txid(&t));
+                let held = outpoint_txid_name(input).and_then(|t| self.find_txid(t));
                 if let Some(found) = held.and_then(BeefTx::tx) {
                     tx.replace_source(i, Some(Box::new(found.clone())));
                 }
@@ -196,7 +165,7 @@ impl Beef {
     }
 
     /// Builds the proof tree rooted at a specific transaction.
-    pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction> {
+    pub fn find_atomic_transaction(&self, txid: Txid) -> Option<Transaction> {
         let beef_tx = self.find_txid(txid)?;
         let mut tx = beef_tx.tx().cloned()?;
         self.add_input_proof(&mut tx);
@@ -265,7 +234,7 @@ impl Beef {
         // (`Beef.ts:576-585` at `ts-stack@edf6e03`, `Map.set` over the bumps
         // in order; the earliest until #732).
         let mut bump_by_txid: HashMap<&str, &MerklePath> = HashMap::new();
-        for bump in &self.bumps {
+        for bump in self.bumps() {
             for leaf in bump.path.first().into_iter().flatten() {
                 if let Some(hash) = leaf.hash.as_deref() {
                     bump_by_txid.insert(hash, bump);
@@ -291,7 +260,7 @@ impl Beef {
 
         // Keyed by txid, the value being the stub handed to later inputs.
         // Presence also means "this txid has been linked in full once".
-        let mut stubs: HashMap<String, Transaction> = HashMap::new();
+        let mut stubs: HashMap<Txid, Transaction> = HashMap::new();
         let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
 
         while let Some(top) = stack.last_mut() {
@@ -319,9 +288,9 @@ impl Beef {
             let input = &top.tx.inputs()[i];
             // Keyed by what the input links, its own source's id, named or not (#869's
             // fourth fold), else its text (`Beef.ts:649-679` at `ts-stack@edf6e03`).
-            let src_txid = match (&input.source_transaction, &input.source_txid) {
-                (Some(own), _) => own.id(),
-                (None, Some(txid)) => txid.to_string(),
+            let src_txid = match (&input.source_transaction, input.source_txid) {
+                (Some(own), _) => own.txid(),
+                (None, Some(txid)) => txid,
                 (None, None) => continue, // links and names nothing: left as it is
             };
             if let Some(stub) = stubs.get(&src_txid) {
@@ -339,7 +308,7 @@ impl Beef {
             };
             let src = match own {
                 Some(own) => *own,
-                None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
+                None => match self.find_txid(src_txid).and_then(|b| b.tx().cloned()) {
                     Some(found) => found,
                     None => continue, // not in this BEEF: left unlinked, as before
                 },
@@ -348,7 +317,7 @@ impl Beef {
             // form a cycle then terminates instead of walking forever, and for
             // the honest DAG case the order makes no difference (a transaction
             // is never reachable from inside its own ancestry).
-            let stub = Self::bare_stub(&src, find_bump(&src_txid));
+            let stub = Self::bare_stub(&src, find_bump(&src_txid.to_string()));
             stubs.insert(src_txid, stub);
             stack.push(enter(src));
         }
@@ -377,8 +346,9 @@ impl Beef {
     ///
     /// The index of the merged bump.
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize {
-        // `#markMutated(false)` (`Beef.ts:690`): the bytes read are stale.
-        self.wire_order = false;
+        // `#markMutated(false)` (`Beef.ts:690`): the bytes read are stale,
+        // no sort is asked for (`push_bump`, `bump_mut` and `point_entry`
+        // clear the wire mark and leave the sort mark).
         // An existing bump of the same block height and root is combined:
         // both roots are computed here, so the combine cannot fail
         // (`combine_verified`; until #817 `combine`'s result was dropped
@@ -393,15 +363,16 @@ impl Beef {
                 && root.is_some()
                 && existing.compute_root(None).ok() == root
         };
-        if let Some(i) = self.bumps.iter().position(same) {
-            self.bumps[i].combine_verified(&bump);
+        if let Some(i) = self.bumps().iter().position(same) {
+            if let Some(held) = self.bump_mut(i) {
+                held.combine_verified(&bump);
+            }
             self.update_bump_indices(i);
             return i;
         }
 
         // Add as new bump
-        let index = self.bumps.len();
-        self.bumps.push(bump);
+        let index = self.push_bump(bump);
         self.update_bump_indices(index);
         index
     }
@@ -412,11 +383,24 @@ impl Beef {
     /// (`ts-stack@edf6e03` `Beef.ts:774-786`, `:813-822`); see
     /// `try_to_validate_bump_index` for the strict match this was until #765.
     fn update_bump_indices(&mut self, bump_index: usize) {
-        let bump = &mut self.bumps[bump_index];
-        for tx in self.txs.iter_mut().filter(|tx| tx.bump_index().is_none()) {
-            if bump.contains_and_mark(&tx.txid()) {
-                tx.set_bump_index(Some(bump_index));
-            }
+        // The entries without an index, then each whose txid the BUMP holds.
+        let unproven: Vec<(usize, String)> = self
+            .txs()
+            .iter()
+            .enumerate()
+            .filter(|(_, tx)| tx.bump_index().is_none())
+            .map(|(position, tx)| (position, tx.id()))
+            .collect();
+        let Some(bump) = self.bump_mut(bump_index) else {
+            return;
+        };
+        let proven: Vec<usize> = unproven
+            .into_iter()
+            .filter(|(_, txid)| bump.contains_and_mark(txid))
+            .map(|(position, _)| position)
+            .collect();
+        for position in proven {
+            self.point_entry(position, Some(bump_index));
         }
     }
 
@@ -425,27 +409,34 @@ impl Beef {
     /// (`merge_graph.rs`; `to_beef`'s collected ancestors).
     pub(super) fn push_transaction(
         &mut self,
-        txid: String,
+        txid: Txid,
         tx: Transaction,
         bump: Option<usize>,
     ) -> usize {
-        let idx = self.replace_or_append(BeefTx::from_tx(tx, bump).with_txid(txid.clone()), txid);
+        let idx = self.replace_or_append(BeefTx::from_tx(tx, bump).with_txid(txid));
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
         idx
     }
 
-    /// Merges a txid-only entry into this BEEF.
-    pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx {
+    /// Merges a txid-only entry into this BEEF; an entry already held under
+    /// the txid is kept.
+    ///
+    /// The txid is a [`Txid`] since #843b (`beef.merge_txid_only(text.parse()?)`).
+    /// Until then it was a text nothing checked, held as given: one that was
+    /// not 64 hex digits was refused only when the BEEF was written, and one
+    /// in upper case was a second entry beside the same transaction merged
+    /// raw.
+    pub fn merge_txid_only(&mut self, txid: Txid) -> &BeefTx {
         if let Some(idx) = self.position(&txid) {
-            return &self.txs[idx];
+            return &self.txs()[idx];
         }
 
-        let idx = self.push_tx(BeefTx::from_txid(txid.clone()), txid);
+        let idx = self.append_entry(BeefTx::from_txid(txid));
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
-        &self.txs[idx]
+        &self.txs()[idx]
     }
 
     /// Converts an existing transaction to txid-only format.
@@ -454,21 +445,21 @@ impl Beef {
     /// reducing the BEEF size when the recipient already has the full transaction.
     ///
     /// Returns the modified BeefTx if found, None if txid not in BEEF.
-    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx> {
-        let idx = self.position(txid)?;
+    pub fn make_txid_only(&mut self, txid: Txid) -> Option<&BeefTx> {
+        let idx = self.position(&txid)?;
 
         // If already txid-only, just return it
-        if self.txs[idx].is_txid_only() {
-            return Some(&self.txs[idx]);
+        if self.txs()[idx].is_txid_only() {
+            return Some(&self.txs()[idx]);
         }
 
         // Replace with txid-only version
-        self.txs[idx] = BeefTx::from_txid(txid.to_string());
+        self.replace_entry(idx, BeefTx::from_txid(txid));
         // The BUMP index again, as the reference's `makeTxidOnly` (`Beef.ts:550-565`).
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
-        Some(&self.txs[idx])
+        Some(&self.txs()[idx])
     }
 
     /// Gives a new entry without an index the LAST BUMP whose level 0 holds
@@ -486,13 +477,16 @@ impl Beef {
     /// rule's one recorded effect a refusal of a BEEF the reference links
     /// (`tests/beef_sibling_leaf_765.rs`).
     fn try_to_validate_bump_index(&mut self, tx_idx: usize) {
-        if self.txs[tx_idx].bump_index().is_some() {
+        if self.txs()[tx_idx].bump_index().is_some() {
             return;
         }
-        let txid = self.txs[tx_idx].txid();
-        let mut bumps = self.bumps.iter_mut();
-        if let Some(i) = bumps.rposition(|b| b.contains_and_mark(&txid)) {
-            self.txs[tx_idx].set_bump_index(Some(i));
+        let txid = self.txs()[tx_idx].id();
+        let holds = |beef: &mut Self, i: usize| {
+            beef.bump_mut(i)
+                .is_some_and(|bump| bump.contains_and_mark(&txid))
+        };
+        if let Some(i) = (0..self.bumps().len()).rev().find(|&i| holds(self, i)) {
+            self.point_entry(tx_idx, Some(i));
         }
     }
 
@@ -511,97 +505,83 @@ impl Beef {
     pub fn trim_known_proven(&mut self) {
         use std::collections::{HashSet, VecDeque};
 
-        self.refresh_mutated();
-        let all_txids: HashSet<String> = self.txs.iter().map(|tx| tx.txid()).collect();
+        let all_txids: HashSet<Txid> = self.txs().iter().map(BeefTx::txid).collect();
+
+        // An entry held raw with no input list (a proven one) is parsed here
+        // and keeps its parse, as it always has (`BeefTx::parsed` until
+        // #843b), so `tx()` and the lookups that hand a transaction back
+        // answer for it after a trim; the same bytes, so nothing else moves.
+        for position in 0..self.txs().len() {
+            let entry = &self.txs()[position];
+            if entry.input_txids().is_empty() && entry.tx().is_none() {
+                if let Some(Ok(tx)) = entry.raw_tx().map(Transaction::from_binary) {
+                    let _ = self.swap_parse(position, tx);
+                }
+            }
+        }
 
         // Find which txids are referenced as inputs by other txs in the BEEF.
         // Note: proven txs have empty input_txids (cleared by set_bump_index),
         // so we also parse their raw tx bytes to recover the full reference graph.
-        let mut referenced_as_input: HashSet<String> = HashSet::new();
-        for tx in &mut self.txs {
-            let input_refs: Vec<String> = if !tx.input_txids.is_empty() {
-                tx.input_txids.clone()
-            } else if let Some(parsed) = tx.parsed() {
-                parsed
-                    .inputs()
-                    .iter()
-                    .filter_map(crate::transaction::transaction::outpoint_txid_name)
-                    .collect::<Vec<String>>()
+        let mut referenced_as_input: HashSet<Txid> = HashSet::new();
+        for tx in self.txs() {
+            let input_refs: Vec<Txid> = if !tx.input_txids().is_empty() {
+                tx.input_txids().to_vec()
             } else {
-                Vec::new()
+                in_memory::spent_txids(tx)
             };
             for input_txid in &input_refs {
                 if all_txids.contains(input_txid) {
-                    referenced_as_input.insert(input_txid.clone());
+                    referenced_as_input.insert(*input_txid);
                 }
             }
         }
 
         // Tip transactions: not referenced as an input by any other tx in the BEEF
-        let tips: Vec<String> = all_txids
+        let tips: Vec<Txid> = all_txids
             .iter()
             .filter(|txid| !referenced_as_input.contains(*txid))
-            .cloned()
+            .copied()
             .collect();
 
         // BFS from tips: mark needed txids, stop at proven txs
-        let mut needed: HashSet<String> = HashSet::new();
-        let mut queue: VecDeque<String> = VecDeque::from(tips);
+        let mut needed: HashSet<Txid> = HashSet::new();
+        let mut queue: VecDeque<Txid> = VecDeque::from(tips);
 
         while let Some(txid) = queue.pop_front() {
-            if needed.contains(&txid) {
+            if !needed.insert(txid) {
                 continue;
             }
-            needed.insert(txid.clone());
 
-            if let Some(tx) = self.find_txid(&txid) {
+            if let Some(tx) = self.find_txid(txid) {
                 // Proven tx is self-sufficient — don't need its ancestors
                 if tx.bump_index().is_some() {
                     continue;
                 }
                 // Unproven — need its input txids too
-                for input_txid in tx.input_txids.clone() {
-                    if all_txids.contains(&input_txid) && !needed.contains(&input_txid) {
-                        queue.push_back(input_txid);
+                for input_txid in tx.input_txids() {
+                    if all_txids.contains(input_txid) && !needed.contains(input_txid) {
+                        queue.push_back(*input_txid);
                     }
                 }
             }
         }
 
         // Nothing to trim
-        if needed.len() == self.txs.len() {
+        if needed.len() == self.txs().len() {
             return;
         }
 
-        // Remove unneeded transactions
-        self.txs.retain(|tx| needed.contains(&tx.txid()));
-        self.rebuild_index();
+        // Remove unneeded transactions (the entries' door: order kept).
+        self.retain_txs(|tx| needed.contains(&tx.txid()));
 
-        // Clean up unused BUMPs and remap indices
+        // Clean up unused BUMPs; the rows re-point every entry (#843b: a
+        // hand remap here until then).
         let used_bump_indices: HashSet<usize> =
-            self.txs.iter().filter_map(|tx| tx.bump_index()).collect();
+            self.txs().iter().filter_map(BeefTx::bump_index).collect();
 
-        if used_bump_indices.len() < self.bumps.len() {
-            let mut new_bumps = Vec::new();
-            let mut index_map: HashMap<usize, usize> = HashMap::new();
-
-            for (old_idx, bump) in self.bumps.iter().enumerate() {
-                if used_bump_indices.contains(&old_idx) {
-                    let new_idx = new_bumps.len();
-                    index_map.insert(old_idx, new_idx);
-                    new_bumps.push(bump.clone());
-                }
-            }
-
-            self.bumps = new_bumps;
-
-            for tx in &mut self.txs {
-                if let Some(old_idx) = tx.bump_index() {
-                    if let Some(&new_idx) = index_map.get(&old_idx) {
-                        tx.set_bump_index(Some(new_idx));
-                    }
-                }
-            }
+        if used_bump_indices.len() < self.bumps().len() {
+            self.retain_bumps(|old_idx, _| used_bump_indices.contains(&old_idx));
         }
 
         self.mark_mutated();
@@ -681,11 +661,10 @@ impl Beef {
     /// A byte after the frame (NL-8 W3) is refused by [`from_binary`](Self::from_binary)
     /// before this runs.
     pub fn verify_structure(&mut self) -> std::result::Result<HashMap<u32, String>, Kind> {
-        self.refresh_mutated();
         // The atomic rule is answered after the rest, where the reader's
         // `finish` answers it.
-        let atomic = match self.atomic_txid.clone() {
-            Some(subject) => self.atomic_rule(&subject),
+        let atomic = match self.atomic_txid {
+            Some(subject) => self.atomic_rule(subject),
             None => Ok(()),
         };
         let roots = self.bump_roots()?;
@@ -713,7 +692,7 @@ impl Beef {
     /// there; another root at that height is [`Kind::RootNotCarried`].
     fn bump_roots(&self) -> std::result::Result<HashMap<u32, String>, Kind> {
         let mut roots: HashMap<u32, String> = HashMap::new();
-        for bump in &self.bumps {
+        for bump in self.bumps() {
             let root = display_hex(&in_memory::merkle_path_root(bump).map_err(|r| r.kind())?);
             match roots.get(&bump.block_height) {
                 Some(existing) if *existing != root => return Err(Kind::RootNotCarried),
@@ -739,7 +718,7 @@ impl Beef {
         // Every hash of each BUMP's level 0 is a txid that BUMP proves,
         // indexed once.
         let carried: HashSet<(usize, &str)> = self
-            .bumps
+            .bumps()
             .iter()
             .enumerate()
             .flat_map(|(i, bump)| {
@@ -751,15 +730,16 @@ impl Beef {
             })
             .collect();
         let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
-        for tx in &self.txs {
+        for tx in self.txs() {
             if let Some(kind) = in_memory::content_refused(tx) {
                 return Err(kind);
             }
-            // A raw entry's txid is a hash of its bytes: computed once.
-            let txid = tx.txid();
+            // A raw entry's txid is a hash of its bytes: computed once. A
+            // leaf's hash is text, compared with the txid's display text.
+            let txid = tx.id();
             let refused = match (tx.is_txid_only(), tx.bump_index()) {
                 (true, _) if !proven.contains(txid.as_str()) => Some(Kind::StubNotProven),
-                (false, Some(index)) if index >= self.bumps.len() => {
+                (false, Some(index)) if index >= self.bumps().len() => {
                     Some(Kind::BumpIndexNamesNoBump)
                 }
                 (false, Some(index)) if !carried.contains(&(index, txid.as_str())) => {
@@ -777,12 +757,10 @@ impl Beef {
     /// The atomic rule on the subject's graph: the streaming reader's walk
     /// ([`atomic_unreached`]) over this BEEF's entries, whatever order they
     /// hold.
-    fn atomic_rule(&self, subject: &str) -> std::result::Result<(), Kind> {
-        let Some(subject) = in_memory::wire_hash(subject) else {
-            return Err(Kind::SubjectMissing);
-        };
-        let mut table = in_memory::atomic_table(&self.txs);
-        match atomic_unreached(&subject, &mut table)? {
+    fn atomic_rule(&self, subject: Txid) -> std::result::Result<(), Kind> {
+        // The stream's tables key a txid by its wire bytes.
+        let mut table = in_memory::atomic_table(self.txs());
+        match atomic_unreached(subject.as_wire_bytes(), &mut table)? {
             Some(_) => Err(Kind::UnrelatedTransaction),
             None => Ok(()),
         }
@@ -799,32 +777,29 @@ impl Beef {
     /// (`@bsv/sdk` `Beef.#topoSort`, "preserve the legacy repeated-scan
     /// ordering without repeating scans").
     pub fn sort_txs(&mut self) -> SortResult {
-        self.refresh_mutated();
-        for tx in &mut self.txs {
-            tx.is_valid = Some(tx.has_proof());
-        }
         let (new_order, result) = {
-            let inputs: Vec<&[String]> = self
-                .txs
-                .iter()
-                .map(|tx| tx.input_txids.as_slice())
-                .collect();
-            dependency_order(&self.txs, &inputs)
+            let inputs: Vec<&[Txid]> = self.txs().iter().map(BeefTx::input_txids).collect();
+            dependency_order(self.txs(), &inputs)
         };
 
         // Move the transactions into the new order (every index is in exactly
         // one of the five lists; anything left over keeps its relative order
-        // at the end, as before).
-        let mut old: Vec<Option<BeefTx>> = std::mem::take(&mut self.txs)
+        // at the end, as before), through the rows' general door: the index
+        // is emptied before the entries are lent and filled from the sorted
+        // rows on the next lookup.
+        let (txs, _) = self.rows_mut();
+        let mut old: Vec<Option<BeefTx>> = std::mem::take(txs)
             .into_iter()
-            .map(Some)
+            .map(|mut tx| {
+                tx.set_valid(Some(tx.has_proof()));
+                Some(tx)
+            })
             .collect();
-        self.txs = new_order.iter().filter_map(|&i| old[i].take()).collect();
-        self.txs.extend(old.into_iter().flatten());
+        *txs = new_order.iter().filter_map(|&i| old[i].take()).collect();
+        txs.extend(old.into_iter().flatten());
 
-        self.needs_sort = false;
-        self.wire_order = false;
-        self.rebuild_index();
+        // Sorted: written as held until a door changes a row.
+        self.hold_order();
 
         result
     }
@@ -891,7 +866,7 @@ impl Beef {
 
     /// Returns a shallow clone of this BEEF.
     pub fn clone_shallow(&self) -> Self {
-        // Every field, as the derived `Clone` copies them.
+        // Every row and field, as `Clone` copies them (`beef/rows.rs`).
         self.clone()
     }
 
@@ -899,21 +874,22 @@ impl Beef {
     /// at `ts-stack@edf6e03`; until #603 `BUMPs`, no list separators and no
     /// txids list for a BUMP that flags none).
     pub fn to_log_string(&mut self) -> String {
+        let valid = self.is_valid(false);
         let mut log = format!(
             "BEEF with {} BUMPS and {} Transactions, isValid {}\n",
-            self.bumps.len(),
-            self.txs.len(),
-            self.is_valid(false)
+            self.bumps().len(),
+            self.txs().len(),
+            valid
         );
         let listed = |txids: &[String]| {
             let lines: Vec<String> = txids.iter().map(|t| format!("      '{t}'")).collect();
             lines.join(",\n")
         };
-        for (i, bump) in self.bumps.iter().enumerate() {
+        for (i, bump) in self.bumps().iter().enumerate() {
             log.push_str(&format!("  BUMP {i}\n    block: {}\n", bump.block_height));
             log.push_str(&format!("    txids: [\n{}\n    ]\n", listed(&bump.txids())));
         }
-        for (i, tx) in self.txs.iter().enumerate() {
+        for (i, tx) in self.txs().iter().enumerate() {
             log.push_str(&format!("  TX {}\n    txid: {}\n", i, tx.txid()));
             if let Some(bump_idx) = tx.bump_index() {
                 log.push_str(&format!("    bumpIndex: {}\n", bump_idx));
@@ -924,11 +900,9 @@ impl Beef {
                 let length = tx.raw_tx().map(|r| r.len()).unwrap_or(0);
                 log.push_str(&format!("    rawTx length={length}\n"));
             }
-            if !tx.input_txids.is_empty() {
-                log.push_str(&format!(
-                    "    inputs: [\n{}\n    ]\n",
-                    listed(&tx.input_txids)
-                ));
+            if !tx.input_txids().is_empty() {
+                let inputs: Vec<String> = tx.input_txids().iter().map(Txid::to_string).collect();
+                log.push_str(&format!("    inputs: [\n{}\n    ]\n", listed(&inputs)));
             }
         }
         log
@@ -945,14 +919,14 @@ impl Default for Beef {
 /// from the entries alone: `merge_beef` walks an unsorted source by it
 /// (#621's second fold, `Beef.ts:360-373`); `inputs[i]` the txids entry `i`
 /// waits on (its `input_txids`, or its mutated transaction's).
-fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortResult) {
+fn dependency_order(txs: &[BeefTx], inputs: &[&[Txid]]) -> (Vec<usize>, SortResult) {
     use std::cmp::Reverse;
     use std::collections::{BinaryHeap, HashSet};
 
     let mut result = SortResult::default();
-    let mut valid_txids: HashMap<String, bool> = HashMap::new();
-    let txids: Vec<String> = txs.iter().map(BeefTx::txid).collect();
-    let known: HashSet<&str> = txids.iter().map(String::as_str).collect();
+    let mut valid_txids: HashMap<Txid, bool> = HashMap::new();
+    let txids: Vec<Txid> = txs.iter().map(BeefTx::txid).collect();
+    let known: HashSet<Txid> = txids.iter().copied().collect();
 
     // Separate transactions by type
     let mut with_proof: Vec<usize> = Vec::new();
@@ -961,12 +935,12 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
 
     for (i, tx) in txs.iter().enumerate() {
         if tx.has_proof() {
-            valid_txids.insert(txids[i].clone(), true);
+            valid_txids.insert(txids[i], true);
             with_proof.push(i);
         } else if tx.is_txid_only() && inputs[i].is_empty() {
-            valid_txids.insert(txids[i].clone(), true);
+            valid_txids.insert(txids[i], true);
             txid_only.push(i);
-            result.txid_only.push(txids[i].clone());
+            result.txid_only.push(txids[i]);
         } else {
             queue.push(i);
         }
@@ -979,14 +953,14 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     for &i in &queue {
         let mut has_missing = false;
         for input_txid in inputs[i] {
-            if !known.contains(input_txid.as_str()) {
-                result.missing_inputs.push(input_txid.clone());
+            if !known.contains(input_txid) {
+                result.missing_inputs.push(*input_txid);
                 has_missing = true;
             }
         }
         if has_missing {
             with_missing.push(i);
-            result.with_missing_inputs.push(txids[i].clone());
+            result.with_missing_inputs.push(txids[i]);
         } else {
             pending.push(i);
         }
@@ -996,12 +970,12 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     // yet; `dependents` lists the waiters of each such txid.
     let n = txs.len();
     let mut waiting_on = vec![0usize; n];
-    let mut dependents: HashMap<&str, Vec<usize>> = HashMap::new();
+    let mut dependents: HashMap<Txid, Vec<usize>> = HashMap::new();
     for &i in &pending {
         for input_txid in inputs[i] {
             if !valid_txids.contains_key(input_txid) {
                 waiting_on[i] += 1;
-                dependents.entry(input_txid.as_str()).or_default().push(i);
+                dependents.entry(*input_txid).or_default().push(i);
             }
         }
     }
@@ -1022,10 +996,10 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     while let Some(Reverse((s, i))) = ready.pop() {
         accepted[i] = true;
         sorted_pending.push(i);
-        if valid_txids.insert(txids[i].clone(), true).is_some() {
+        if valid_txids.insert(txids[i], true).is_some() {
             continue; // a repeated txid: its waiters were released already
         }
-        for j in dependents.remove(txids[i].as_str()).unwrap_or_default() {
+        for j in dependents.remove(&txids[i]).unwrap_or_default() {
             let from = if i < j { s } else { s + 1 };
             scan[j] = scan[j].max(from);
             waiting_on[j] -= 1;
@@ -1038,11 +1012,11 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     // Remaining are not valid
     let not_valid: Vec<usize> = pending.into_iter().filter(|&i| !accepted[i]).collect();
     for &i in &not_valid {
-        result.not_valid.push(txids[i].clone());
+        result.not_valid.push(txids[i]);
     }
 
     // Collect valid txids
-    result.valid = valid_txids.keys().cloned().collect();
+    result.valid = valid_txids.keys().copied().collect();
 
     // Reorder transactions - build new order indices
     let mut new_order: Vec<usize> = Vec::with_capacity(n);
@@ -1075,8 +1049,8 @@ mod tests {
     fn test_new_beef() {
         let beef = Beef::new();
         assert_eq!(beef.version, BEEF_V2);
-        assert!(beef.bumps.is_empty());
-        assert!(beef.txs.is_empty());
+        assert!(beef.bumps().is_empty());
+        assert!(beef.txs().is_empty());
     }
 
     #[test]
@@ -1089,10 +1063,10 @@ mod tests {
     fn test_merge_txid_only() {
         let mut beef = Beef::new();
         let txid = "a".repeat(64);
-        beef.merge_txid_only(txid.clone());
-        assert_eq!(beef.txs.len(), 1);
-        assert!(beef.txs[0].is_txid_only());
-        assert!(beef.find_txid(&txid).is_some());
+        beef.merge_txid_only(txid.parse().unwrap());
+        assert_eq!(beef.txs().len(), 1);
+        assert!(beef.txs()[0].is_txid_only());
+        assert!(beef.find_txid(txid.parse().unwrap()).is_some());
     }
 
     #[test]
@@ -1122,23 +1096,23 @@ mod tests {
         let txid = beef_tx.txid();
 
         // Verify it's not txid-only
-        assert!(!beef.txs[0].is_txid_only());
+        assert!(!beef.txs()[0].is_txid_only());
 
         // Convert to txid-only
-        let result = beef.make_txid_only(&txid);
+        let result = beef.make_txid_only(txid);
         assert!(result.is_some());
-        assert!(beef.txs[0].is_txid_only());
+        assert!(beef.txs()[0].is_txid_only());
 
         // Verify the txid is still findable
-        assert!(beef.find_txid(&txid).is_some());
+        assert!(beef.find_txid(txid).is_some());
 
         // Converting again should succeed (already txid-only)
-        let result2 = beef.make_txid_only(&txid);
+        let result2 = beef.make_txid_only(txid);
         assert!(result2.is_some());
 
         // Non-existent txid should return None
         let fake_txid = "b".repeat(64);
-        assert!(beef.make_txid_only(&fake_txid).is_none());
+        assert!(beef.make_txid_only(fake_txid.parse().unwrap()).is_none());
     }
 
     #[test]
@@ -1147,7 +1121,7 @@ mod tests {
         let bump = MerklePath::from_coinbase_txid(&"a".repeat(64), 100);
         let idx = beef.merge_bump(bump);
         assert_eq!(idx, 0);
-        assert_eq!(beef.bumps.len(), 1);
+        assert_eq!(beef.bumps().len(), 1);
     }
 
     #[test]
@@ -1192,14 +1166,12 @@ mod tests {
         };
 
         // Give TX_A a proof (BUMP)
-        let bump_a = MerklePath::from_coinbase_txid(&tx_a_id, 100);
+        let bump_a = MerklePath::from_coinbase_txid(&tx_a_id.to_string(), 100);
         let bump_idx_a = beef.merge_bump(bump_a);
-        beef.find_txid_mut(&tx_a_id)
-            .unwrap()
-            .set_bump_index(Some(bump_idx_a));
+        beef.set_bump_index(tx_a_id, Some(bump_idx_a)).unwrap();
 
         // TX_B: spends TX_A (input references tx_a_id)
-        let tx_a_id_bytes = from_hex(&tx_a_id).unwrap();
+        let tx_a_id_bytes = from_hex(&tx_a_id.to_string()).unwrap();
         let mut tx_b_raw = vec![0x01, 0x00, 0x00, 0x00, 0x01]; // version + 1 input
                                                                // prev txid (reversed tx_a_id)
         let mut prev_txid = tx_a_id_bytes.clone();
@@ -1220,7 +1192,7 @@ mod tests {
         };
 
         // TX_C: spends TX_B (tip, unproven)
-        let tx_b_id_bytes = from_hex(&tx_b_id).unwrap();
+        let tx_b_id_bytes = from_hex(&tx_b_id.to_string()).unwrap();
         let mut tx_c_raw = vec![0x01, 0x00, 0x00, 0x00, 0x01];
         let mut prev_txid_b = tx_b_id_bytes.clone();
         prev_txid_b.reverse();
@@ -1240,26 +1212,24 @@ mod tests {
         };
 
         // Before trim: 3 txs (A proven, B unproven, C unproven)
-        assert_eq!(beef.txs.len(), 3);
+        assert_eq!(beef.txs().len(), 3);
 
         // Now "prove" TX_B
-        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id, 101);
+        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id.to_string(), 101);
         let bump_idx_b = beef.merge_bump(bump_b);
-        beef.find_txid_mut(&tx_b_id)
-            .unwrap()
-            .set_bump_index(Some(bump_idx_b));
+        beef.set_bump_index(tx_b_id, Some(bump_idx_b)).unwrap();
 
         // Trim: TX_A should be removed (only ancestor of now-proven TX_B)
         beef.trim_known_proven();
 
-        assert_eq!(beef.txs.len(), 2); // TX_B and TX_C remain
-        assert!(beef.find_txid(&tx_b_id).is_some()); // TX_B kept (proven, needed by TX_C)
-        assert!(beef.find_txid(&_tx_c_id).is_some()); // TX_C kept (tip)
-        assert!(beef.find_txid(&tx_a_id).is_none()); // TX_A removed (unnecessary)
+        assert_eq!(beef.txs().len(), 2); // TX_B and TX_C remain
+        assert!(beef.find_txid(tx_b_id).is_some()); // TX_B kept (proven, needed by TX_C)
+        assert!(beef.find_txid(_tx_c_id).is_some()); // TX_C kept (tip)
+        assert!(beef.find_txid(tx_a_id).is_none()); // TX_A removed (unnecessary)
 
         // BUMP for TX_A's block should be removed, BUMP for TX_B's block kept
-        assert_eq!(beef.bumps.len(), 1);
-        assert_eq!(beef.bumps[0].block_height, 101);
+        assert_eq!(beef.bumps().len(), 1);
+        assert_eq!(beef.bumps()[0].block_height, 101);
     }
 
     #[test]
@@ -1371,7 +1341,7 @@ mod tests {
     fn add_raw_tx(beef: &mut Beef, raw: Vec<u8>, bump_index: Option<usize>) -> String {
         beef.merge_raw_tx(raw, bump_index)
             .expect("the bytes are one transaction")
-            .txid()
+            .id()
     }
 
     /// Helper: adds a raw tx to a beef, creates a coinbase-style BUMP for it, and
@@ -1380,7 +1350,8 @@ mod tests {
         let txid = add_raw_tx(beef, raw, None);
         let bump = MerklePath::from_coinbase_txid(&txid, block_height);
         let bi = beef.merge_bump(bump);
-        beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(bi));
+        beef.set_bump_index(txid.parse().unwrap(), Some(bi))
+            .unwrap();
         txid
     }
 
@@ -1409,14 +1380,14 @@ mod tests {
         let parsed = Beef::from_binary(&bin).unwrap();
 
         // Verify raw bytes of both txs survived the round-trip.
-        let found_a = parsed.find_txid(&txid_a).unwrap();
+        let found_a = parsed.find_txid(txid_a.parse().unwrap()).unwrap();
         assert_eq!(
             found_a.raw_tx().unwrap(),
             &raw_a,
             "TX A raw bytes differ after merge round-trip"
         );
 
-        let found_b = parsed.find_txid(&txid_b).unwrap();
+        let found_b = parsed.find_txid(txid_b.parse().unwrap()).unwrap();
         assert_eq!(
             found_b.raw_tx().unwrap(),
             &raw_b,
@@ -1448,26 +1419,37 @@ mod tests {
         let raw_d = make_raw_tx(Some(&txid_c), 6000, None);
         let txid_d = add_raw_tx(&mut beef, raw_d, None);
 
-        assert_eq!(beef.txs.len(), 5);
+        assert_eq!(beef.txs().len(), 5);
 
         // Now prove B.
         let bump_b = MerklePath::from_coinbase_txid(&txid_b, 200);
         let bi = beef.merge_bump(bump_b);
-        beef.find_txid_mut(&txid_b)
-            .unwrap()
-            .set_bump_index(Some(bi));
+        beef.set_bump_index(txid_b.parse().unwrap(), Some(bi))
+            .unwrap();
 
         beef.trim_known_proven();
 
-        assert_eq!(beef.txs.len(), 3, "Should keep B, C, D only");
-        assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
-        assert!(beef.find_txid(&txid_a1).is_none(), "A1 should be trimmed");
+        assert_eq!(beef.txs().len(), 3, "Should keep B, C, D only");
         assert!(
-            beef.find_txid(&txid_b).is_some(),
+            beef.find_txid(txid_a0.parse().unwrap()).is_none(),
+            "A0 should be trimmed"
+        );
+        assert!(
+            beef.find_txid(txid_a1.parse().unwrap()).is_none(),
+            "A1 should be trimmed"
+        );
+        assert!(
+            beef.find_txid(txid_b.parse().unwrap()).is_some(),
             "B should remain (proven)"
         );
-        assert!(beef.find_txid(&txid_c).is_some(), "C should remain");
-        assert!(beef.find_txid(&txid_d).is_some(), "D should remain (tip)");
+        assert!(
+            beef.find_txid(txid_c.parse().unwrap()).is_some(),
+            "C should remain"
+        );
+        assert!(
+            beef.find_txid(txid_d.parse().unwrap()).is_some(),
+            "D should remain (tip)"
+        );
     }
 
     // ── Test 3: V1 <-> V2 round-trip preserving data ────────────────────
@@ -1485,7 +1467,7 @@ mod tests {
         let v2_bin = beef_v2.to_binary().expect("the BEEF is writable");
         let mut parsed_v2 = Beef::from_binary(&v2_bin).unwrap();
         assert_eq!(parsed_v2.version, BEEF_V2);
-        assert_eq!(parsed_v2.txs.len(), 2);
+        assert_eq!(parsed_v2.txs().len(), 2);
 
         // Switch to V1, serialize, parse back.
         parsed_v2.version = BEEF_V1;
@@ -1493,17 +1475,17 @@ mod tests {
         let parsed_v1 = Beef::from_binary(&v1_bin).unwrap();
 
         assert_eq!(parsed_v1.version, BEEF_V1);
-        assert_eq!(parsed_v1.txs.len(), 2);
+        assert_eq!(parsed_v1.txs().len(), 2);
 
         // Verify both txids present and raw bytes preserved.
-        let found_1 = parsed_v1.find_txid(&txid_1).unwrap();
+        let found_1 = parsed_v1.find_txid(txid_1.parse().unwrap()).unwrap();
         assert_eq!(found_1.raw_tx().unwrap(), &raw_1);
-        let found_2 = parsed_v1.find_txid(&txid_2).unwrap();
+        let found_2 = parsed_v1.find_txid(txid_2.parse().unwrap()).unwrap();
         assert_eq!(found_2.raw_tx().unwrap(), &raw_2);
 
         // Verify bump is preserved.
-        assert_eq!(parsed_v1.bumps.len(), 1);
-        assert!(parsed_v1.bumps[0].contains(&txid_1));
+        assert_eq!(parsed_v1.bumps().len(), 1);
+        assert!(parsed_v1.bumps()[0].contains(&txid_1));
     }
 
     // ── Test 4: V1 serialization format (raw_tx BEFORE has_bump) ────────
@@ -1561,7 +1543,7 @@ mod tests {
         let bin = beef.to_binary().expect("the BEEF is writable");
         let parsed = Beef::from_binary(&bin).unwrap();
 
-        let found = parsed.find_txid(&txid).unwrap();
+        let found = parsed.find_txid(txid.parse().unwrap()).unwrap();
         let recovered_raw = found.raw_tx().unwrap();
         assert_eq!(
             recovered_raw, &raw_tx,
@@ -1594,8 +1576,20 @@ mod tests {
         let txid_b = add_proven_tx(&mut beef_b, raw_b, 200);
 
         // Before merge, both have bump index 0 in their respective BEEFs.
-        assert_eq!(beef_a.find_txid(&txid_a).unwrap().bump_index(), Some(0));
-        assert_eq!(beef_b.find_txid(&txid_b).unwrap().bump_index(), Some(0));
+        assert_eq!(
+            beef_a
+                .find_txid(txid_a.parse().unwrap())
+                .unwrap()
+                .bump_index(),
+            Some(0)
+        );
+        assert_eq!(
+            beef_b
+                .find_txid(txid_b.parse().unwrap())
+                .unwrap()
+                .bump_index(),
+            Some(0)
+        );
 
         // Merge B into A.
         beef_a
@@ -1603,19 +1597,19 @@ mod tests {
             .expect("the source BEEF writes and reads back");
 
         // After merge, A should have 2 bumps.
-        assert_eq!(beef_a.bumps.len(), 2);
+        assert_eq!(beef_a.bumps().len(), 2);
 
         // tx_a should still reference the bump at block 100.
-        let btx_a = beef_a.find_txid(&txid_a).unwrap();
+        let btx_a = beef_a.find_txid(txid_a.parse().unwrap()).unwrap();
         let bump_a = btx_a.bump_index().unwrap();
-        assert_eq!(beef_a.bumps[bump_a].block_height, 100);
-        assert!(beef_a.bumps[bump_a].contains(&txid_a));
+        assert_eq!(beef_a.bumps()[bump_a].block_height, 100);
+        assert!(beef_a.bumps()[bump_a].contains(&txid_a));
 
         // tx_b should reference the bump at block 200 (remapped index).
-        let btx_b = beef_a.find_txid(&txid_b).unwrap();
+        let btx_b = beef_a.find_txid(txid_b.parse().unwrap()).unwrap();
         let bump_b = btx_b.bump_index().unwrap();
-        assert_eq!(beef_a.bumps[bump_b].block_height, 200);
-        assert!(beef_a.bumps[bump_b].contains(&txid_b));
+        assert_eq!(beef_a.bumps()[bump_b].block_height, 200);
+        assert!(beef_a.bumps()[bump_b].contains(&txid_b));
 
         // The bump indices should be different.
         assert_ne!(bump_a, bump_b, "Bump indices should differ after merge");
@@ -1653,28 +1647,30 @@ mod tests {
         let raw_e = make_raw_tx(None, 15_000, None);
         let txid_e = add_proven_tx(&mut beef, raw_e, 13);
 
-        assert_eq!(beef.txs.len(), 5);
+        assert_eq!(beef.txs().len(), 5);
 
         let size_before = beef.to_binary().expect("the BEEF is writable").len();
 
         // Prove A1.
         let bump_a1 = MerklePath::from_coinbase_txid(&txid_a1, 11);
         let bi = beef.merge_bump(bump_a1);
-        beef.find_txid_mut(&txid_a1)
-            .unwrap()
-            .set_bump_index(Some(bi));
+        beef.set_bump_index(txid_a1.parse().unwrap(), Some(bi))
+            .unwrap();
 
         beef.trim_known_proven();
 
         let size_after = beef.to_binary().expect("the BEEF is writable").len();
 
         // A0 removed, bump for block 10 removed.
-        assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
-        assert!(beef.find_txid(&txid_a1).is_some());
-        assert!(beef.find_txid(&txid_a2).is_some());
-        assert!(beef.find_txid(&txid_d).is_some());
-        assert!(beef.find_txid(&txid_e).is_some());
-        assert_eq!(beef.txs.len(), 4);
+        assert!(
+            beef.find_txid(txid_a0.parse().unwrap()).is_none(),
+            "A0 should be trimmed"
+        );
+        assert!(beef.find_txid(txid_a1.parse().unwrap()).is_some());
+        assert!(beef.find_txid(txid_a2.parse().unwrap()).is_some());
+        assert!(beef.find_txid(txid_d.parse().unwrap()).is_some());
+        assert!(beef.find_txid(txid_e.parse().unwrap()).is_some());
+        assert_eq!(beef.txs().len(), 4);
         assert!(
             size_after < size_before,
             "Trimmed BEEF ({} bytes) should be smaller than original ({} bytes)",
@@ -1905,12 +1901,12 @@ mod tests {
             .merge_raw_tx(raw, None)
             .expect("the bytes are one transaction")
             .txid();
-        let bump = MerklePath::from_coinbase_txid(&txid, 100);
+        let bump = MerklePath::from_coinbase_txid(&txid.to_string(), 100);
         let bi = beef.merge_bump(bump);
-        beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(bi));
+        beef.set_bump_index(txid, Some(bi)).unwrap();
 
         beef.trim_known_proven();
-        assert_eq!(beef.txs.len(), 1); // Still there
+        assert_eq!(beef.txs().len(), 1); // Still there
     }
 
     #[test]
@@ -1941,34 +1937,28 @@ mod tests {
             path: vec![vec![
                 MerklePathLeaf {
                     offset: 0,
-                    hash: Some(tx_a_id.clone()),
+                    hash: Some(tx_a_id.clone().to_string()),
                     txid: true,
                     duplicate: false,
                 },
                 MerklePathLeaf {
                     offset: 1,
-                    hash: Some(tx_b_id.clone()), // TX_B appears as sibling!
-                    txid: false,                 // NOT a txid — just a sibling hash
+                    hash: Some(tx_b_id.clone().to_string()), // TX_B appears as sibling!
+                    txid: false,                             // NOT a txid — just a sibling hash
                     duplicate: false,
                 },
             ]],
         };
         let bi_a = beef1.merge_bump(bump_a);
-        beef1
-            .find_txid_mut(&tx_a_id)
-            .unwrap()
-            .set_bump_index(Some(bi_a));
+        beef1.set_bump_index(tx_a_id, Some(bi_a)).unwrap();
 
         // Build BEEF 2 with TX_B proven in a different block.
         let mut beef2 = Beef::new();
         add_raw_tx(&mut beef2, tx_b_raw, None);
 
-        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id, 200);
+        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id.to_string(), 200);
         let bi_b = beef2.merge_bump(bump_b);
-        beef2
-            .find_txid_mut(&tx_b_id)
-            .unwrap()
-            .set_bump_index(Some(bi_b));
+        beef2.set_bump_index(tx_b_id, Some(bi_b)).unwrap();
 
         // Merge BEEF 2 into BEEF 1.
         beef1
@@ -1976,14 +1966,14 @@ mod tests {
             .expect("the source BEEF writes and reads back");
 
         // TX_A should still point to bump[0] (height=100)
-        let tx_a = beef1.find_txid(&tx_a_id).unwrap();
+        let tx_a = beef1.find_txid(tx_a_id).unwrap();
         assert_eq!(tx_a.bump_index(), Some(0), "TX_A should keep bump[0]");
 
         // TX_B must point to its OWN bump (height=200), NOT bump[0].
-        let tx_b = beef1.find_txid(&tx_b_id).unwrap();
+        let tx_b = beef1.find_txid(tx_b_id).unwrap();
         let tx_b_bump_idx = tx_b.bump_index().expect("TX_B should have a bump index");
         assert_eq!(
-            beef1.bumps[tx_b_bump_idx].block_height, 200,
+            beef1.bumps()[tx_b_bump_idx].block_height, 200,
             "TX_B's bump must be at height 200 (its own proof), not height 100 (where it's a sibling)"
         );
 
@@ -2019,7 +2009,7 @@ mod tests {
                 },
                 MerklePathLeaf {
                     offset: 1,
-                    hash: Some(tx_id.clone()), // our tx, flagged `00`
+                    hash: Some(tx_id.clone().to_string()), // our tx, flagged `00`
                     txid: false,
                     duplicate: false,
                 },
@@ -2031,9 +2021,12 @@ mod tests {
         beef.merge_raw_tx(tx_raw, None)
             .expect("the bytes are one transaction");
 
-        let tx = beef.find_txid(&tx_id).unwrap();
+        let tx = beef.find_txid(tx_id).unwrap();
         assert_eq!(tx.bump_index(), Some(0), "the sibling leaf's BUMP");
-        assert!(beef.bumps[0].path[0][1].txid, "the leaf flagged on the way");
+        assert!(
+            beef.bumps()[0].path[0][1].txid,
+            "the leaf flagged on the way"
+        );
     }
 
     #[test]
@@ -2069,9 +2062,12 @@ mod tests {
 
         beef.merge_bump(bump);
 
-        let tx = beef.find_txid(&tx_id).unwrap();
+        let tx = beef.find_txid(tx_id.parse().unwrap()).unwrap();
         assert_eq!(tx.bump_index(), Some(0), "the sibling leaf's BUMP");
-        assert!(beef.bumps[0].path[0][1].txid, "the leaf flagged on the way");
+        assert!(
+            beef.bumps()[0].path[0][1].txid,
+            "the leaf flagged on the way"
+        );
     }
 }
 
@@ -2119,7 +2115,7 @@ mod merkle_path_reattach_tests {
     #[test]
     fn from_beef_reattaches_the_merkle_path() {
         let (beef, txid) = proven_beef();
-        let parsed = match Transaction::from_beef(&beef, Some(&txid)) {
+        let parsed = match Transaction::from_beef(&beef, Some(txid.parse().unwrap())) {
             Ok(t) => t,
             Err(e) => panic!("from_beef failed: {e}"),
         };
@@ -2217,7 +2213,7 @@ mod merkle_path_reattach_tests {
         let beef = subject.to_beef(false).unwrap();
         let subject_txid = subject.id();
 
-        let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
+        let parsed = Transaction::from_beef(&beef, Some(subject_txid.parse().unwrap())).unwrap();
         // Every input carries the parent it spends, so its output (satoshis and
         // locking script) is right there...
         for (vin, input) in parsed.inputs().iter().enumerate() {
@@ -2281,7 +2277,7 @@ mod merkle_path_reattach_tests {
         let (beef, subject_txid) = diamond_chain_beef(LEVELS, None).await;
 
         let started = std::time::Instant::now();
-        let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
+        let parsed = Transaction::from_beef(&beef, Some(subject_txid.parse().unwrap()))
             .expect("a 24-deep diamond of unproven spends must parse and link");
         let verified = parsed
             .verify(&MockChainTracker::always_valid(800_100), None, None)
@@ -2318,7 +2314,7 @@ mod merkle_path_reattach_tests {
     #[tokio::test]
     async fn a_corrupted_signature_in_the_middle_of_the_chain_is_refused() {
         let (beef, subject_txid) = diamond_chain_beef(12, Some(6)).await;
-        let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
+        let parsed = Transaction::from_beef(&beef, Some(subject_txid.parse().unwrap()))
             .expect("the corrupted chain still parses and links");
         match parsed
             .verify(&MockChainTracker::always_valid(800_010), None, None)
@@ -2374,7 +2370,7 @@ mod merkle_path_reattach_tests {
         let beef = spend.to_beef(false).unwrap();
         let subject_txid = spend.id();
 
-        let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
+        let parsed = Transaction::from_beef(&beef, Some(subject_txid.parse().unwrap())).unwrap();
         let verified = parsed
             .verify(&MockChainTracker::always_valid(800_010), None, None)
             .await;
@@ -2486,7 +2482,7 @@ mod merkle_path_reattach_tests {
 
         let subject_txid = prev.id();
         assert_eq!(
-            beef.txs.len(),
+            beef.txs().len(),
             levels as usize + 1,
             "the fixture BEEF holds the funding plus every level, each once"
         );
@@ -2523,7 +2519,7 @@ mod iterative_equivalence_tests {
     ) {
         let txid = tx.id();
         if tx.merkle_path.is_none() {
-            if let Some(mp) = beef.find_bump(&txid) {
+            if let Some(mp) = beef.find_bump(txid.parse().unwrap()) {
                 tx.merkle_path = Some(mp.clone());
             }
         }
@@ -2540,12 +2536,15 @@ mod iterative_equivalence_tests {
             }
             let mut src = match input.source_transaction.take() {
                 Some(own) => *own,
-                None => match beef.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
+                None => match beef
+                    .find_txid(src_txid.parse().unwrap())
+                    .and_then(|b| b.tx().cloned())
+                {
                     Some(found) => found,
                     None => continue,
                 },
             };
-            let stub = Beef::bare_stub(&src, beef.find_bump(&src_txid));
+            let stub = Beef::bare_stub(&src, beef.find_bump(src_txid.parse().unwrap()));
             stubs.insert(src_txid, stub);
             legacy_attach_proof_memoized(beef, &mut src, stubs);
             input.source_transaction = Some(Box::new(src));
@@ -2553,7 +2552,7 @@ mod iterative_equivalence_tests {
     }
 
     fn legacy_find_atomic_transaction(beef: &Beef, txid: &str) -> Option<Transaction> {
-        let mut tx = beef.find_txid(txid)?.tx().cloned()?;
+        let mut tx = beef.find_txid(txid.parse().unwrap())?.tx().cloned()?;
         let mut stubs: HashMap<String, Transaction> = HashMap::new();
         legacy_attach_proof_memoized(beef, &mut tx, &mut stubs);
         Some(tx)
@@ -2561,10 +2560,10 @@ mod iterative_equivalence_tests {
 
     fn legacy_sort_txs(beef: &mut Beef) -> SortResult {
         let mut result = SortResult::default();
-        let mut valid_txids: HashMap<String, bool> = HashMap::new();
-        let mut txid_to_idx: HashMap<String, usize> = HashMap::new();
+        let mut valid_txids: HashMap<Txid, bool> = HashMap::new();
+        let mut txid_to_idx: HashMap<Txid, usize> = HashMap::new();
 
-        for (i, tx) in beef.txs.iter().enumerate() {
+        for (i, tx) in beef.txs().iter().enumerate() {
             txid_to_idx.insert(tx.txid(), i);
         }
 
@@ -2572,12 +2571,12 @@ mod iterative_equivalence_tests {
         let mut txid_only: Vec<usize> = Vec::new();
         let mut queue: Vec<usize> = Vec::new();
 
-        for (i, tx) in beef.txs.iter_mut().enumerate() {
-            tx.is_valid = Some(tx.has_proof());
+        for (i, tx) in beef.rows_mut().0.iter_mut().enumerate() {
+            tx.set_valid(Some(tx.has_proof()));
             if tx.has_proof() {
                 valid_txids.insert(tx.txid(), true);
                 with_proof.push(i);
-            } else if tx.is_txid_only() && tx.input_txids.is_empty() {
+            } else if tx.is_txid_only() && tx.input_txids().is_empty() {
                 valid_txids.insert(tx.txid(), true);
                 txid_only.push(i);
                 result.txid_only.push(tx.txid());
@@ -2591,15 +2590,15 @@ mod iterative_equivalence_tests {
 
         for &i in &queue {
             let mut has_missing = false;
-            for input_txid in &beef.txs[i].input_txids {
+            for input_txid in beef.txs()[i].input_txids() {
                 if !txid_to_idx.contains_key(input_txid) {
-                    result.missing_inputs.push(input_txid.clone());
+                    result.missing_inputs.push(*input_txid);
                     has_missing = true;
                 }
             }
             if has_missing {
                 with_missing.push(i);
-                result.with_missing_inputs.push(beef.txs[i].txid());
+                result.with_missing_inputs.push(beef.txs()[i].txid());
             } else {
                 pending.push(i);
             }
@@ -2609,12 +2608,12 @@ mod iterative_equivalence_tests {
         while !pending.is_empty() {
             let old_len = pending.len();
             pending.retain(|&i| {
-                let all_inputs_valid = beef.txs[i]
-                    .input_txids
+                let all_inputs_valid = beef.txs()[i]
+                    .input_txids()
                     .iter()
                     .all(|txid| valid_txids.contains_key(txid));
                 if all_inputs_valid {
-                    valid_txids.insert(beef.txs[i].txid(), true);
+                    valid_txids.insert(beef.txs()[i].txid(), true);
                     sorted_pending.push(i);
                     false
                 } else {
@@ -2627,10 +2626,10 @@ mod iterative_equivalence_tests {
         }
 
         for &i in &pending {
-            result.not_valid.push(beef.txs[i].txid());
+            result.not_valid.push(beef.txs()[i].txid());
         }
 
-        result.valid = valid_txids.keys().cloned().collect();
+        result.valid = valid_txids.keys().copied().collect();
 
         let mut new_order: Vec<usize> = Vec::new();
         new_order.extend(&with_missing);
@@ -2639,24 +2638,25 @@ mod iterative_equivalence_tests {
         new_order.extend(&with_proof);
         new_order.extend(&sorted_pending);
 
-        let old_txs = std::mem::take(&mut beef.txs);
-        let old_len = old_txs.len();
-        let old_vec: Vec<BeefTx> = old_txs;
+        // Through the rows' general door (#843b: the fields by hand until
+        // then), the order held as the sort leaves it.
+        let (txs, _) = beef.rows_mut();
+        let old_vec: Vec<BeefTx> = std::mem::take(txs);
+        let old_len = old_vec.len();
         for &i in &new_order {
             if i < old_len {
-                beef.txs.push(old_vec[i].clone());
+                txs.push(old_vec[i].clone());
             }
         }
-        if beef.txs.len() < old_len {
+        if txs.len() < old_len {
             for (i, tx) in old_vec.into_iter().enumerate() {
                 if !new_order.contains(&i) {
-                    beef.txs.push(tx);
+                    txs.push(tx);
                 }
             }
         }
 
-        beef.needs_sort = false;
-        beef.rebuild_index();
+        beef.hold_order();
 
         result
     }
@@ -2740,11 +2740,11 @@ mod iterative_equivalence_tests {
         }
         for ancestor in ancestors {
             // 0.3.34's merge: the entry alone, no path or source walk (#764).
-            beef.push_transaction(ancestor.id(), ancestor, None);
+            beef.push_transaction(ancestor.txid(), ancestor, None);
         }
         beef.hold_order();
         if atomic {
-            beef.to_binary_atomic_subject_last(&tx.id())
+            beef.to_binary_atomic_subject_last(tx.txid())
         } else {
             Ok(beef.to_binary().expect("the BEEF is writable"))
         }
@@ -2788,7 +2788,7 @@ mod iterative_equivalence_tests {
             }
             let txid = tx.id();
             if rng.gen_bool(0.05) {
-                beef.merge_txid_only(txid.clone());
+                beef.merge_txid_only(txid.parse().unwrap());
             } else if rng.gen_bool(0.2) {
                 let height = rng.gen_range(800_000..800_003);
                 let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&txid, height));
@@ -2801,11 +2801,10 @@ mod iterative_equivalence_tests {
             made.push((txid, outputs as u32));
         }
         for _ in 0..rng.gen_range(0..3) {
-            let repeat = beef.txs[rng.gen_range(0..beef.txs.len())].clone();
-            beef.txs.push(repeat);
+            let repeat = beef.txs()[rng.gen_range(0..beef.txs().len())].clone();
+            beef.rows_mut().0.push(repeat);
         }
-        beef.txs.shuffle(rng);
-        beef.rebuild_index();
+        beef.rows_mut().0.shuffle(rng);
         beef
     }
 
@@ -2833,10 +2832,11 @@ mod iterative_equivalence_tests {
     }
 
     fn txids(beef: &Beef) -> Vec<String> {
-        beef.txs.iter().map(|t| t.txid()).collect()
+        beef.txs().iter().map(|t| t.id()).collect()
     }
 
-    fn sorted(mut v: Vec<String>) -> Vec<String> {
+    fn sorted(v: Vec<Txid>) -> Vec<String> {
+        let mut v: Vec<String> = v.iter().map(Txid::to_string).collect();
         v.sort();
         v
     }
@@ -2886,7 +2886,7 @@ mod iterative_equivalence_tests {
                 beef.sort_txs();
             }
             for txid in txids(&beef) {
-                let new = beef.find_atomic_transaction(&txid);
+                let new = beef.find_atomic_transaction(txid.parse().unwrap());
                 let old = legacy_find_atomic_transaction(&beef, &txid);
                 assert_eq!(
                     new.as_ref().map(shape),
@@ -2907,7 +2907,7 @@ mod iterative_equivalence_tests {
             let n = rng.gen_range(1..30);
             let beef = random_beef(&mut rng, n);
             for txid in txids(&beef) {
-                let Some(mut tx) = beef.find_atomic_transaction(&txid) else {
+                let Some(mut tx) = beef.find_atomic_transaction(txid.parse().unwrap()) else {
                     continue;
                 };
                 if rng.gen_bool(0.3) {
@@ -2944,7 +2944,7 @@ mod iterative_equivalence_tests {
             let n = rng.gen_range(1..30);
             let beef = random_beef(&mut rng, n);
             for txid in txids(&beef) {
-                let Some(tx) = beef.find_atomic_transaction(&txid) else {
+                let Some(tx) = beef.find_atomic_transaction(txid.parse().unwrap()) else {
                     continue;
                 };
                 let copy = tx.clone();

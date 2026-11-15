@@ -33,10 +33,11 @@ use crate::primitives::Writer;
 use crate::Result;
 
 use super::super::beef_stream::{
-    display_hex, BeefDecoder, BeefIndex, Bump, Element, Hash32, Reason, Refusal, Step, Stop,
+    BeefDecoder, BeefIndex, Bump, Element, Hash32, Reason, Refusal, Step, Stop,
 };
 use super::super::beef_tx::BeefTx;
 use super::super::merkle_path::MerklePath;
+use super::super::txid::Txid;
 use super::super::Transaction;
 use super::{Beef, BeefLimits};
 
@@ -118,12 +119,11 @@ impl Beef {
     ) -> Result<(Self, usize)> {
         let mut decoder = BeefDecoder::collecting();
         let mut judge = Judge::new();
-        let mut beef = Self::new();
+        // The rows as read, handed to the BEEF whole at the end (#843b).
+        let (mut txs, mut bumps) = (Vec::new(), Vec::new());
         if let Some(hints) = hints {
-            beef.bumps
-                .reserve(bounded_capacity(hints.max_bumps, bin.len(), 3));
-            beef.txs
-                .reserve(bounded_capacity(hints.max_txs, bin.len(), 10));
+            bumps.reserve(bounded_capacity(hints.max_bumps, bin.len(), 3));
+            txs.reserve(bounded_capacity(hints.max_txs, bin.len(), 10));
         }
         let mut input = bin;
         loop {
@@ -133,7 +133,7 @@ impl Beef {
                         Some(refusal) => judge.note(refusal),
                         None => judge.fold(&element),
                     }
-                    beef.collect_element(element).map_err(|e| judge.refuse(e))?;
+                    collect_element(&mut txs, &mut bumps, element).map_err(|e| judge.refuse(e))?;
                 }
                 Ok(Step::NeedMore) => match decoder.finish() {
                     Ok(()) => break,
@@ -144,12 +144,12 @@ impl Beef {
                 Err(r) => return Err(judge.refuse(refusal_error(&r))),
             }
         }
+        let mut beef = Self::of_rows(super::BEEF_V2, txs, bumps, true);
         if let Some(version) = decoder.version() {
             beef.version = version;
         }
-        beef.atomic_txid = decoder.subject().as_ref().map(display_hex);
-        beef.needs_sort = true;
-        beef.wire_order = true;
+        // The prefix's 32 bytes are the subject's txid in wire order.
+        beef.atomic_txid = decoder.subject().map(Txid::from_wire_bytes);
         let used = usize::try_from(decoder.offset()).unwrap_or(bin.len());
         Ok((beef, used))
     }
@@ -191,9 +191,9 @@ impl Beef {
         let mut judge = Judge::new();
         let mut head = Writer::new();
         head.write_u32_le(self.version);
-        head.write_var_int(self.bumps.len() as u64);
+        head.write_var_int(self.bumps().len() as u64);
         let mut at = head.len() as u64;
-        for path in &self.bumps {
+        for path in self.bumps() {
             let mut writer = Writer::new();
             path.write_unchecked(&mut writer);
             let bytes = writer.into_bytes();
@@ -216,36 +216,37 @@ impl Beef {
         }
         Ok(())
     }
+}
 
-    /// One element of the stream, in its in-memory form.
-    fn collect_element(&mut self, element: Element) -> Result<()> {
-        match element {
-            Element::Bump(bump) => self.bumps.push(in_memory_bump(&bump)?),
-            Element::Tx {
-                txid,
-                bump_index,
-                body,
-                ..
-            } => {
-                // An index past `usize` names no BUMP, as the stream reads it.
-                let bump_index = bump_index.map(|i| usize::try_from(i).unwrap_or(usize::MAX));
-                // The bytes the decoder read, kept as the transaction's own,
-                // and the txid it hashed from them (its hash is theirs, not a
-                // serialization's, and computed once).
-                let tx = Transaction::from_binary(&body.raw)?;
-                let txid = display_hex(&txid);
-                self.push_tx(
-                    BeefTx::from_parts(tx, body.raw, bump_index).with_txid(txid.clone()),
-                    txid,
-                );
-            }
-            Element::TxidOnly { txid, .. } => {
-                let txid = display_hex(&txid);
-                self.push_tx(BeefTx::from_txid(txid.clone()), txid);
-            }
+/// One element of the stream, in its in-memory form, appended to the rows
+/// being read.
+fn collect_element(
+    txs: &mut Vec<BeefTx>,
+    bumps: &mut Vec<MerklePath>,
+    element: Element,
+) -> Result<()> {
+    match element {
+        Element::Bump(bump) => bumps.push(in_memory_bump(&bump)?),
+        Element::Tx {
+            txid,
+            bump_index,
+            body,
+            ..
+        } => {
+            // An index past `usize` names no BUMP, as the stream reads it.
+            let bump_index = bump_index.map(|i| usize::try_from(i).unwrap_or(usize::MAX));
+            // The bytes the decoder read, kept as the transaction's own,
+            // and the txid it hashed from them (its hash is theirs, not a
+            // serialization's, and computed once): the decoder's hash is
+            // the txid in wire order.
+            let tx = Transaction::from_binary(&body.raw)?;
+            let txid = Txid::from_wire_bytes(txid);
+            txs.push(BeefTx::from_parts(tx, body.raw, bump_index).with_txid(txid));
         }
-        Ok(())
+        // A txid-only entry's 32 bytes on the wire, in wire order.
+        Element::TxidOnly { txid, .. } => txs.push(BeefTx::from_txid(Txid::from_wire_bytes(txid))),
     }
+    Ok(())
 }
 
 /// A streamed BUMP as the in-memory [`MerklePath`] ([`Bump::in_memory`]):

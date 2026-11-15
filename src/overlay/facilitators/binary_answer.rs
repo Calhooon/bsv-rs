@@ -15,7 +15,7 @@
 
 use crate::overlay::lookup_limits::resource_limit;
 use crate::overlay::types::OutputListItem;
-use crate::transaction::Beef;
+use crate::transaction::{Beef, Txid};
 use crate::{Error, Result};
 use std::collections::HashMap;
 
@@ -25,9 +25,10 @@ use std::collections::HashMap;
 /// `:924-927`): 64 MiB.
 pub(super) const MAX_AGGREGATED_BEEF_BYTES: usize = 64 * 1024 * 1024;
 
-/// One outpoint of a binary aggregated answer: the txid as its 32 bytes'
-/// hex, the output index and the context.
-pub(super) type Outpoint = (String, u32, Option<Vec<u8>>);
+/// One outpoint of a binary aggregated answer: the txid (the answer's 32
+/// bytes are its display order, `Txid::from_display_bytes`; its hex text
+/// until #843b), the output index and the context.
+pub(super) type Outpoint = (Txid, u32, Option<Vec<u8>>);
 
 /// The answer's outputs, each carrying the Atomic BEEF of its outpoint's
 /// txid (`extractAtomicOutputs`, `:905-936`) and that txid as its hint
@@ -75,13 +76,14 @@ fn atomic_outputs_within(
     if outpoints.is_empty() {
         return Ok(Vec::new());
     }
-    // One refresh, one amount check and one position map for every
-    // outpoint's closure (#817: `Beef::to_binary_atomic` ran the three a
-    // distinct txid), prepared where the leading outpoint's closure began,
-    // so its refusal stands where that call's did.
+    // One amount check for every outpoint's closure (#817:
+    // `Beef::to_binary_atomic` ran it a distinct txid, beside a refresh and
+    // a position map that #843b's rows made needless), prepared where the
+    // leading outpoint's closure began, so its refusal stands where that
+    // call's did.
     let extract = |e: Error| Error::OverlayError(format!("Failed to extract BEEF: {e}"));
     let batch = beef.atomic_batch().map_err(extract)?;
-    let mut by_txid: HashMap<String, Vec<u8>> = HashMap::new();
+    let mut by_txid: HashMap<Txid, Vec<u8>> = HashMap::new();
     let mut generated = 0usize;
     let mut extracted = 0usize;
     let mut outputs = Vec::with_capacity(outpoints.len());
@@ -89,14 +91,14 @@ fn atomic_outputs_within(
         let atomic = match by_txid.get(&txid) {
             Some(atomic) => atomic.clone(),
             None => {
-                let atomic = batch.to_binary_atomic(&txid).map_err(extract)?;
+                let atomic = batch.to_binary_atomic(txid).map_err(extract)?;
                 generated = generated.saturating_add(atomic.len());
                 if generated > max_generated {
                     return Err(Error::OverlayError(
                         "Aggregated overlay BEEF exceeds the maximum permitted size.".into(),
                     ));
                 }
-                by_txid.insert(txid.clone(), atomic.clone());
+                by_txid.insert(txid, atomic.clone());
                 atomic
             }
         };
@@ -112,7 +114,7 @@ fn atomic_outputs_within(
             beef: atomic,
             output_index,
             context,
-            txid: Some(txid),
+            txid: Some(txid.to_string()),
         });
     }
     Ok(outputs)

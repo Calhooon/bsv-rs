@@ -368,7 +368,7 @@ macro_rules! basket {
                 let mut partial = Transaction::new();
                 for input in inputs {
                     let txid = bsv_rs::primitives::to_hex(&input.outpoint.txid);
-                    let source = Transaction::from_beef(beef, Some(&txid)).unwrap();
+                    let source = Transaction::from_beef(beef, Some(txid.parse().unwrap())).unwrap();
                     partial
                         .add_input(TransactionInput::with_source_transaction(source, input.outpoint.vout))
                         .unwrap();

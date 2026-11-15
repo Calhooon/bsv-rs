@@ -19,8 +19,13 @@
 //! from the others without a cell or a telling name (a plain `bool` flag), a
 //! struct built by a macro. So `BeefTx`, whose derived members (`txid`,
 //! `raw_tx`, `input_txids`, `is_valid`) carry no cell and no collection named
-//! for a store, is not seen by this scan: #843's next pull request makes
-//! `input_txids` and `is_valid` read-only by hand, and its rule names them.
+//! for a store, is not seen by this scan: it is named by hand since #843b
+//! ([`HAND_NAMED`]: no field of it is public, `input_txids` and `is_valid`
+//! read-only through accessors). `Beef` left the scan's sight with #843b
+//! too: its index lives in `Rows` (`src/transaction/beef/rows.rs`' `sealed`
+//! module, which the scan does read and which has no public field), and
+//! `Beef`'s two public fields, `version` and `atomic_txid`, are derived
+//! from nothing.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 mod arch_support;
@@ -33,25 +38,10 @@ const CELLS: &[&str] = &["RefCell", "Cell", "OnceLock", "OnceCell", "Mutex", "Rw
 /// `Type.field`: a public field of a struct that holds a cache or an index,
 /// each with its reason. `Transaction.metadata` and `Transaction.merkle_path`
 /// left the list with #869's fold: the caches moved into `Fields`, which has
-/// no public field, and `Transaction` holds no cell of its own. #843's next pull request (the BEEF owns `txs` and
-/// `bumps`) removes the rows that name it; the list only shrinks.
+/// no public field, and `Transaction` holds no cell of its own. The four
+/// `Beef.*` rows left it with #843b (the BEEF owns `txs` and `bumps`; its
+/// index lives in the sealed `Rows`); the list only shrinks.
 const ALLOWED: &[(&str, &str)] = &[
-    (
-        "Beef.bumps",
-        "#843's next PR: private, with retain_bumps and edit_bump (Part O, 4 of 5)",
-    ),
-    (
-        "Beef.txs",
-        "#843's next PR: private, the index derived from it (Part O, 5 of 5)",
-    ),
-    (
-        "Beef.version",
-        "nothing derived from it: stays public by Part O (the next PR re-reads it)",
-    ),
-    (
-        "Beef.atomic_txid",
-        "nothing derived from it: stays public by Part O (the next PR re-reads it)",
-    ),
     (
         "AuthFetch.wallet",
         "a finding of #843's lane: crate-private sharing (pub(super)) beside its locks; the locks hold sessions and peers, nothing derived from these fields",
@@ -368,6 +358,69 @@ fn transaction_holds_its_caches_and_no_serialized_field_is_public_843() {
             "Transaction declares no {name} of its own"
         );
     }
+}
+
+/// The BEEF's half of the rule (#843b). `Rows` (the inline `sealed` module
+/// of `src/transaction/beef/rows.rs`) holds the entries, the BUMPs, the
+/// index and the two marks, every field private, and the scan sees its
+/// index as a derived store; `Beef` holds it in a private field and declares
+/// neither row itself, its two public fields the ones nothing is derived
+/// from; and `BeefTx`, which the scan cannot see (no cell, no collection
+/// named for a store), is named by hand: no field of it is public, its
+/// `input_txids` and `is_valid` read through accessors alone.
+#[test]
+fn beef_holds_its_rows_and_no_row_or_derived_member_is_public_843b() {
+    let all = structs();
+    let declared = |path: &str, name: &str| {
+        all.iter()
+            .find(|(p, _, n, _)| p == path && n == name)
+            .map(|(_, _, _, fields)| fields)
+            .unwrap_or_else(|| panic!("{name} is declared in {path}"))
+    };
+    let rows = declared("src/transaction/beef/rows.rs", "Rows");
+    assert!(
+        holds_derived(rows),
+        "the scan sees the BEEF's index in Rows"
+    );
+    for name in ["txs", "bumps", "index", "needs_sort", "wire_order"] {
+        let f = rows
+            .iter()
+            .find(|f| f.name == name)
+            .unwrap_or_else(|| panic!("Rows.{name} is declared"));
+        assert!(f.public.is_none(), "Rows.{name} is private (#843b)");
+    }
+    assert_eq!(rows.len(), 5, "Rows holds the five and nothing else");
+
+    let beef = declared("src/transaction/beef.rs", "Beef");
+    let held = beef
+        .iter()
+        .find(|f| f.name == "rows")
+        .expect("Beef holds its Rows");
+    assert!(held.public.is_none(), "Beef.rows is private");
+    assert_eq!(held.ty, ["rows", "::", "Rows"]);
+    let public: Vec<&str> = beef
+        .iter()
+        .filter(|f| f.public.is_some())
+        .map(|f| f.name.as_str())
+        .collect();
+    assert_eq!(
+        public,
+        ["version", "atomic_txid"],
+        "the two fields nothing is derived from stay public (Part O)"
+    );
+    assert_eq!(beef.len(), 3, "Beef declares no row, index or mark itself");
+
+    let entry = declared("src/transaction/beef_tx.rs", "BeefTx");
+    for name in ["txid", "input_txids", "is_valid"] {
+        assert!(
+            entry.iter().any(|f| f.name == name),
+            "BeefTx.{name} is declared"
+        );
+    }
+    assert!(
+        entry.iter().all(|f| f.public.is_none()),
+        "no field of BeefTx is public: its txid, input list and validity are derived (#843b)"
+    );
 }
 
 /// The scanner's reading on a probe: visibility forms, a tuple struct, a

@@ -58,7 +58,7 @@ fn sign(mut copy: Transaction) -> Transaction {
 }
 
 fn entry_input_linked(beef: &Beef, txid: &str) -> bool {
-    beef.find_txid(txid)
+    beef.find_txid(txid.parse().unwrap())
         .expect("the child is held")
         .tx()
         .is_some_and(|tx| tx.inputs()[0].source_transaction.is_some())
@@ -78,7 +78,9 @@ fn find_transaction_for_signing_answers_a_copy_and_leaves_the_entry_as_held_stat
     assert!(!entry_input_linked(&beef, &child));
     assert_eq!(s["entry_input_linked_before"], false);
 
-    let copy = beef.find_transaction_for_signing(&child).unwrap();
+    let copy = beef
+        .find_transaction_for_signing(child.parse().unwrap())
+        .unwrap();
     assert_eq!(copy.id(), child);
     let source = copy.inputs()[0]
         .source_transaction
@@ -93,7 +95,7 @@ fn find_transaction_for_signing_answers_a_copy_and_leaves_the_entry_as_held_stat
     let signed = sign(copy);
     assert_eq!(signed.id(), text(&s, "signed_child_txid"));
     assert_eq!(beef.to_hex().unwrap(), before);
-    assert!(beef.find_txid(&child).is_some());
+    assert!(beef.find_txid(child.parse().unwrap()).is_some());
 
     // Theirs, the other column: the entry itself returned, its input linked,
     // the BEEF's bytes moved by the signature.
@@ -108,17 +110,24 @@ fn a_signed_copy_returns_through_edit_tx_stated_817() {
     let s = signing();
     let child = text(&s, "child_txid");
     let mut beef = Beef::from_hex(&text(&s, "before")).unwrap();
-    let signed = sign(beef.find_transaction_for_signing(&child).unwrap());
+    let signed = sign(
+        beef.find_transaction_for_signing(child.parse().unwrap())
+            .unwrap(),
+    );
     assert_eq!(signed.to_hex(), text(&s, "signed_child"));
 
     let script = signed.inputs()[0].unlocking_script.clone();
-    beef.edit_tx(&child, |tx| tx.inputs_mut()[0].unlocking_script = script)
-        .unwrap();
+    beef.edit_tx(child.parse().unwrap(), |tx| {
+        tx.inputs_mut()[0].unlocking_script = script
+    })
+    .unwrap();
     assert_eq!(
         beef.to_hex().unwrap(),
         text(&s, "hex_after_signing_the_returned"),
         "the BEEF after edit_tx is the reference's after its in-place signing"
     );
-    assert!(beef.find_txid(&child).is_none());
-    assert!(beef.find_txid(&text(&s, "signed_child_txid")).is_some());
+    assert!(beef.find_txid(child.parse().unwrap()).is_none());
+    assert!(beef
+        .find_txid(text(&s, "signed_child_txid").parse().unwrap())
+        .is_some());
 }

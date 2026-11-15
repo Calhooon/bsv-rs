@@ -8,13 +8,13 @@
 //! Such a ring names at least one entry that is not held ahead of it, which
 //! BRC-62's order (`transactions/0062.md:172` step 2.4.1) and both readers
 //! refuse as `InputNamesNoElement` before any walk. In memory the same
-//! holds of the parsed transactions since #171: an entry mutated through
-//! `BeefTx::tx_mut` is renamed by its new hash, so pointing an input at a
-//! descendant leaves a chain. A ring is left only in the public
-//! `input_txids` cache, written by hand: there `sort_txs`, the whole-path
-//! judge and the trim must each stop. The linker's memo
-//! (`Beef::add_input_proof`, a stub memoized before it descends) and
-//! `to_binary_atomic`'s closure keep their seen sets.
+//! holds of the parsed transactions since #171: an entry edited in place
+//! (`Beef::edit_tx`) is renamed by its new hash, so pointing an input at a
+//! descendant leaves a chain. Until #843b a ring could be left in the
+//! public `input_txids` cache, written by hand; the list is read-only now,
+//! always the txids the entry's transaction names, so no ring is held. The
+//! linker's memo (`Beef::add_input_proof`, a stub memoized before it
+//! descends) and `to_binary_atomic`'s closure keep their seen sets.
 //! The termination these mirror is the stack's: `BeefOfAnySize.lean`
 //! `walk` (`:944`) takes one unit of fuel per txid and keeps a `seen` set,
 //! `budget` (`:956`) bounds the fuel by the entries and the edges.
@@ -335,9 +335,11 @@ fn linked_depth(tx: &Transaction) -> usize {
 }
 
 #[test]
-fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
-    // Since #171 an entry mutated through `tx_mut` is named by the mutated
-    // transaction's hash, so pointing `T0`'s input at the last link renames
+fn a_ring_closed_through_an_edit_renames_the_entry_and_is_a_chain() {
+    // Since #171 an entry edited in place is named by the edited
+    // transaction's hash (`Beef::edit_tx`; through `BeefTx::tx_mut` until
+    // #843b, the test then `a_ring_closed_through_tx_mut_renames_the_entry_
+    // and_is_a_chain`), so pointing `T0`'s input at the last link renames
     // `T0` and the names cannot close: `T0'` spends the last link, `T1`
     // spends the `T0` that is no longer held. In memory as on the wire, no
     // transaction's hash is in its own ancestry.
@@ -345,26 +347,36 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
         let (mut beef, ids) = in_memory_chain(n);
         let last = ids[n - 1].clone();
         let renamed = beef
-            .edit_tx(&ids[0], |tx| {
+            .edit_tx(ids[0].parse().unwrap(), |tx| {
                 tx.inputs_mut()[0].source_txid = Some(last.parse().unwrap());
                 tx.id()
             })
             .unwrap();
         assert_ne!(renamed, ids[0], "chain of {n}: the entry is renamed");
-        assert!(beef.find_txid(&ids[0]).is_none(), "chain of {n}");
+        assert!(
+            beef.find_txid(ids[0].parse().unwrap()).is_none(),
+            "chain of {n}"
+        );
         // The linker walks the chain under the new name and stops at the
         // missing `T0`: `n - 1` links.
         let (depth, _) = bounded(&format!("renamed chain of {n}: link"), {
             let (mut beef, renamed) = (beef.clone(), renamed.clone());
             move || {
                 beef.sort_txs();
-                linked_depth(&beef.find_atomic_transaction(&renamed).unwrap())
+                linked_depth(
+                    &beef
+                        .find_atomic_transaction(renamed.parse().unwrap())
+                        .unwrap(),
+                )
             }
         });
         assert_eq!(depth, n - 1, "chain of {n}: the links held");
         let (closure, _) = bounded(&format!("renamed chain of {n}: to_binary_atomic"), {
             let (mut beef, renamed) = (beef.clone(), renamed.clone());
-            move || beef.to_binary_atomic(&renamed).map(|b| b.len())
+            move || {
+                beef.to_binary_atomic(renamed.parse().unwrap())
+                    .map(|b| b.len())
+            }
         });
         assert!(closure.is_ok(), "chain of {n}: the closure is written");
         let (sorted, _) = bounded(&format!("renamed chain of {n}: sort_txs"), {
@@ -385,7 +397,7 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
                 let mut back =
                     Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
                 (
-                    back.find_txid(&renamed).is_some(),
+                    back.find_txid(renamed.parse().unwrap()).is_some(),
                     back.verify_structure().err(),
                 )
             }
@@ -398,49 +410,54 @@ fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
     }
 }
 
+// Removed: `a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge`.
+// It wrote a ring into the public `BeefTx::input_txids` by hand (through
+// `find_txid_mut`) and pinned that the sort, the whole-path judge and the
+// trim each stop on it. The write does not compile since #843b:
+// `src/transaction/beef/rows.rs`' `compile_fail` doc tests. What replaced
+// it is the test below: an entry's input list is its transaction's after
+// every door, so the only ring left to try is the one through the fields,
+// which the test above shows is a chain.
+
+/// An entry's `input_txids` is read from its transaction, at the read and
+/// after an edit: for every unproven entry it is the txids the
+/// transaction's inputs name, so the sort reads what the bytes carry.
+///
+/// Replaces `a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge`
+/// on the law (#843b): no hand write of the list is left to plant a ring.
 #[test]
-fn a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge() {
-    // `BeefTx::input_txids` is a public field: set by hand on an entry
-    // `tx_mut` never touched, it names a ring the sort, the whole-path judge
-    // and the trim read (the linker and the atomic closure read the parsed
-    // transaction, where no ring can be). Each stops.
+fn an_entrys_input_list_is_its_transactions_after_every_door_843b() {
+    let named = |beef: &Beef| {
+        for entry in beef.txs() {
+            let tx = entry.tx().expect("a raw entry read from bytes is parsed");
+            let inputs: Vec<_> = tx.inputs().iter().filter_map(|i| i.source_txid).collect();
+            assert_eq!(entry.input_txids(), inputs, "{}", entry.id());
+        }
+    };
     for n in [1, 2, 3] {
-        // `n = 1`: a transaction whose cached input names its own txid.
         let (mut beef, ids) = in_memory_chain(n);
+        named(&beef);
+        // The edit that would close a ring: `T0` pointed at the last link.
         let last = ids[n - 1].clone();
-        beef.find_txid_mut(&ids[0]).unwrap().input_txids = vec![last];
-        let (sorted, _) = bounded(&format!("cached ring of {n}: sort_txs"), {
+        let renamed = beef
+            .edit_tx(ids[0].parse().unwrap(), |tx| {
+                tx.inputs_mut()[0].source_txid = Some(last.parse().unwrap());
+                tx.txid()
+            })
+            .unwrap();
+        named(&beef);
+        assert_eq!(beef.find_txid(renamed).unwrap().input_txids(), [last]);
+        // The trim and the sort stop, and the sort names no ring: `T0` is
+        // missing, as the test above reads it.
+        let (sorted, _) = bounded(&format!("edited chain of {n}: trim and sort"), {
             let mut beef = beef.clone();
             move || {
-                let sr = beef.sort_txs();
-                (sr.missing_inputs.len(), sr.not_valid.len())
+                beef.trim_known_proven();
+                beef.sort_txs().missing_inputs
             }
         });
-        assert_eq!(
-            sorted,
-            (0, n),
-            "ring of {n}: no input missing, every link not valid"
-        );
-        let (whole, _) = bounded(&format!("cached ring of {n}: verify_structure"), {
-            let mut beef = beef.clone();
-            move || beef.verify_structure().err()
-        });
-        assert_eq!(whole, Some(Kind::InputNamesNoElement), "ring of {n}");
-        // The trim stops (a ring has no tip to walk from).
-        bounded(&format!("cached ring of {n}: trim_known_proven"), {
-            let mut beef = beef.clone();
-            move || beef.trim_known_proven()
-        });
-        // The writer emits the bytes each entry was read with: read back,
-        // `T0` spends the placeholder again and the whole path refuses it.
-        let (reread, _) = bounded(&format!("cached ring of {n}: round trip"), {
-            let mut beef = beef.clone();
-            move || {
-                let bytes = beef.to_binary().expect("the BEEF is writable");
-                Beef::from_binary(&bytes).unwrap().verify_structure().err()
-            }
-        });
-        assert_eq!(reread, Some(Kind::InputNamesNoElement), "ring of {n}");
+        assert_eq!(sorted, vec![ids[0].clone()], "chain of {n}");
+        named(&beef);
     }
 }
 

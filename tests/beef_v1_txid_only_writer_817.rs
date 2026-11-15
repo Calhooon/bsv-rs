@@ -108,13 +108,16 @@ fn a_v1_beef_holding_a_txid_only_entry_is_refused_in_the_reference_words_817() {
     let (_, _, v1) = proven_parent_and_child();
     let mut beef = Beef::from_binary(&v1).unwrap();
     assert_eq!(beef.version, BEEF_V1);
-    beef.merge_txid_only(FRESH.to_string());
+    beef.merge_txid_only(FRESH.to_string().parse().unwrap());
     every_writer_refuses(&mut beef, RAW_TX_EXPECTED);
     assert_eq!(beef.version, BEEF_V1, "the held version is left as it is");
     // The migration's remedy: the V2 word carries it.
     beef.version = BEEF_V2;
     let read = Beef::from_binary(&beef.to_binary().expect("V2 carries a txid-only entry")).unwrap();
-    assert!(read.find_txid(FRESH).unwrap().is_txid_only());
+    assert!(read
+        .find_txid(FRESH.parse().unwrap())
+        .unwrap()
+        .is_txid_only());
 }
 
 #[test]
@@ -122,7 +125,7 @@ fn a_v2_beef_merged_into_a_v1_beef_makes_a_beef_the_writers_refuse_817() {
     let (_, _, v1) = proven_parent_and_child();
     let mut target = Beef::from_binary(&v1).unwrap();
     let mut source = Beef::new();
-    source.merge_txid_only(FRESH.to_string());
+    source.merge_txid_only(FRESH.to_string().parse().unwrap());
     // The V2 source writes and reads back: the merge is the reference's.
     target
         .merge_beef(&source)
@@ -134,11 +137,11 @@ fn a_v2_beef_merged_into_a_v1_beef_makes_a_beef_the_writers_refuse_817() {
 fn a_v1_entry_made_txid_only_is_refused_and_written_under_v2_still_proven_817() {
     let (parent, _, v1) = proven_parent_and_child();
     let mut beef = Beef::from_binary(&v1).unwrap();
-    beef.make_txid_only(&parent.id()).unwrap();
+    beef.make_txid_only(parent.txid()).unwrap();
     every_writer_refuses(&mut beef, RAW_TX_EXPECTED);
     beef.version = BEEF_V2;
     let mut read = Beef::from_binary(&beef.to_binary().expect("V2 carries it")).unwrap();
-    assert!(read.find_txid(&parent.id()).unwrap().is_txid_only());
+    assert!(read.find_txid(parent.txid()).unwrap().is_txid_only());
     assert!(read.verify_valid(true).valid, "the BUMP proves the stub");
 }
 
@@ -157,27 +160,27 @@ fn a_v1_beef_without_a_txid_only_entry_is_still_written_v1_byte_for_byte_817() {
 fn the_atomic_writer_refuses_a_v1_closure_holding_a_txid_only_entry_817() {
     let (parent, child, v1) = proven_parent_and_child();
     let mut beef = Beef::from_binary(&v1).unwrap();
-    beef.make_txid_only(&parent.id()).unwrap();
+    beef.make_txid_only(parent.txid()).unwrap();
     assert_eq!(
-        beef_words(beef.to_binary_atomic(&child.id())),
+        beef_words(beef.to_binary_atomic(child.txid())),
         RAW_TX_EXPECTED
     );
 
     // A V1 closure without one is written as before; a txid-only entry
     // outside the closure is dropped, so it writes too.
     let mut beef = Beef::from_binary(&v1).unwrap();
-    beef.merge_txid_only(FRESH.to_string());
+    beef.merge_txid_only(FRESH.to_string().parse().unwrap());
     let atomic = beef
-        .to_binary_atomic(&child.id())
+        .to_binary_atomic(child.txid())
         .expect("the closure holds no txid-only entry");
     assert_eq!(&atomic[36..40], &BEEF_V1.to_le_bytes());
     let read = Beef::from_binary(&atomic).unwrap();
-    assert!(read.find_txid(FRESH).is_none());
+    assert!(read.find_txid(FRESH.parse().unwrap()).is_none());
 }
 
 #[test]
 fn beef_tx_to_writer_refuses_a_txid_only_entry_outside_v2_817() {
-    let entry = BeefTx::from_txid(FRESH.to_string());
+    let entry = BeefTx::from_txid(FRESH.to_string().parse().unwrap());
     for version in [BEEF_V1, 0, 0xEFBE_0003] {
         let mut writer = Writer::new();
         assert_eq!(
@@ -214,9 +217,9 @@ fn every_vector_beef_is_written_and_read_back_and_a_v1_one_refuses_a_stub_817() 
         };
         read += 1;
         let shape = |b: &Beef| {
-            let mut txids: Vec<String> = b.txs.iter().map(|t| t.txid()).collect();
+            let mut txids: Vec<String> = b.txs().iter().map(|t| t.id()).collect();
             txids.sort();
-            let bumps: Vec<Vec<u8>> = b.bumps.iter().map(|p| p.to_binary().unwrap()).collect();
+            let bumps: Vec<Vec<u8>> = b.bumps().iter().map(|p| p.to_binary().unwrap()).collect();
             (txids, bumps, b.version)
         };
         let written = beef
@@ -234,13 +237,18 @@ fn every_vector_beef_is_written_and_read_back_and_a_v1_one_refuses_a_stub_817() 
         if beef.version == BEEF_V1 {
             v1 += 1;
         }
-        beef.merge_txid_only(FRESH.to_string());
+        beef.merge_txid_only(FRESH.to_string().parse().unwrap());
         if beef.version == BEEF_V1 {
             assert_eq!(beef_words(beef.to_binary()), RAW_TX_EXPECTED, "{name}");
         } else {
             let bytes = beef.to_binary().expect("V2 carries a txid-only entry");
             let back = Beef::from_binary(&bytes).unwrap();
-            assert!(back.find_txid(FRESH).unwrap().is_txid_only(), "{name}");
+            assert!(
+                back.find_txid(FRESH.parse().unwrap())
+                    .unwrap()
+                    .is_txid_only(),
+                "{name}"
+            );
         }
     }
     assert_eq!((read, v1), SWEPT, "BEEFs read, V1 BEEFs read");
@@ -266,21 +274,21 @@ fn the_reference_and_this_crate_refuse_in_the_same_words_recorded_817() {
         let mut beef = Beef::from_binary(&v1).unwrap();
         match name {
             "merge_txid_only" => {
-                beef.merge_txid_only(FRESH.to_string());
+                beef.merge_txid_only(FRESH.to_string().parse().unwrap());
             }
             "make_txid_only" => {
-                beef.make_txid_only(&parent.id()).unwrap();
+                beef.make_txid_only(parent.txid()).unwrap();
             }
             "merge_beef_v2_txid_only" => {
                 let mut source = Beef::new();
-                source.merge_txid_only(FRESH.to_string());
+                source.merge_txid_only(FRESH.to_string().parse().unwrap());
                 beef.merge_beef(&source)
                     .expect("the V2 source writes and reads back");
             }
             "to_binary_atomic_make_txid_only" => {
-                beef.make_txid_only(&parent.id()).unwrap();
+                beef.make_txid_only(parent.txid()).unwrap();
                 assert_eq!(
-                    beef_words(beef.to_binary_atomic(&child.id())),
+                    beef_words(beef.to_binary_atomic(child.txid())),
                     thrown,
                     "{name}"
                 );

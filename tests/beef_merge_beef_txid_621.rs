@@ -137,15 +137,15 @@ fn sources() -> Vec<(String, Beef)> {
 /// raw entry went through `merge_raw_tx` whatever the target held; on these
 /// 260 BEEFs the two models write the same (green on `abbda405` and the tip).
 fn merge_entry_by_entry(target: &mut Beef, source: &Beef) {
-    for bump in &source.bumps {
+    for bump in source.bumps() {
         target.merge_bump(bump.clone());
     }
-    for tx in &source.txs {
+    for tx in source.txs() {
         if tx.is_txid_only() {
             target.merge_txid_only(tx.txid());
         } else if let Some(raw) = tx.raw_tx() {
             let held = target
-                .find_txid(&tx.txid())
+                .find_txid(tx.txid())
                 .is_some_and(|e| !e.is_txid_only());
             if !held {
                 target
@@ -169,11 +169,14 @@ struct Seen {
 fn seen(mut beef: Beef, txids: &[String]) -> Seen {
     let bytes = beef.to_binary().expect("the BEEF is writable");
     let entries = beef
-        .txs
+        .txs()
         .iter()
-        .map(|t| (t.txid(), t.bump_index(), t.is_txid_only()))
+        .map(|t| (t.id(), t.bump_index(), t.is_txid_only()))
         .collect();
-    let found = txids.iter().map(|t| beef.find_txid(t).is_some()).collect();
+    let found = txids
+        .iter()
+        .map(|t| beef.find_txid(t.parse().unwrap()).is_some())
+        .collect();
     Seen {
         bytes,
         entries,
@@ -185,7 +188,7 @@ fn seen(mut beef: Beef, txids: &[String]) -> Seen {
 /// (the two leading raw entries), or `None` with fewer than two.
 fn prefilled(source: &Beef) -> Option<Beef> {
     let mut raws = source
-        .txs
+        .txs()
         .iter()
         .filter_map(|t| t.raw_tx().map(|r| (t.txid(), r)));
     let (leading, _) = raws.next()?;
@@ -204,7 +207,7 @@ fn merge_beef_writes_the_bytes_the_per_entry_merge_writes_621() {
     assert!(sources.len() > 50, "the tree's BEEFs: {}", sources.len());
     let mut prefilled_count = 0;
     for (name, source) in &sources {
-        let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
+        let txids: Vec<String> = source.txs().iter().map(BeefTx::id).collect();
 
         let mut merged = Beef::new();
         merged
@@ -238,56 +241,75 @@ fn merge_beef_writes_the_bytes_the_per_entry_merge_writes_621() {
     assert!(prefilled_count > 0);
 }
 
-/// The source entry built by the public constructor holds no txid: the merge
-/// files it under its bytes' hash.
+/// A source entry merged from raw bytes is filed by `merge_beef` under the
+/// hash of those bytes.
+///
+/// Replaces `a_source_entry_built_from_raw_bytes_without_a_txid_merges_under_its_hash_621`,
+/// which pushed `BeefTx::from_raw_tx(raw, None)`, an entry holding no txid,
+/// onto the public `txs`. No public door puts such an entry in a `Beef`
+/// since #843b (the push does not compile: `src/transaction/beef/rows.rs`'
+/// `compile_fail` doc tests); `merge_raw_tx` is the door for raw bytes and
+/// files the entry under their hash where it enters, which `merge_beef`
+/// keeps.
 #[test]
-fn a_source_entry_built_from_raw_bytes_without_a_txid_merges_under_its_hash_621() {
+fn a_source_entry_merged_from_raw_bytes_merges_under_its_hash_843b() {
     let (_, chain) = sources()
         .into_iter()
         .find(|(name, _)| name == "deep chain of 40")
         .unwrap();
-    let raw = chain.txs[1].raw_tx().unwrap().to_vec();
+    let raw = chain.txs()[1].raw_tx().unwrap().to_vec();
     let mut hash = sha256d(&raw);
     hash.reverse();
     let txid = to_hex(&hash);
 
     let mut source = Beef::new();
     source
-        .txs
-        .push(BeefTx::from_raw_tx(raw.clone(), None).expect("the bytes are one transaction"));
+        .merge_raw_tx(raw.clone(), None)
+        .expect("the bytes are one transaction");
     let mut merged = Beef::new();
     merged
         .merge_beef(&source)
         .expect("the source BEEF writes and reads back");
     assert_eq!(
-        merged.find_txid(&txid).unwrap().raw_tx(),
+        merged.find_txid(txid.parse().unwrap()).unwrap().raw_tx(),
         Some(raw.as_slice())
     );
-    assert_eq!(merged.txs.len(), 1);
+    assert_eq!(merged.txs().len(), 1);
 }
 
-/// An entry mutated through `tx_mut` has dropped its bytes and merges on the
-/// parsed branch under its new txid, unchanged by #621.
+/// A source entry edited through `edit_tx` is re-keyed at once and merges
+/// under its new txid, its bytes the edited transaction's.
+///
+/// Replaces `a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621`:
+/// `BeefTx::tx_mut` and `Beef::find_txid_mut` do not compile since #843b
+/// (`src/transaction/beef/rows.rs`' `compile_fail` doc tests). Through
+/// `tx_mut` the entry dropped its bytes and waited for `merge_beef`'s scan
+/// to re-key it; through `edit_tx` an entry held raw stays raw, re-written,
+/// and the source is found by the new txid before any merge.
 #[test]
-#[allow(deprecated)] // pins the deprecated `tx_mut` path: an entry that dropped its bytes
-fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
+fn a_source_entry_edited_through_edit_tx_merges_under_its_new_txid_843b() {
     let (_, mut source) = sources()
         .into_iter()
         .find(|(name, _)| name == "deep chain of 40")
         .unwrap();
-    let old = source.txs[2].txid();
-    let tx = source.find_txid_mut(&old).unwrap().tx_mut().unwrap();
-    tx.set_lock_time(7);
-    let new = tx.id();
+    let old = source.txs()[2].txid();
+    let new = source
+        .edit_tx(old, |tx| {
+            tx.set_lock_time(7);
+            tx.txid()
+        })
+        .unwrap();
     assert_ne!(old, new);
+    assert!(source.find_txid(new).is_some(), "re-keyed at once");
+    assert!(source.find_txid(old).is_none());
 
     let mut merged = Beef::new();
     merged
         .merge_beef(&source)
         .expect("the source BEEF writes and reads back");
-    assert!(merged.find_txid(&new).is_some());
-    assert!(merged.find_txid(&old).is_none());
-    assert_eq!(merged.find_txid(&new).unwrap().tx().unwrap().lock_time(), 7);
+    assert!(merged.find_txid(new).is_some());
+    assert!(merged.find_txid(old).is_none());
+    assert_eq!(merged.find_txid(new).unwrap().tx().unwrap().lock_time(), 7);
 }
 
 /// #817: a target holding a raw entry of the source under a BUMP of its own
@@ -297,20 +319,20 @@ fn a_source_entry_mutated_through_tx_mut_merges_under_its_new_txid_621() {
 /// later, the index a rescan of the entry would name. `None` where the source
 /// proves no raw entry. The target and the entry's txid.
 fn held_under_its_own_bump(source: &Beef) -> Option<(Beef, String)> {
-    let (txid, raw) = source.txs.iter().find_map(|t| {
+    let (txid, raw) = source.txs().iter().find_map(|t| {
         let raw = t.raw_tx()?;
         let txid = t.txid();
-        let bump = source.bumps.get(t.bump_index()?)?;
+        let bump = source.bumps().get(t.bump_index()?)?;
         bump.path
             .first()?
             .iter()
-            .any(|leaf| leaf.hash.as_deref() == Some(txid.as_str()))
+            .any(|leaf| leaf.hash.as_deref().is_some_and(|hash| txid == hash))
             .then(|| (txid, raw.to_vec()))
     })?;
-    let height = source.bumps.iter().map(|b| b.block_height).max()?;
+    let height = source.bumps().iter().map(|b| b.block_height).max()?;
     let own = MerklePath::new(
         height.checked_add(1)?,
-        vec![vec![MerklePathLeaf::new_txid(0, txid.clone())]],
+        vec![vec![MerklePathLeaf::new_txid(0, txid.to_string())]],
     )
     .ok()?;
     let mut target = Beef::new();
@@ -323,7 +345,7 @@ fn held_under_its_own_bump(source: &Beef) -> Option<(Beef, String)> {
         Some(0),
         "the target's own BUMP proves it"
     );
-    Some((target, txid))
+    Some((target, txid.to_string()))
 }
 
 /// #817: a target holding a raw child of the source as `merge_transaction`
@@ -331,11 +353,11 @@ fn held_under_its_own_bump(source: &Beef) -> Option<(Beef, String)> {
 /// too), or `None` where no raw entry of the source spends another. The
 /// target, the child's txid and the linked input's position.
 fn held_with_its_source_link(source: &Beef) -> Option<(Beef, String, usize)> {
-    source.txs.iter().find_map(|t| {
+    source.txs().iter().find_map(|t| {
         let mut child = Transaction::from_binary(t.raw_tx()?).ok()?;
         let (at, parent) = child.inputs().iter().enumerate().find_map(|(at, input)| {
             let named = input.source_txid.map(|t| t.to_string())?;
-            let parent = source.find_txid(&named)?;
+            let parent = source.find_txid(named.parse().unwrap())?;
             Some((at, Transaction::from_binary(parent.raw_tx()?).ok()?))
         })?;
         child.inputs_mut()[at].source_transaction = Some(Box::new(parent));
@@ -349,7 +371,7 @@ fn held_with_its_source_link(source: &Beef) -> Option<(Beef, String, usize)> {
 /// True when the entry under `txid` is held parsed with its input `at`
 /// linked to a source transaction.
 fn linked(beef: &Beef, txid: &str, at: usize) -> bool {
-    beef.find_txid(txid)
+    beef.find_txid(txid.parse().unwrap())
         .and_then(BeefTx::tx)
         .and_then(|tx| tx.inputs().get(at))
         .is_some_and(|input| input.source_transaction.is_some())
@@ -367,7 +389,7 @@ fn a_held_raw_entry_keeps_the_index_of_its_own_bump_on_every_beef_817() {
     let sources = sources();
     let mut indexed = 0;
     for (name, source) in &sources {
-        let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
+        let txids: Vec<String> = source.txs().iter().map(BeefTx::id).collect();
         let (Some((mut merged, txid)), Some((mut by_entry, _))) = (
             held_under_its_own_bump(source),
             held_under_its_own_bump(source),
@@ -378,14 +400,17 @@ fn a_held_raw_entry_keeps_the_index_of_its_own_bump_on_every_beef_817() {
         merged
             .merge_beef(source)
             .expect("the source BEEF writes and reads back");
-        let later = merged.bumps.iter().skip(1).any(|b| {
+        let later = merged.bumps().iter().skip(1).any(|b| {
             b.path
                 .first()
                 .is_some_and(|l| l.iter().any(|leaf| leaf.hash.as_deref() == Some(&txid)))
         });
         assert!(later, "{name}: a later BUMP holds the held txid");
         assert_eq!(
-            merged.find_txid(&txid).unwrap().bump_index(),
+            merged
+                .find_txid(txid.parse().unwrap())
+                .unwrap()
+                .bump_index(),
             Some(0),
             "{name}: the held raw entry keeps the index it was held under"
         );
@@ -413,7 +438,7 @@ fn a_held_parsed_entry_keeps_its_source_link_on_every_beef_817() {
     let sources = sources();
     let mut with_links = 0;
     for (name, source) in &sources {
-        let txids: Vec<String> = source.txs.iter().map(BeefTx::txid).collect();
+        let txids: Vec<String> = source.txs().iter().map(BeefTx::id).collect();
         let (Some((mut merged, txid, at)), Some((mut by_entry, _, _))) = (
             held_with_its_source_link(source),
             held_with_its_source_link(source),

@@ -74,7 +74,7 @@ fn bump(v: &Value, name: &str) -> MerklePath {
 /// `link:c_to_t` (the held C's transaction given T as its source in memory)
 /// and `reread:` (the BEEF replaced by its own bytes read back, #621's third
 /// fold) and `edit:u_to_v` (the held U given a lock time of 1 through
-/// `tx_mut`, so it is V; #621's fourth fold).
+/// `Beef::edit_tx`, so it is V; #621's fourth fold, `tx_mut` until #843b).
 fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
     for step in steps.as_array().unwrap() {
         let (kind, what) = step.as_str().unwrap().split_once(':').unwrap();
@@ -90,12 +90,13 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
                     .expect("the bytes are one transaction");
             }
             "txid" => {
-                beef.merge_txid_only(tx(v, what).id());
+                beef.merge_txid_only(tx(v, what).txid());
             }
             "edit" => {
                 assert_eq!(what, "u_to_v");
                 let u = tx(v, "u").id();
-                beef.edit_tx(&u, |t| t.set_lock_time(1)).unwrap();
+                beef.edit_tx(u.parse().unwrap(), |t| t.set_lock_time(1))
+                    .unwrap();
             }
             "link" => {
                 // The held C given T as its input's source, in memory, T no
@@ -103,7 +104,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value) {
                 assert_eq!(what, "c_to_t");
                 let c = tx(v, "c").id();
                 let t = tx(v, "t");
-                beef.edit_tx(&c, |c| {
+                beef.edit_tx(c.parse().unwrap(), |c| {
                     c.inputs_mut()[0].source_transaction = Some(Box::new(t))
                 })
                 .unwrap();
@@ -140,7 +141,7 @@ fn assert_merged_as_recorded(name: &str) {
     let c = case(&v, name);
     let mut source = Beef::new();
     apply(&v, &mut source, &c["source"]);
-    let held: Vec<String> = source.txs.iter().map(|t| t.txid()).collect();
+    let held: Vec<String> = source.txs().iter().map(|t| t.id()).collect();
     let read_back = Beef::from_hex(c["source_beef"].as_str().unwrap()).unwrap();
     for (how, source) in [("as built", &source), ("read back", &read_back)] {
         let mut target = Beef::new();
@@ -158,7 +159,7 @@ fn assert_merged_as_recorded(name: &str) {
             "{name} ({how}): the bytes the reference's mergeBeef then toHex writes"
         );
         assert_eq!(
-            target.bumps.len() as u64,
+            target.bumps().len() as u64,
             c["bumps"].as_u64().unwrap(),
             "{name} ({how}): BUMPs"
         );
@@ -176,16 +177,16 @@ fn assert_merged_as_recorded(name: &str) {
             })
             .collect();
         let held: Vec<(String, Option<u64>, bool)> = target
-            .txs
+            .txs()
             .iter()
-            .map(|t| (t.txid(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
+            .map(|t| (t.id(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
             .collect();
         assert_eq!(
             held, recorded,
             "{name} ({how}): the entries, their indices and forms"
         );
         if let Some(links) = c["c_links"].as_array() {
-            let entry = target.find_txid(&tx(&v, "c").id()).unwrap();
+            let entry = target.find_txid(tx(&v, "c").txid()).unwrap();
             let linked: Vec<bool> = entry
                 .tx()
                 .expect("C held parsed")
@@ -197,7 +198,7 @@ fn assert_merged_as_recorded(name: &str) {
             assert_eq!(linked, recorded, "{name} ({how}): C's source links");
         }
     }
-    let after: Vec<String> = source.txs.iter().map(|t| t.txid()).collect();
+    let after: Vec<String> = source.txs().iter().map(|t| t.id()).collect();
     assert_eq!(
         after, held,
         "{name}: merge_beef left the source's order as held"
@@ -332,9 +333,9 @@ fn a_source_read_then_given_a_raw_transaction_is_merged_in_its_sorted_order_817(
         .find(|c| c["name"] == "read_source_then_raw_merged_is_sorted")
         .expect("the recorded case");
     let entries = |beef: &Beef| -> Vec<(String, Option<u64>, bool)> {
-        beef.txs
+        beef.txs()
             .iter()
-            .map(|t| (t.txid(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
+            .map(|t| (t.id(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
             .collect()
     };
     let recorded = |list: &Value| -> Vec<(String, Option<u64>, bool)> {
@@ -371,7 +372,7 @@ fn a_source_read_then_given_a_raw_transaction_is_merged_in_its_sorted_order_817(
         recorded(&c["entries"]),
         "the target's entries, in the order the reference's mergeBeef leaves"
     );
-    assert_eq!(target.bumps.len() as u64, c["bumps"].as_u64().unwrap());
+    assert_eq!(target.bumps().len() as u64, c["bumps"].as_u64().unwrap());
     assert_eq!(
         to_hex(&sha256(&target.to_binary().expect("the BEEF is writable"))),
         c["beef_sha256"].as_str().unwrap(),
@@ -386,10 +387,12 @@ fn a_source_read_then_given_a_raw_transaction_is_merged_in_its_sorted_order_817(
 }
 
 /// #621's fourth fold, the rule read's FIX: the target holds U and edits it
-/// through `tx_mut` to V; `merge_beef` re-keys the target first, as the
-/// reference's `mergeBeef` synchronizes it (`Beef.ts:976`, `:342-352`), so
-/// the source's V is found held and left alone. Until the fold a second V
-/// was appended.
+/// to V; the source's V is found held and left alone, as the reference's
+/// `mergeBeef` finds it after it synchronizes the target (`Beef.ts:976`,
+/// `:342-352`). The edit is `Beef::edit_tx`'s, which re-keys the entry at
+/// once (#843b); until then it could be `BeefTx::tx_mut`'s, and `merge_beef`
+/// re-keyed the target ahead of the merge (`refresh_mutated`, the fold's fix: a second V
+/// was appended before it).
 #[test]
 fn an_entry_edited_in_the_target_is_found_held_by_its_new_txid_621() {
     assert_merged_as_recorded("edited_target_entry_held_raw");

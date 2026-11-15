@@ -185,7 +185,7 @@ fn a_flat_bump_of_8192_leaves_parses_in_under_the_bound() {
             bytes.len(),
             elapsed.as_secs_f64()
         );
-        assert_eq!(beef.bumps[0].compute_root(None).unwrap(), root);
+        assert_eq!(beef.bumps()[0].compute_root(None).unwrap(), root);
         if leaves == 8192 {
             at_8192 = Some(elapsed);
         }
@@ -217,7 +217,7 @@ fn a_compound_bump_from_a_block_parses_in_under_the_bound() {
         // `compute_root` on 8,192 leaves takes about 0.1 s in a debug build,
         // and the parse has already checked that every leaf reaches one root
         // (speed loop two, #670; every 97th txid until then, 85 of them).
-        let bump = &beef.bumps[0];
+        let bump = &beef.bumps()[0];
         for k in 0..=8 {
             let txid = &txids[k * (txids.len() - 1) / 8];
             assert_eq!(bump.compute_root(Some(txid)).unwrap(), root);

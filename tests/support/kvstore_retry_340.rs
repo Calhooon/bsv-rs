@@ -350,7 +350,7 @@ pub fn assert_attempts(h: &Harness, attempts: usize, aborts: usize) {
         for item in token_outputs(&h.case[field]) {
             let tx = Transaction::from_beef(&item.beef, None).unwrap();
             assert_eq!(
-                Transaction::from_beef(beef, Some(&tx.id())).unwrap().id(),
+                Transaction::from_beef(beef, Some(tx.txid())).unwrap().id(),
                 tx.id()
             );
         }

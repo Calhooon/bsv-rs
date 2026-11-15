@@ -51,12 +51,12 @@ fn rebuilt(name: &str) -> (Vec<u8>, String, serde_json::Value) {
 /// A parsed entry in the recorder's `wire_order` words.
 fn entry_words(entry: &BeefTx) -> String {
     let v = build::vector();
-    let txid = entry.txid();
+    let txid = entry.id();
     let name = ["alone", "parent", "subject"]
         .into_iter()
         .find(|n| v[format!("{n}_txid")].as_str() == Some(txid.as_str()))
         .map(str::to_string)
-        .unwrap_or(txid);
+        .unwrap_or(txid.to_string());
     let only = if entry.is_txid_only() {
         " (txid only)"
     } else {
@@ -74,8 +74,9 @@ fn entry_words(entry: &BeefTx) -> String {
 fn judged_as_recorded(name: &str) {
     let (beef, x, case) = rebuilt(name);
     let parsed = sdk::transaction::Beef::from_binary(&beef).unwrap();
-    assert_eq!(parsed.atomic_txid.as_deref(), Some(x.as_str()), "{name}");
-    let wire: Vec<String> = parsed.txs.iter().map(entry_words).collect();
+    let named = parsed.atomic_txid.map(|t| t.to_string());
+    assert_eq!(named.as_deref(), Some(x.as_str()), "{name}");
+    let wire: Vec<String> = parsed.txs().iter().map(entry_words).collect();
     let recorded: Vec<String> = case["wire_order"]
         .as_array()
         .unwrap()
@@ -86,7 +87,7 @@ fn judged_as_recorded(name: &str) {
         wire, recorded,
         "{name}: both entries of X, in the written order"
     );
-    let held = parsed.find_txid(&x).unwrap();
+    let held = parsed.find_txid(x.parse().unwrap()).unwrap();
     let index_entry = if held.is_txid_only() {
         "txid only"
     } else {
@@ -97,7 +98,7 @@ fn judged_as_recorded(name: &str) {
         case["index_entry"].as_str().unwrap(),
         "{name}: the index's entry"
     );
-    let later = parsed.txs.iter().rev().find(|e| e.txid() == x).unwrap();
+    let later = parsed.txs().iter().rev().find(|e| e.txid() == x).unwrap();
     assert_eq!(
         held.is_txid_only(),
         later.is_txid_only(),

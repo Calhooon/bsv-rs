@@ -63,11 +63,16 @@ const CHILD: &str = "f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831
 
 fn family() -> Family {
     let beef = read("beef-023");
-    let parent = beef.find_txid(PARENT).unwrap();
+    let parent = beef.find_txid(PARENT.parse().unwrap()).unwrap();
     Family {
         parent: parent.raw_tx().unwrap().to_vec(),
-        bump: beef.bumps[parent.bump_index().unwrap()].clone(),
-        child: beef.find_txid(CHILD).unwrap().raw_tx().unwrap().to_vec(),
+        bump: beef.bumps()[parent.bump_index().unwrap()].clone(),
+        child: beef
+            .find_txid(CHILD.parse().unwrap())
+            .unwrap()
+            .raw_tx()
+            .unwrap()
+            .to_vec(),
     }
 }
 
@@ -75,8 +80,8 @@ fn family() -> Family {
 fn proven(id: &str) -> (Vec<u8>, MerklePath) {
     let beef = read(id);
     (
-        beef.txs[0].raw_tx().unwrap().to_vec(),
-        beef.bumps[0].clone(),
+        beef.txs()[0].raw_tx().unwrap().to_vec(),
+        beef.bumps()[0].clone(),
     )
 }
 
@@ -89,7 +94,10 @@ fn a_bump_of_a_held_height_and_root_is_combined_wire_beef_001() {
     let mut beef = read("beef-001");
     beef.merge_beef(&read("beef-001"))
         .expect("the source BEEF writes and reads back");
-    assert_eq!(beef.bumps.len() as u64, expected["bumps"].as_u64().unwrap());
+    assert_eq!(
+        beef.bumps().len() as u64,
+        expected["bumps"].as_u64().unwrap()
+    );
     assert_eq!(
         beef.to_hex().expect("the BEEF is writable"),
         text(&expected["hex"])
@@ -143,14 +151,16 @@ fn a_merge_after_a_serialization_sorts_again_wire_beef_023() {
 fn find_bump_answers_the_bump_carrying_the_txid_wire_beef_001() {
     let expected = case("find_bump");
     let beef = read("beef-001");
-    let bump = beef.find_bump(text(&expected["txid"])).unwrap();
+    let bump = beef
+        .find_bump(text(&expected["txid"]).parse().unwrap())
+        .unwrap();
     assert_eq!(
         u64::from(bump.block_height),
         expected["block_height"].as_u64().unwrap()
     );
     assert_eq!(bump.compute_root(None).unwrap(), text(&expected["root"]));
     assert!(expected["absent"].as_bool().unwrap());
-    assert!(read("beef-023").find_bump(CHILD).is_none());
+    assert!(read("beef-023").find_bump(CHILD.parse().unwrap()).is_none());
 }
 
 /// Kills `find_transaction_for_signing` replaced with `None` and with
@@ -161,7 +171,7 @@ fn find_transaction_for_signing_links_each_source_wire_beef_023() {
     let expected = case("find_transaction_for_signing");
     let beef = read("beef-023");
     let tx = beef
-        .find_transaction_for_signing(text(&expected["txid"]))
+        .find_transaction_for_signing(text(&expected["txid"]).parse().unwrap())
         .unwrap();
     assert_eq!(tx.id(), text(&expected["found"]));
     let sources: Vec<Option<String>> = tx
@@ -178,7 +188,7 @@ fn find_transaction_for_signing_links_each_source_wire_beef_023() {
     assert_eq!(sources, recorded);
     assert!(expected["absent"].as_bool().unwrap());
     assert!(beef
-        .find_transaction_for_signing(&"00".repeat(32))
+        .find_transaction_for_signing("00".repeat(32).parse().unwrap())
         .is_none());
 }
 
@@ -191,7 +201,7 @@ fn find_atomic_transaction_links_the_proven_source_wire_beef_023() {
     let expected = case("find_atomic_transaction");
     let beef = read("beef-023");
     let tx = beef
-        .find_atomic_transaction(text(&expected["txid"]))
+        .find_atomic_transaction(text(&expected["txid"]).parse().unwrap())
         .unwrap();
     let source = tx.inputs()[0].source_transaction.as_ref().unwrap();
     assert_eq!(source.id(), text(&expected["source"]));
@@ -265,8 +275,8 @@ fn the_log_string_is_the_reference_text_wire_beef_023() {
 fn two_bumps_at_one_height_with_one_root_are_valid_wire_beef_001() {
     let expected = case("two_bumps_one_root");
     let mut beef = read("beef-001");
-    let bump = beef.bumps[0].clone();
-    beef.bumps.push(bump);
+    let bump = beef.bumps()[0].clone();
+    beef.push_bump(bump);
     assert_eq!(
         beef.to_hex().expect("the BEEF is writable"),
         text(&expected["hex"])
@@ -286,8 +296,8 @@ fn two_bumps_at_one_height_with_two_roots_are_refused_wire_beef_001_beef_002() {
     let expected = case("two_bumps_two_roots");
     let mut beef = read("beef-001");
     let (_, mut other) = proven("beef-002");
-    other.block_height = beef.bumps[0].block_height;
-    beef.bumps.push(other);
+    other.block_height = beef.bumps()[0].block_height;
+    beef.push_bump(other);
     assert_eq!(
         beef.to_hex().expect("the BEEF is writable"),
         text(&expected["hex"])
@@ -306,8 +316,8 @@ fn two_bumps_at_one_height_with_two_roots_are_refused_wire_beef_001_beef_002() {
 fn a_bump_index_naming_a_bump_without_the_txid_is_refused_wire_beef_023() {
     let expected = case("bump_index_names_a_bump_without_the_txid");
     let mut beef = read("beef-023");
-    let at = beef.txs.iter().position(|t| t.txid() == CHILD).unwrap();
-    beef.txs[at].set_bump_index(Some(0));
+    beef.set_bump_index(CHILD.parse().unwrap(), Some(0))
+        .unwrap();
     assert_eq!(
         beef.verify_valid(false).valid,
         expected["valid"].as_bool().unwrap()
@@ -324,10 +334,10 @@ fn a_bump_index_naming_no_bump_is_refused_in_the_stream_kind_wire_beef_029() {
     let expected = case("bump_index_names_no_bump");
     let bytes = row("beef-029");
     let mut beef = Beef::from_binary(&bytes).unwrap();
-    let mut root = from_hex(&beef.bumps[0].compute_root(None).unwrap()).unwrap();
+    let mut root = from_hex(&beef.bumps()[0].compute_root(None).unwrap()).unwrap();
     root.reverse();
     let headers: HashMap<u64, [u8; 32]> = HashMap::from([(
-        u64::from(beef.bumps[0].block_height),
+        u64::from(beef.bumps()[0].block_height),
         root.try_into().unwrap(),
     )]);
     let stream = verify_stream_structure(bytes.as_slice(), &headers, None).unwrap();
@@ -363,32 +373,46 @@ fn a_raw_transaction_without_inputs_sorts_after_the_proven_wire_beef_023() {
         .expect("the bytes are one transaction");
     let sorted = beef.sort_txs();
     assert_eq!(sorted.txid_only, strings(&expected["txid_only"]));
-    let order: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+    let order: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
     assert_eq!(order, strings(&expected["order"]));
 }
 
-/// Kills `verify_structure`'s `||` to `&&` at 719:13 and 720:13: a ring held
-/// in the input cache is not valid with no input missing, and refused
-/// (`verifyValid`, `Beef.ts:1065-1073`).
+/// Kills `verify_structure`'s `||` to `&&` at 719:13 and 720:13: a ring is
+/// not valid with no input missing, and refused (`verifyValid`,
+/// `Beef.ts:1065-1073`).
+///
+/// Restated by #843b. The ring was written by hand into the two entries'
+/// public `input_txids` (the reference's recording assigns `inputTxids`);
+/// that field is read-only now, and no public door holds a ring (a raw
+/// entry is named by its bytes' hash). The same two txids wait on each other
+/// here through entries the crate's own `with_txid` files under them: each
+/// holds a transaction spending the other txid. It replaces
+/// `a_ring_in_the_input_cache_is_refused_wire_beef_002_beef_004`.
 #[test]
-fn a_ring_in_the_input_cache_is_refused_wire_beef_002_beef_004() {
+fn a_ring_of_two_entries_is_refused_wire_beef_002_beef_004_843b() {
+    use crate::transaction::{BeefTx, Transaction, TransactionInput, TransactionOutput, Txid};
     let expected = case("ring_in_the_input_cache");
     let (one, _) = proven("beef-002");
     let (two, _) = proven("beef-004");
+    let id = |raw: &[u8]| Transaction::from_binary(raw).unwrap().txid();
+    let (a, c) = (id(&one), id(&two));
+    let spending = |parent: Txid| {
+        let mut tx = Transaction::new();
+        tx.inputs_mut().push(TransactionInput::new(parent, 0));
+        tx.outputs_mut().push(TransactionOutput::new(
+            1,
+            crate::script::LockingScript::new(),
+        ));
+        tx
+    };
     let mut beef = Beef::with_version(BEEF_V1);
-    let a = beef
-        .merge_raw_tx(one, None)
-        .expect("the bytes are one transaction")
-        .txid();
-    let c = beef
-        .merge_raw_tx(two, None)
-        .expect("the bytes are one transaction")
-        .txid();
-    beef.find_txid_mut(&a).unwrap().input_txids = vec![c.clone()];
-    beef.find_txid_mut(&c).unwrap().input_txids = vec![a];
+    beef.append_entry(BeefTx::from_tx(spending(c), None).with_txid(a));
+    beef.append_entry(BeefTx::from_tx(spending(a), None).with_txid(c));
+    assert_eq!(beef.txs()[0].input_txids(), [c]);
+    assert_eq!(beef.txs()[1].input_txids(), [a]);
     let sorted = beef.sort_txs();
     assert_eq!(sorted.missing_inputs, strings(&expected["missing_inputs"]));
-    let mut not_valid = sorted.not_valid;
+    let mut not_valid: Vec<String> = sorted.not_valid.iter().map(Txid::to_string).collect();
     not_valid.sort();
     assert_eq!(not_valid, strings(&expected["not_valid"]));
     assert_eq!(
@@ -423,7 +447,7 @@ fn behind_a_proof() -> Beef {
 fn an_ancestor_behind_a_proof_is_trimmed_wire_beef_002_beef_004_beef_023() {
     let mut beef = behind_a_proof();
     beef.trim_known_proven();
-    let mut held: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+    let mut held: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
     held.sort();
     let (spend, _) = proven("beef-002");
     let (outside, _) = proven("beef-004");
@@ -437,7 +461,7 @@ fn an_ancestor_behind_a_proof_is_trimmed_wire_beef_002_beef_004_beef_023() {
     ];
     kept.sort();
     assert_eq!(held, kept);
-    assert_eq!(beef.bumps.len(), 1);
+    assert_eq!(beef.bumps().len(), 1);
 }
 
 /// Kills `trim_known_proven`'s `<` to `<=` at 605:36: no BUMP is removed while
@@ -449,12 +473,15 @@ fn the_bump_clean_up_keeps_every_bump_while_as_many_are_named_wire_beef_002_beef
     let expected = case("reindex_guard_with_an_index_past_the_bumps");
     let mut beef = behind_a_proof();
     let (outside, outside_bump) = proven("beef-004");
-    beef.bumps.push(outside_bump);
+    beef.push_bump(outside_bump);
     let txid = crate::transaction::Transaction::from_binary(&outside)
         .unwrap()
         .id();
-    beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(5));
+    beef.set_bump_index(txid.parse().unwrap(), Some(5)).unwrap();
     beef.trim_known_proven();
-    assert_eq!(beef.txs.len(), 2);
-    assert_eq!(beef.bumps.len() as u64, expected["bumps"].as_u64().unwrap());
+    assert_eq!(beef.txs().len(), 2);
+    assert_eq!(
+        beef.bumps().len() as u64,
+        expected["bumps"].as_u64().unwrap()
+    );
 }

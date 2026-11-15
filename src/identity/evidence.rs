@@ -66,7 +66,7 @@
 //! whose subject is the hint.
 
 use crate::overlay::OutputListItem;
-use crate::transaction::{Beef, BeefTx, Transaction};
+use crate::transaction::{Beef, BeefTx, Transaction, Txid};
 use crate::wallet::WalletInterface;
 use crate::Error;
 use std::collections::HashSet;
@@ -223,19 +223,19 @@ fn load_evidence_transaction(
     output_index: u32,
 ) -> Result<(Beef, Transaction), Refusal> {
     let beef = Beef::from_binary(bytes).map_err(|_| invalid("TransactionEvidence.ts:116"))?;
-    if beef.txs.len() > TRANSACTIONS {
+    if beef.txs().len() > TRANSACTIONS {
         return Err(limit("TransactionEvidence.ts:117"));
     }
-    let target = match &beef.atomic_txid {
-        Some(atomic) => atomic.clone(),
+    let target = match beef.atomic_txid {
+        Some(atomic) => atomic,
         None => beef
-            .txs
+            .txs()
             .last()
             .map(BeefTx::txid)
             .ok_or(invalid("TransactionEvidence.ts:119"))?,
     };
     let subject = beef
-        .find_txid(&target)
+        .find_txid(target)
         .and_then(BeefTx::tx)
         .cloned()
         .ok_or(invalid("TransactionEvidence.ts:120-121"))?;
@@ -270,8 +270,8 @@ fn assert_unconfirmed_graph(beef: &Beef, subject: &Transaction) -> Result<(), Re
     let mut spent = HashSet::new();
     let (mut inputs, mut script_bytes) = (0usize, 0usize);
     while let Some(current) = pending.pop() {
-        let id = current.id();
-        if !visited.insert(id.clone()) {
+        let id = current.txid();
+        if !visited.insert(id) {
             continue;
         }
         script_bytes += graph_script_bytes(current);
@@ -279,7 +279,7 @@ fn assert_unconfirmed_graph(beef: &Beef, subject: &Transaction) -> Result<(), Re
         if inputs > INPUTS || script_bytes > SCRIPT_BYTES {
             return Err(limit("TransactionEvidence.ts:170-171"));
         }
-        if beef.find_bump(&id).is_some() {
+        if beef.find_bump(id).is_some() {
             continue;
         }
         if current.inputs().is_empty() {
@@ -297,16 +297,15 @@ fn enqueue_unconfirmed_parents<'a>(
     beef: &'a Beef,
     current: &Transaction,
     pending: &mut Vec<&'a Transaction>,
-    spent: &mut HashSet<(String, u32)>,
+    spent: &mut HashSet<(Txid, u32)>,
 ) -> Result<(), Refusal> {
     for input in current.inputs() {
-        let named = input.source_txid.map(|t| t.to_string());
-        let named = named.as_deref();
+        let named = input.source_txid;
         let Some(source) = named.and_then(|t| beef.find_txid(t)).and_then(BeefTx::tx) else {
             return Err(invalid("TransactionEvidence.ts:143"));
         };
-        let source_txid = source.id();
-        if named != Some(source_txid.as_str()) {
+        let source_txid = source.txid();
+        if named != Some(source_txid) {
             return Err(invalid("TransactionEvidence.ts:145-146"));
         }
         if !spent.insert((source_txid, input.source_output_index)) {

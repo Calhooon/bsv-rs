@@ -1,11 +1,13 @@
 //! #731: the BEEFs of `tests/vectors/identity_evidence_731.json`, built by
 //! this crate's writer as `tests/support/identity_evidence_731.mjs` builds
 //! them with the reference's: an Atomic BEEF prefix naming the subject X
-//! (`0x01010101`, X's txid reversed) by `primitives::Writer`, then
-//! `Beef::to_writer` over `txs` set by hand, unsorted, X written raw and
-//! txid-only in the order the shape names (no merge writes both entries:
-//! `merge_raw_tx` and `merge_txid_only` deduplicate, as the reference's
-//! do). Over #725's transactions: `alone` proven at 900 alone, or `parent`
+//! (`0x01010101`, X's txid reversed) by `primitives::Writer`, then the
+//! frame written element by element (`MerklePath::to_writer`,
+//! `BeefTx::to_writer`), unsorted, X written raw and txid-only in the
+//! order the shape names (no merge writes both entries: `merge_raw_tx` and
+//! `merge_txid_only` deduplicate, as the reference's do; until #843b the
+//! entries were set by hand on the public `txs` and written by
+//! `Beef::to_writer`). Over #725's transactions: `alone` proven at 900 alone, or `parent`
 //! proven at 900 and the unproven `subject` spending it. Shared by the door
 //! test (`tests/identity_evidence_731.rs`, `use bsv_rs as sdk;`) and the
 //! check's unit pins (`src/identity/evidence_731_tests.rs`,
@@ -15,7 +17,7 @@
 use super::sdk::primitives::{from_hex, Writer};
 use super::sdk::script::{LockingScript, UnlockingScript};
 use super::sdk::transaction::{
-    Beef, BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+    BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
 };
 use serde_json::Value;
 
@@ -101,6 +103,26 @@ pub struct Built {
     pub subject: String,
 }
 
+/// A V2 BEEF frame of `bumps` and `entries` as given, each written by this
+/// crate's own writer (`MerklePath::to_writer`, `BeefTx::to_writer`), in
+/// the order given: the form that carries one txid twice, which no merge
+/// door holds (#843b: until then the entries were pushed by hand onto the
+/// public `txs` and written by `Beef::to_writer`).
+fn frame(writer: &mut Writer, bumps: &[MerklePath], entries: &[BeefTx]) {
+    const BEEF_V2: u32 = 0xEFBE_0002;
+    writer.write_u32_le(BEEF_V2);
+    writer.write_var_int(bumps.len() as u64);
+    for bump in bumps {
+        bump.to_writer(writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(entries.len() as u64);
+    for entry in entries {
+        entry
+            .to_writer(writer, BEEF_V2)
+            .expect("the entry is writable");
+    }
+}
+
 /// The shape `name` built.
 pub fn build(name: &str) -> Built {
     let (proven_subject, raw_first) = match name {
@@ -115,29 +137,30 @@ pub fn build(name: &str) -> Built {
     } else {
         (parent(), subject())
     };
-    let mut beef = Beef::new();
-    let index = beef.merge_bump(lone_leaf(&proven.id(), 900));
+    let bump = lone_leaf(&proven.id(), 900);
+    let index = 0;
     // X's raw entry: proven by the BUMP when X is `alone`, unproven else.
     let x_raw = BeefTx::from_raw_tx(x.to_binary(), proven_subject.then_some(index))
         .expect("the bytes are one transaction");
-    let x_txid_only = BeefTx::from_txid(x.id());
+    let x_txid_only = BeefTx::from_txid(x.txid());
+    let mut entries = Vec::new();
     if !proven_subject {
-        beef.txs.push(
+        entries.push(
             BeefTx::from_raw_tx(proven.to_binary(), Some(index))
                 .expect("the bytes are one transaction"),
         );
     }
     if raw_first {
-        beef.txs.extend([x_raw, x_txid_only]);
+        entries.extend([x_raw, x_txid_only]);
     } else {
-        beef.txs.extend([x_txid_only, x_raw]);
+        entries.extend([x_txid_only, x_raw]);
     }
     let mut writer = Writer::new();
     writer.write_u32_le(0x0101_0101);
     let mut reversed = from_hex(&x.id()).unwrap();
     reversed.reverse();
     writer.write_bytes(&reversed);
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    frame(&mut writer, &[bump], &entries);
     Built {
         beef: writer.into_bytes(),
         subject: x.id(),

@@ -152,21 +152,21 @@ pub fn law_reach(tx: &Transaction, at: &str) {
 #[allow(dead_code)] // `fuzz_beef_parser`'s alone; the module is shared.
 pub fn beef_copies_keep_the_law(beef: &Beef) {
     fn entries(beef: &Beef, at: &str) {
-        for entry in &beef.txs {
+        for entry in beef.txs() {
             if let Some(tx) = entry.tx() {
                 law_reach(tx, at);
                 let id = entry.txid();
-                if let Some(signing) = beef.find_transaction_for_signing(&id) {
-                    assert_eq!(signing.id(), id, "{at}: the id for signing (#869)");
+                if let Some(signing) = beef.find_transaction_for_signing(id) {
+                    assert_eq!(signing.txid(), id, "{at}: the id for signing (#869)");
                 }
-                if let Some(linked) = beef.find_atomic_transaction(&id) {
-                    assert_eq!(linked.id(), id, "{at}: the id linked (#869)");
+                if let Some(linked) = beef.find_atomic_transaction(id) {
+                    assert_eq!(linked.txid(), id, "{at}: the id linked (#869)");
                     law_reach(&linked, at);
                     // Merged back: every ancestor stored as a copy.
                     merged_hands_back_what_it_took(&linked, "a linked entry merged back");
                     let mut back = Beef::new();
                     back.merge_transaction(linked);
-                    for copy in back.txs.iter().filter_map(|e| e.tx()) {
+                    for copy in back.txs().iter().filter_map(|e| e.tx()) {
                         law_reach(copy, "a linked entry merged back");
                     }
                 }
@@ -194,13 +194,15 @@ pub fn merged_hands_back_what_it_took(tx: &Transaction, at: &str) {
     let id = tx.id();
     let mut beef = Beef::new();
     beef.merge_transaction(tx.clone());
-    let signing = beef.find_transaction_for_signing(&id).expect("merged");
+    let signing = beef
+        .find_transaction_for_signing(tx.txid())
+        .expect("merged");
     assert_eq!(
         signing.id(),
         id,
         "{at}: find_transaction_for_signing's id (#869)"
     );
-    let linked = beef.find_atomic_transaction(&id).expect("merged");
+    let linked = beef.find_atomic_transaction(tx.txid()).expect("merged");
     assert_eq!(linked.id(), id, "{at}: find_atomic_transaction's id (#869)");
     let mut stack = vec![(tx, &linked)];
     while let Some((g, l)) = stack.pop() {

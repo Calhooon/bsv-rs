@@ -40,7 +40,7 @@ fn main() {
     spend.add_input(input).unwrap();
     spend.add_p2pkh_output(&address, Some(9_900)).unwrap();
     futures::executor::block_on(spend.sign()).unwrap();
-    let subject = spend.id();
+    let subject = spend.txid();
 
     // The BEEF carries every transaction once, however many inputs source it;
     // `to_binary_atomic` prefixes the subject's txid (BRC-95) so a reader
@@ -50,7 +50,7 @@ fn main() {
     beef.merge_raw_tx(funding.to_binary(), Some(bump))
         .expect("the bytes are one transaction");
     beef.merge_transaction(spend);
-    let bytes = beef.to_binary_atomic(&subject).unwrap();
+    let bytes = beef.to_binary_atomic(subject).unwrap();
     println!("beef {} bytes, subject {subject}", bytes.len());
 
     // Reading it back: the container is validated (structure, then the
@@ -63,7 +63,7 @@ fn main() {
     assert!(validation.valid);
     assert_eq!(validation.roots.get(&800_000), Some(&funding_txid));
     let tx = Transaction::from_beef(&bytes, None).unwrap();
-    assert_eq!(tx.id(), subject);
+    assert_eq!(tx.txid(), subject);
     assert!(tx.inputs()[0].source_transaction.is_some());
 
     // And the verdict: the spend's script executed against the linked

@@ -186,25 +186,38 @@ fn ancestry(subject: &Transaction) -> Vec<Transaction> {
     out
 }
 
+/// Holds each of `entries` in `beef` as a transaction alone, in the order
+/// given (the collected order: a source ahead of its spender), through
+/// `merge_transaction`, the door for such an entry since #843b; until then
+/// each was pushed by hand onto the public `txs` as `BeefTx::from_tx` with
+/// the index of its path's BUMP. A proven entry takes that index here too
+/// (its path is merged into the BUMP already held); the walk of an unproven
+/// entry's sources finds each held and stores it in its place, so no entry
+/// moves and the held order is the order given.
+fn merge_in_collected_order(beef: &mut Beef, entries: &[Transaction]) {
+    for tx in entries {
+        beef.merge_transaction(tx.clone());
+    }
+    let held: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
+    let given: Vec<String> = entries.iter().map(Transaction::id).collect();
+    assert_eq!(held, given, "the entries are held in the order given");
+}
+
 /// The same graph assembled by hand, a caller's Beef under the V1 word (the
 /// reference's `toBEEF` writes V1; the V1 word keeps the bytes comparable):
-/// the BUMPs merged, the entries pushed in the collected order, written by
+/// the BUMPs merged, the entries merged in the collected order, written by
 /// [`Beef::to_binary`], which sorts a BEEF a caller assembles — the
 /// dependency order every version before 0.8.8 also wrote at the
 /// transaction doors.
 fn assembled_by_hand(subject: &Transaction) -> Vec<u8> {
     let entries = ancestry(subject);
     let mut beef = Beef::with_version(BEEF_V1);
-    let mut bump_of: HashMap<String, usize> = HashMap::new();
     for tx in &entries {
         if let Some(path) = &tx.merkle_path {
-            bump_of.insert(tx.id(), beef.merge_bump(path.clone()));
+            beef.merge_bump(path.clone());
         }
     }
-    for tx in &entries {
-        beef.txs
-            .push(BeefTx::from_tx(tx.clone(), bump_of.get(&tx.id()).copied()));
-    }
+    merge_in_collected_order(&mut beef, &entries);
     beef.to_binary().unwrap()
 }
 
@@ -248,14 +261,16 @@ fn a_beef_beside_a_proven_ancestor_ends_with_the_subject() {
             "the no-txid read takes the last entry: the subject"
         );
         assert_eq!(
-            Transaction::from_beef(&bytes, Some(&id)).unwrap().id(),
+            Transaction::from_beef(&bytes, Some(id.parse().unwrap()))
+                .unwrap()
+                .id(),
             id,
             "the named read"
         );
         assert_eq!(
             Beef::from_binary(&bytes)
                 .unwrap()
-                .txs
+                .txs()
                 .last()
                 .unwrap()
                 .txid(),
@@ -311,13 +326,13 @@ fn the_reference_writes_the_same_bytes_on_every_witness() {
         assert_eq!(
             Beef::from_binary(&v2)
                 .unwrap()
-                .txs
+                .txs()
                 .iter()
                 .map(|t| t.txid().to_string())
                 .collect::<Vec<_>>(),
             Beef::from_binary(&v1)
                 .unwrap()
-                .txs
+                .txs()
                 .iter()
                 .map(|t| t.txid().to_string())
                 .collect::<Vec<_>>(),
@@ -366,7 +381,9 @@ fn a_caller_assembled_beef_keeps_the_documented_dependency_sort() {
             );
         }
         assert_eq!(
-            Transaction::from_beef(&sorted, Some(&id)).unwrap().id(),
+            Transaction::from_beef(&sorted, Some(id.parse().unwrap()))
+                .unwrap()
+                .id(),
             id,
             "{name}: the named read of the sorted bytes"
         );
@@ -385,7 +402,9 @@ fn what_a_version_before_0_8_8_wrote_still_reads() {
         let held = tx.to_beef(true).unwrap();
         let sorted = sorted_bytes(&held);
         assert_eq!(
-            Transaction::from_beef(&sorted, Some(&id)).unwrap().id(),
+            Transaction::from_beef(&sorted, Some(id.parse().unwrap()))
+                .unwrap()
+                .id(),
             id,
             "{name}: the named read of the old order"
         );
@@ -420,13 +439,13 @@ fn a_merged_beef_keeps_the_documented_dependency_sort() {
         assert_eq!(
             Beef::from_binary(&merged)
                 .unwrap()
-                .txs
+                .txs()
                 .iter()
                 .map(BeefTx::txid)
                 .collect::<Vec<_>>(),
             Beef::from_binary(&sorted_bytes(&held))
                 .unwrap()
-                .txs
+                .txs()
                 .iter()
                 .map(BeefTx::txid)
                 .collect::<Vec<_>>(),
@@ -643,14 +662,16 @@ fn one_graph_holds_the_invariant(tx: &Transaction, corpus: &mut Corpus) {
             "the no-txid read takes the subject"
         );
         assert_eq!(
-            Transaction::from_beef(&bytes, Some(&id)).unwrap().id(),
+            Transaction::from_beef(&bytes, Some(id.parse().unwrap()))
+                .unwrap()
+                .id(),
             id,
             "the named read takes the subject"
         );
         assert_eq!(
             Beef::from_binary(&bytes)
                 .unwrap()
-                .txs
+                .txs()
                 .last()
                 .unwrap()
                 .txid(),
@@ -824,12 +845,12 @@ fn the_atomic_bytes_of_the_finding_shape_are_pinned() {
     // The closure ends with the subject, and the entries read back.
     let beef = Beef::from_binary(&atomic).unwrap();
     assert_eq!(
-        beef.txs.last().unwrap().txid(),
+        beef.txs().last().unwrap().txid(),
         tx.id(),
         "the closure's last entry is the subject"
     );
     assert!(
-        beef.txs.len() >= 4,
+        beef.txs().len() >= 4,
         "the finding's shape holds both branches in the closure"
     );
 }
@@ -839,19 +860,15 @@ fn the_atomic_bytes_of_the_finding_shape_are_pinned() {
 fn beef_level_atomic_order(subject: &Transaction) -> Vec<String> {
     let entries = ancestry(subject);
     let mut beef = Beef::with_version(BEEF_V2);
-    let mut bump_of: HashMap<String, usize> = HashMap::new();
     for tx in &entries {
         if let Some(path) = &tx.merkle_path {
-            bump_of.insert(tx.id(), beef.merge_bump(path.clone()));
+            beef.merge_bump(path.clone());
         }
     }
-    for tx in &entries {
-        beef.txs
-            .push(BeefTx::from_tx(tx.clone(), bump_of.get(&tx.id()).copied()));
-    }
-    let atomic = beef.to_binary_atomic(&subject.id()).unwrap();
+    merge_in_collected_order(&mut beef, &entries);
+    let atomic = beef.to_binary_atomic(subject.txid()).unwrap();
     let closure = Beef::from_binary(&atomic).unwrap();
-    closure.txs.iter().map(|t| t.txid()).collect()
+    closure.txs().iter().map(|t| t.id()).collect()
 }
 
 /// The transaction door's atomic order on one graph, checked: its closure is
@@ -863,9 +880,9 @@ fn atomic_door_order_holds(name: &str, tx: &Transaction) -> bool {
     let atomic = tx.to_atomic_beef(true).unwrap();
     let written: Vec<String> = Beef::from_binary(&atomic)
         .unwrap()
-        .txs
+        .txs()
         .iter()
-        .map(|t| t.txid())
+        .map(|t| t.id())
         .collect();
     let mut expected: Vec<String> = beef_level_atomic_order(tx)
         .into_iter()
@@ -940,16 +957,12 @@ fn a_held_beef_written_by_to_writer_keeps_the_collected_order() {
     for (name, tx) in witnesses() {
         let entries = ancestry(&tx);
         let mut beef = Beef::with_version(BEEF_V2);
-        let mut bump_of: HashMap<String, usize> = HashMap::new();
         for t in &entries {
             if let Some(path) = &t.merkle_path {
-                bump_of.insert(t.id(), beef.merge_bump(path.clone()));
+                beef.merge_bump(path.clone());
             }
         }
-        for t in &entries {
-            beef.txs
-                .push(BeefTx::from_tx(t.clone(), bump_of.get(&t.id()).copied()));
-        }
+        merge_in_collected_order(&mut beef, &entries);
         let mut writer = bsv_rs::primitives::Writer::new();
         beef.to_writer(&mut writer)
             .expect("the collected graph is writable");
@@ -979,7 +992,7 @@ fn the_committed_fuzz_seed_reads_the_subject() {
     assert_eq!(
         Beef::from_binary(&bytes)
             .unwrap()
-            .txs
+            .txs()
             .last()
             .unwrap()
             .txid(),
@@ -1036,12 +1049,12 @@ fn two_proven_roots_under_one_bump_read_through_every_door() {
     let atomic = tx.to_atomic_beef(true).unwrap();
     let beef = Beef::from_binary(&atomic).unwrap();
     assert_eq!(
-        beef.bumps.len(),
+        beef.bumps().len(),
         1,
         "the two roots share the one renumbered BUMP"
     );
     let index_of = |wanted: &String| {
-        beef.txs
+        beef.txs()
             .iter()
             .find(|t| &t.txid() == wanted)
             .unwrap()

@@ -81,25 +81,23 @@ fn build(v: &Value, case: &Value) -> Beef {
                 beef.merge_transaction(tx(v, name));
             }
             "txid" => {
-                beef.merge_txid_only(tx(v, name).id());
+                beef.merge_txid_only(tx(v, name).txid());
             }
             "txidonly" => {
-                beef.make_txid_only(&tx(v, name).id());
+                beef.make_txid_only(tx(v, name).txid());
             }
             "mut" => {
                 // The held entry mutated in place, as the recorder sets
                 // `findTxid(..).tx.lockTime` (#798's second fold).
                 let (name, lock_time) = name.split_once('=').unwrap();
                 let lock_time = lock_time.parse().unwrap();
-                beef.edit_tx(&tx(v, name).id(), |t| t.set_lock_time(lock_time))
+                beef.edit_tx(tx(v, name).txid(), |t| t.set_lock_time(lock_time))
                     .unwrap();
             }
             "index" => {
                 let (name, index) = name.split_once('=').unwrap();
                 let index = (index != "none").then(|| index.parse().unwrap());
-                beef.find_txid_mut(&tx(v, name).id())
-                    .unwrap()
-                    .set_bump_index(index);
+                beef.set_bump_index(tx(v, name).txid(), index).unwrap();
             }
             other => panic!("no step {other}"),
         }
@@ -135,7 +133,7 @@ fn assert_written_as_recorded(v: &Value, name: &str) {
         "{name}: the bytes the reference's toBinary writes"
     );
     assert_eq!(
-        beef.find_txid(parent)
+        beef.find_txid(parent.parse().unwrap())
             .unwrap()
             .bump_index()
             .map(|i| i as u64),
@@ -154,7 +152,7 @@ fn assert_atomic_as_recorded(v: &Value, case: &Value, beef: &mut Beef, name: &st
             .as_str()
             .unwrap();
         assert_eq!(
-            to_hex(&beef.to_binary_atomic(subject).unwrap()),
+            to_hex(&beef.to_binary_atomic(subject.parse().unwrap()).unwrap()),
             atomic["beef"].as_str().unwrap(),
             "{name}: the bytes the reference's toBinaryAtomic({}) writes",
             atomic["subject"]
@@ -198,11 +196,11 @@ fn the_atomic_beef_carries_the_last_bump_of_a_txid_two_bumps_prove_757() {
         let subject = v["txs"][atomic["subject"].as_str().unwrap()]["txid"]
             .as_str()
             .unwrap();
-        let bytes = beef.to_binary_atomic(subject).unwrap();
+        let bytes = beef.to_binary_atomic(subject.parse().unwrap()).unwrap();
         let read = Beef::from_binary(&bytes).unwrap();
-        assert_eq!(read.bumps.len(), 1);
+        assert_eq!(read.bumps().len(), 1);
         assert_eq!(
-            read.bumps[0]
+            read.bumps()[0]
                 .to_hex()
                 .expect("the path holds only states a BUMP writes (#817)"),
             last.to_hex()
@@ -245,7 +243,7 @@ fn a_bump_holding_the_txid_as_an_unflagged_sibling_leaf_is_its_proof_765() {
         assert_eq!(index_case(&v, name)["parent_bump_index"], index, "{name}");
         assert_written_as_recorded(&v, name);
         let mut beef = build(&v, &index_case(&v, name));
-        assert!(beef.bumps[index as usize]
+        assert!(beef.bumps()[index as usize]
             .txids()
             .contains(&parent.to_string()));
         let mut read = Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
@@ -270,11 +268,12 @@ fn a_txid_only_entry_without_a_matching_index_carries_no_bump_into_the_atomic_be
     ] {
         assert_written_as_recorded(&v, name);
         let mut beef = build(&v, &index_case(&v, name));
-        let mut read = Beef::from_binary(&beef.to_binary_atomic(child).unwrap()).unwrap();
-        assert!(read.bumps.is_empty(), "{name}");
-        assert_eq!(read.txs.len(), 2, "{name}");
+        let mut read =
+            Beef::from_binary(&beef.to_binary_atomic(child.parse().unwrap()).unwrap()).unwrap();
+        assert!(read.bumps().is_empty(), "{name}");
+        assert_eq!(read.txs().len(), 2, "{name}");
         assert!(
-            read.txs.iter().all(|tx| tx.bump_index().is_none()),
+            read.txs().iter().all(|tx| tx.bump_index().is_none()),
             "{name}"
         );
         // The stub is unproven in the bytes written.
@@ -375,12 +374,14 @@ fn path_case_walk(v: &Value, name: &str) -> (Vec<Value>, Value) {
         .as_str()
         .unwrap();
     let path = bump(v, case["set"].as_str().unwrap());
-    read.edit_tx(set_on, |t| t.merkle_path = Some(path))
+    read.edit_tx(set_on.parse().unwrap(), |t| t.merkle_path = Some(path))
         .unwrap();
     let subject = v["txs"][case["subject"].as_str().unwrap()]["txid"]
         .as_str()
         .unwrap();
-    let atomic = read.find_atomic_transaction(subject).unwrap();
+    let atomic = read
+        .find_atomic_transaction(subject.parse().unwrap())
+        .unwrap();
     (walk(&atomic), case["walk"].clone())
 }
 
@@ -430,7 +431,7 @@ fn atomic_read(v: &Value, name: &str) -> Beef {
     let subject = v["txs"][case["atomic"][0]["subject"].as_str().unwrap()]["txid"]
         .as_str()
         .unwrap();
-    Beef::from_binary(&beef.to_binary_atomic(subject).unwrap()).unwrap()
+    Beef::from_binary(&beef.to_binary_atomic(subject.parse().unwrap()).unwrap()).unwrap()
 }
 
 /// A raw entry whose index, set by hand, names a BUMP that does not hold its
@@ -450,10 +451,10 @@ fn a_raw_entry_whose_index_names_no_matching_bump_is_written_without_a_bump_798(
     ] {
         assert_written_as_recorded(&v, name);
         let read = atomic_read(&v, name);
-        assert!(read.bumps.is_empty(), "{name}");
-        assert_eq!(read.txs.len(), 2, "{name}");
+        assert!(read.bumps().is_empty(), "{name}");
+        assert_eq!(read.txs().len(), 2, "{name}");
         assert!(
-            read.txs.iter().all(|tx| tx.bump_index().is_none()),
+            read.txs().iter().all(|tx| tx.bump_index().is_none()),
             "{name}"
         );
     }
@@ -471,9 +472,9 @@ fn the_atomic_walk_stops_at_an_entry_carrying_an_index_798() {
     assert_written_as_recorded(&v, name);
     let read = atomic_read(&v, name);
     let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
-    assert!(read.bumps.is_empty());
-    assert!(read.find_txid(parent).is_none());
-    assert_eq!(read.txs.len(), 2);
+    assert!(read.bumps().is_empty());
+    assert!(read.find_txid(parent.parse().unwrap()).is_none());
+    assert_eq!(read.txs().len(), 2);
 }
 
 /// An entry whose index names a BUMP that does not hold its txid keeps that
@@ -487,16 +488,19 @@ fn a_raw_entry_sharing_a_matching_entrys_bump_keeps_the_mapped_index_798() {
     assert_written_as_recorded(&v, name);
     let read = atomic_read(&v, name);
     let uncle = v["txs"]["uncle"]["txid"].as_str().unwrap();
-    assert_eq!(read.bumps.len(), 1);
-    assert_eq!(read.find_txid(uncle).unwrap().bump_index(), Some(0));
+    assert_eq!(read.bumps().len(), 1);
+    assert_eq!(
+        read.find_txid(uncle.parse().unwrap()).unwrap().bump_index(),
+        Some(0)
+    );
 }
 
 /// The txids of an atomic BEEF's entries, in the order written.
 fn atomic_order(v: &Value, name: &str) -> Vec<String> {
     atomic_read(v, name)
-        .txs
+        .txs()
         .iter()
-        .map(|tx| tx.txid())
+        .map(|tx| tx.id())
         .collect()
 }
 
@@ -558,7 +562,7 @@ fn a_transaction_entry_after_to_hex_keeps_the_never_serialized_order_stated_798(
         case["beef"].as_str().unwrap()
     );
     let join = v["txs"]["join"]["txid"].as_str().unwrap();
-    let ours = to_hex(&beef.to_binary_atomic(join).unwrap());
+    let ours = to_hex(&beef.to_binary_atomic(join.parse().unwrap()).unwrap());
     assert_ne!(ours, case["atomic"][0]["beef"].as_str().unwrap());
     let never = index_case(&v, "transaction_uncle_naming_no_bump_never_serialized");
     assert_eq!(ours, never["atomic"][0]["beef"].as_str().unwrap());
@@ -581,8 +585,13 @@ fn a_stub_read_from_bytes_written_atomic_is_refused_as_stub_not_proven_798() {
         Beef::from_binary(&build(&v, &case).to_binary().expect("the BEEF is writable")).unwrap();
     let parent = v["txs"]["parent"]["txid"].as_str().unwrap();
     // Read from bytes, the stub has no index.
-    assert_eq!(read.find_txid(parent).unwrap().bump_index(), None);
-    let bytes = read.to_binary_atomic(child).unwrap();
+    assert_eq!(
+        read.find_txid(parent.parse().unwrap())
+            .unwrap()
+            .bump_index(),
+        None
+    );
+    let bytes = read.to_binary_atomic(child.parse().unwrap()).unwrap();
     let any = HeadersFn(|_: u64, _: &Hash32| true);
     let streamed = verify_stream_structure(bytes.as_slice(), &any, None).unwrap();
     assert!(
@@ -590,7 +599,7 @@ fn a_stub_read_from_bytes_written_atomic_is_refused_as_stub_not_proven_798() {
         "{streamed:?}"
     );
     let mut again = Beef::from_binary(&bytes).unwrap();
-    assert!(again.bumps.is_empty());
+    assert!(again.bumps().is_empty());
     assert_eq!(
         again.verify_structure().err().map(|k| format!("{k:?}")),
         Some("StubNotProven".to_string())
@@ -618,8 +627,10 @@ fn the_atomic_closure_is_taken_from_the_entries_as_held_798() {
     );
 }
 
-/// An entry held raw and mutated in place through `BeefTx::tx_mut` after
-/// its hand-set index named no BUMP is copied through the raw branch, as the
+/// An entry held raw and edited in place (`Beef::edit_tx`; through
+/// `BeefTx::tx_mut` until #843b removed it, the test's name until then
+/// `a_raw_entry_mutated_through_tx_mut_is_copied_through_the_raw_branch_798`)
+/// after its hand-set index named no BUMP is copied through the raw branch, as the
 /// reference's is: `syncRawTxFromTransaction` keeps `_rawTx` with the new
 /// bytes (`BeefTx.ts:160-169`) and `#copySelectedTransactions` copies it with
 /// the inputs the index emptied (`Beef.ts:465`), so the mutated uncle sorts
@@ -628,7 +639,7 @@ fn the_atomic_closure_is_taken_from_the_entries_as_held_798() {
 /// inputs (`tx_mut` drops the bytes) and the uncle, whose parent lies
 /// outside, sorted ahead.
 #[test]
-fn a_raw_entry_mutated_through_tx_mut_is_copied_through_the_raw_branch_798() {
+fn a_raw_entry_edited_in_place_is_copied_through_the_raw_branch_798() {
     let v = vector();
     let name = "raw_uncle_mutated_naming_no_bump_beside_a_proven_parent";
     assert_written_as_recorded(&v, name);
@@ -660,7 +671,7 @@ fn an_index_read_from_bytes_naming_no_matching_bump_is_written_atomic_as_the_ref
         for atomic in case["atomic"].as_array().unwrap() {
             let subject = atomic["subject"].as_str().unwrap();
             assert_eq!(
-                read.find_txid(subject)
+                read.find_txid(subject.parse().unwrap())
                     .unwrap()
                     .bump_index()
                     .map(|i| i as u64),
@@ -669,7 +680,7 @@ fn an_index_read_from_bytes_naming_no_matching_bump_is_written_atomic_as_the_ref
                 case["name"]
             );
             assert_eq!(
-                to_hex(&read.to_binary_atomic(subject).unwrap()),
+                to_hex(&read.to_binary_atomic(subject.parse().unwrap()).unwrap()),
                 atomic["beef"].as_str().unwrap(),
                 "{}: the bytes the reference's toBinaryAtomic({subject}) writes",
                 case["name"]

@@ -101,20 +101,32 @@ fn by_hand_53() -> Transaction {
     )
 }
 
-/// The seventeen states of a source: as read, and each change below.
+/// The leading BUMP, through the rows' door (#843b: `b.bumps.first_mut()`
+/// until then).
+fn first_bump(b: &mut Beef) -> Option<&mut crate::transaction::MerklePath> {
+    b.bump_mut(0)
+}
+
+/// The last BUMP, through the rows' door.
+fn last_bump(b: &mut Beef) -> Option<&mut crate::transaction::MerklePath> {
+    let last = b.bumps().len().checked_sub(1)?;
+    b.bump_mut(last)
+}
+
+/// The sixteen states of a source: as read, and each change below. Until
+/// #843b there were seventeen: the third was `merge_txid_only` of a text of
+/// 62 hex digits, a state no door builds since the txid is a `Txid` (the
+/// lane's named case; `docs/lanes/fix-843b.md`).
 fn changes() -> Vec<Change> {
     vec![
         Box::new(|_| {}),
         Box::new(|b| b.version = BAD_WORD),
         Box::new(|b| {
-            b.merge_txid_only("ab".repeat(31));
-        }),
-        Box::new(|b| {
-            b.merge_txid_only(FRESH.to_string());
+            b.merge_txid_only(FRESH.to_string().parse().unwrap());
         }),
         // A second leaf at an offset of the leading BUMP's level 0.
         Box::new(|b| {
-            if let Some(level) = b.bumps.first_mut().and_then(|p| p.path.first_mut()) {
+            if let Some(level) = first_bump(b).and_then(|p| p.path.first_mut()) {
                 if let Some(leaf) = level.first().cloned() {
                     level.push(leaf);
                 }
@@ -122,13 +134,13 @@ fn changes() -> Vec<Change> {
         }),
         // No levels in the leading BUMP.
         Box::new(|b| {
-            if let Some(p) = b.bumps.first_mut() {
+            if let Some(p) = first_bump(b) {
                 p.path.clear();
             }
         }),
         // An empty level 0 in the last BUMP.
         Box::new(|b| {
-            if let Some(p) = b.bumps.last_mut() {
+            if let Some(p) = last_bump(b) {
                 if let Some(level) = p.path.first_mut() {
                     level.clear();
                 }
@@ -136,7 +148,7 @@ fn changes() -> Vec<Change> {
         }),
         // 65 levels in the last BUMP (the writer writes up to 255).
         Box::new(|b| {
-            if let Some(p) = b.bumps.last_mut() {
+            if let Some(p) = last_bump(b) {
                 while p.path.len() < 65 {
                     p.path.push(Vec::new());
                 }
@@ -145,8 +157,7 @@ fn changes() -> Vec<Change> {
         // A level-0 leaf at an offset outside the tree.
         Box::new(|b| {
             if let Some(leaf) = b
-                .bumps
-                .first_mut()
+                .bump_mut(0)
                 .and_then(|p| p.path.first_mut())
                 .and_then(|l| l.last_mut())
             {
@@ -156,33 +167,32 @@ fn changes() -> Vec<Change> {
         // A BUMP at the leading BUMP's height with another root, then a BUMP
         // the decoder refuses: the reader names the earlier `RootNotCarried`.
         Box::new(|b| {
-            if let Some(first) = b.bumps.first().cloned() {
+            if let Some(first) = b.bumps().first().cloned() {
                 let mut other = first.clone();
                 if let Some(leaf) = other.path[0].iter_mut().find(|l| l.hash.is_some()) {
                     leaf.hash = Some("11".repeat(32));
                 }
                 let mut broken = first;
                 broken.path.clear();
-                b.bumps.push(other);
-                b.bumps.push(broken);
+                b.push_bump(other);
+                b.push_bump(broken);
             }
         }),
         // The same contradicting BUMP alone: the reader returns the BEEF.
         Box::new(|b| {
-            if let Some(first) = b.bumps.first().cloned() {
+            if let Some(first) = b.bumps().first().cloned() {
                 let mut other = first;
                 if let Some(leaf) = other.path[0].iter_mut().find(|l| l.hash.is_some()) {
                     leaf.hash = Some("11".repeat(32));
                 }
-                b.bumps.push(other);
+                b.push_bump(other);
             }
         }),
         // A carried node above level 0 changed (a contradicted node, where a
         // walk reads it).
         Box::new(|b| {
             if let Some(leaf) = b
-                .bumps
-                .first_mut()
+                .bump_mut(0)
                 .and_then(|p| p.path.get_mut(1))
                 .and_then(|l| l.first_mut())
             {
@@ -193,25 +203,22 @@ fn changes() -> Vec<Change> {
         }),
         // A level-0 sibling removed (a missing sibling, where a walk needs it).
         Box::new(|b| {
-            if let Some(level) = b.bumps.first_mut().and_then(|p| p.path.first_mut()) {
+            if let Some(level) = first_bump(b).and_then(|p| p.path.first_mut()) {
                 if level.len() > 1 {
                     let at = level.iter().position(|l| !l.txid).unwrap_or(0);
                     level.remove(at);
                 }
             }
         }),
-        // An entry edited through the deprecated door (its stale order read
-        // by `written_order`) and a duplicate at an even offset of the last
-        // BUMP's level 0.
+        // An entry edited (through `edit_tx` since #843b; the deprecated
+        // `tx_mut`, its stale order read by `written_order`, until then) and
+        // a duplicate at an even offset of the last BUMP's level 0.
         Box::new(|b| {
-            if let Some(entry) = b.txs.iter_mut().rev().find(|t| !t.is_txid_only()) {
-                #[allow(deprecated)]
-                let tx = entry.tx_mut();
-                if let Some(tx) = tx {
-                    tx.set_lock_time(tx.lock_time() ^ 1);
-                }
+            let last = b.txs().iter().rev().find(|t| !t.is_txid_only());
+            if let Some(txid) = last.map(BeefTx::txid) {
+                let _ = b.edit_tx(txid, |tx| tx.set_lock_time(tx.lock_time() ^ 1));
             }
-            if let Some(level) = b.bumps.last_mut().and_then(|p| p.path.first_mut()) {
+            if let Some(level) = last_bump(b).and_then(|p| p.path.first_mut()) {
                 let free = (0..)
                     .step_by(2)
                     .find(|o| level.iter().all(|l| l.offset != *o));
@@ -225,12 +232,12 @@ fn changes() -> Vec<Change> {
         // rewritten from the fields) ...
         Box::new(|b| {
             let last = b
-                .txs
+                .txs()
                 .iter()
                 .rev()
                 .find(|t| t.tx().is_some_and(|tx| !tx.outputs().is_empty()));
             if let Some(txid) = last.map(BeefTx::txid) {
-                let _ = b.edit_tx(&txid, |tx| tx.outputs_mut()[0].satoshis = Some(1 << 53));
+                let _ = b.edit_tx(txid, |tx| tx.outputs_mut()[0].satoshis = Some(1 << 53));
             }
         }),
         // ... a transaction built by hand merged by `merge_transaction` (its
@@ -242,7 +249,7 @@ fn changes() -> Vec<Change> {
         // entry the writers' check takes from its fields (the state
         // `fuzz_beef_parser` found, where the check took the fields on
         // trust and the round trip refused it).
-        Box::new(|b| b.txs.push(BeefTx::from_tx(by_hand_53(), None))),
+        Box::new(|b| b.rows_mut().0.push(BeefTx::from_tx(by_hand_53(), None))),
     ]
 }
 
@@ -273,7 +280,11 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
     // split 2,443 and 3,694 to 2,467 and 3,704; #904's
     // `contacts_listed_spend.json`, nine distinct V1 BEEFs, 363 to 372 and
     // the split 2,467 and 3,704 to 2,566 and 3,758, the reader's 1,789 and
-    // the judge's 252 unmoved): re-derive them by running this test,
+    // the judge's 252 unmoved; #843b removed the state holding a 62-digit
+    // txid-only entry, which a `Txid` cannot hold, seventeen states to
+    // sixteen: the refused 3,758 less that state's 372, one a BEEF, 3,386,
+    // the `Ok`, the reader's and the judge's unmoved): re-derive them by
+    // running this test,
     // whose failing assertion prints the new figures as `left`, and carry
     // them to the records that cite them (`CHANGELOG.md`'s #621 entry,
     // `src/transaction/CLAUDE.md`'s `beef/prepass_621_tests.rs` row,
@@ -295,7 +306,7 @@ fn the_pre_pass_is_the_round_trip_on_every_vector_beef_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (2566, 3758, 1789, 252)
+        (2566, 3386, 1789, 252)
     );
 }
 
@@ -305,6 +316,7 @@ fn the_pre_pass_is_the_round_trip_on_every_recorded_state_817_621() {
     let f = fixture(&v);
     let targets = targets(&f);
     let mut counts = Counts::default();
+    let mut unbuilt = Vec::new();
     for (group, build) in [
         (
             "writers",
@@ -314,11 +326,23 @@ fn the_pre_pass_is_the_round_trip_on_every_recorded_state_817_621() {
     ] {
         for c in v[group].as_array().unwrap() {
             let name = c["name"].as_str().unwrap();
-            if let Some(source) = build(name, &f) {
-                compare(&format!("{group} {name}"), &source, &targets, &mut counts);
+            match build(name, &f) {
+                Some(source) => compare(&format!("{group} {name}"), &source, &targets, &mut counts),
+                None => unbuilt.push(name),
             }
         }
     }
+    // Seventeen of the 27 recorded states since #843b: the ten whose
+    // txid-only entry holds a text that is no txid have no builder
+    // (`UNBUILDABLE_843B`, each refused until then: 23 refused, now 13),
+    // counted here by name beside the four the raw doors refuse.
+    let no_txid: Vec<&str> = unbuilt
+        .iter()
+        .copied()
+        .filter(|name| states::UNBUILDABLE_843B.contains(name))
+        .collect();
+    assert_eq!(no_txid, states::UNBUILDABLE_843B, "each by name, in order");
+    assert_eq!(unbuilt.len(), no_txid.len() + 4, "{unbuilt:?}");
     assert_eq!(
         (
             counts.ok,
@@ -326,7 +350,7 @@ fn the_pre_pass_is_the_round_trip_on_every_recorded_state_817_621() {
             counts.by_reader,
             counts.root_not_carried
         ),
-        (4, 23, 2, 0)
+        (4, 13, 2, 0)
     );
 }
 
@@ -373,7 +397,7 @@ fn a_parsed_entry_whose_cached_bytes_trail_its_transaction_is_refused_621() {
             if door == 0 {
                 source.merge_transaction(tx);
             } else {
-                source.txs.push(BeefTx::from_tx(tx, None));
+                source.rows_mut().0.push(BeefTx::from_tx(tx, None));
             }
             let name = format!("{name} trailing cache, door {door}");
             compare(&name, &source, &targets, &mut counts);

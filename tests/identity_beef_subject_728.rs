@@ -133,7 +133,7 @@ fn txid_only_last(t: &Txs) -> Beef {
     beef.merge_raw_tx(t.alone.to_binary(), Some(index))
         .expect("the bytes are one transaction");
     beef.merge_bump(lone_leaf(&t.parent.id(), 901));
-    beef.merge_txid_only(t.parent.id());
+    beef.merge_txid_only(t.parent.txid());
     beef
 }
 
@@ -298,7 +298,7 @@ async fn a_txid_only_entry_written_last_is_skipped_by_both_parsers_728() {
         )
     );
     let parsed = Beef::from_binary(&beef).unwrap();
-    let order: Vec<String> = parsed.txs.iter().map(|tx| tx.txid()).collect();
+    let order: Vec<String> = parsed.txs().iter().map(|tx| tx.id()).collect();
     assert_eq!(order, [t.alone.id(), t.parent.id()]);
     assert!(parsed.atomic_txid.is_none());
     assert!(Transaction::from_beef(&beef, None).is_err());
@@ -321,7 +321,9 @@ async fn an_atomic_header_naming_a_txid_only_entry_is_skipped_by_both_parsers_72
     let v = vector();
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
-    let atomic = txid_only_last(&t).to_binary_atomic(&t.parent.id()).unwrap();
+    let atomic = txid_only_last(&t)
+        .to_binary_atomic(t.parent.txid())
+        .unwrap();
     for (name, beef) in [
         ("atomic_txid_only_subject", atomic),
         ("atomic_txid_only_subject_beside_token", beside_token(&t)),
@@ -337,7 +339,7 @@ async fn an_atomic_header_naming_a_txid_only_entry_is_skipped_by_both_parsers_72
             "{name}"
         );
         let parsed = Beef::from_binary(&beef).unwrap();
-        assert_eq!(parsed.atomic_txid.as_deref(), Some(t.parent.id().as_str()));
+        assert_eq!(parsed.atomic_txid, Some(t.parent.txid()));
         assert!(Transaction::from_beef(&beef, None).is_err(), "{name}");
         assert_eq!(read(beef, index, &subject).await, (0, 0), "{name}");
     }

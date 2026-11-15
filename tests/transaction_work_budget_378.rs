@@ -86,16 +86,16 @@ impl Fixture {
         let mut writer = Writer::new();
         writer
             .write_u32_le(BEEF_V1)
-            .write_var_int(beef.bumps.len() as u64);
-        for bump in &beef.bumps {
+            .write_var_int(beef.bumps().len() as u64);
+        for bump in beef.bumps() {
             writer.write_bytes(
                 &bump
                     .to_binary()
                     .expect("the path holds only states a BUMP writes (#817)"),
             );
         }
-        writer.write_var_int(beef.txs.len() as u64);
-        for tx in beef.txs.iter().rev() {
+        writer.write_var_int(beef.txs().len() as u64);
+        for tx in beef.txs().iter().rev() {
             tx.to_writer(&mut writer, BEEF_V1)
                 .expect("the BEEF is writable");
         }

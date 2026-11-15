@@ -1112,7 +1112,7 @@ fn two_transaction_beef() -> (Vec<u8>, String, String) {
 fn atomic_of(beef: &[u8], txid: &str) -> Vec<u8> {
     bsv_rs::transaction::Beef::from_binary(beef)
         .unwrap()
-        .to_binary_atomic(txid)
+        .to_binary_atomic(txid.parse().unwrap())
         .unwrap()
 }
 

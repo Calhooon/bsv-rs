@@ -72,7 +72,7 @@ fn listing(shape: &Value) -> (ListOutputsResult, Transaction) {
     let beef = from_hex(shape["beef"].as_str().unwrap()).unwrap();
     let txid = shape["txid"].as_str().unwrap();
     let vout = shape["vout"].as_u64().unwrap();
-    let child = Transaction::from_beef(&beef, Some(txid)).unwrap();
+    let child = Transaction::from_beef(&beef, Some(txid.parse().unwrap())).unwrap();
     assert_eq!(child.id(), txid);
     let listed = ListOutputsResult {
         outputs: vec![WalletOutput {

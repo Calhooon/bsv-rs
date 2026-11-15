@@ -3,7 +3,7 @@
 //! the same checks over every entry (`beef_writable.rs`).
 
 use super::{BeefTx, TxDataFormat, BEEF_V2};
-use crate::primitives::{from_hex, Writer};
+use crate::primitives::Writer;
 use crate::Result;
 
 /// The reference writer's refusal of a txid-only entry outside V2
@@ -22,14 +22,14 @@ impl BeefTx {
     /// (#817), judged before any byte, so `writer` is untouched on `Err`: a
     /// txid-only entry under a word other than V2 (`a valid serialized
     /// Transaction is expected`, the reference's words, `BeefTx.ts:253-258`),
-    /// a txid-only txid with a non-hex character (`Invalid hex string`, the
-    /// reference's) or of other than 64 hex digits (`Invalid txid-only entry
-    /// txid: expected 64 hex digits, got N`), an entry whose written bytes
+    /// an entry whose written bytes
     /// are not one transaction, held raw or parsed with a cache holding a
     /// transaction and more (#621's fold; [`from_raw_tx`](Self::from_raw_tx)'s
     /// words). Until #817 a txid-only entry
-    /// under a word other than V2 panicked, and a txid of other than 64 hex
-    /// digits was written as the bytes it decoded to, or none.
+    /// under a word other than V2 panicked. A txid-only entry's txid is a
+    /// [`Txid`](crate::transaction::Txid) since #843b, so the three refusals
+    /// of a text that is no txid (empty, a non-hex character, another
+    /// length) have no state left to refuse and are gone.
     pub fn to_writer(&self, writer: &mut Writer, version: u32) -> Result<()> {
         self.writable(version)?;
         self.write_unchecked(writer, version);
@@ -72,40 +72,29 @@ impl BeefTx {
     /// What the reference's writer throws for this entry (#817): a txid-only
     /// entry under a word other than V2, `a valid serialized Transaction is
     /// expected` (`BeefTx.ts:253-258`: its BRC-62 layout has no form for a
-    /// txid); one under V2 whose txid has a character that is not a hex
-    /// digit, `Invalid hex string` (`toArray(txid, 'hex')`, `hex.ts:6-17`).
-    /// A txid-only entry whose txid is empty is refused ahead of every BUMP by
-    /// `Beef`'s check (`empty_txid`).
+    /// txid). Its throw for a txid with a character that is not a hex digit
+    /// (`toArray(txid, 'hex')`, `hex.ts:6-17`) has no state here since
+    /// #843b: the txid is a `Txid`.
     pub(crate) fn reference_refusal(&self, version: u32) -> Result<()> {
-        if !self.is_txid_only() {
-            return Ok(());
-        }
-        if version != BEEF_V2 {
+        if self.is_txid_only() && version != BEEF_V2 {
             return Err(crate::Error::BeefError(RAW_TX_EXPECTED.to_string()));
-        }
-        if !super::super::merkle_path_walk::is_reference_hex(&self.txid()) {
-            return Err(crate::Error::BeefError(
-                super::super::merkle_path_walk::INVALID_HEX.to_string(),
-            ));
         }
         Ok(())
     }
 
     /// What this crate refuses where the reference writes bytes no reader
-    /// reads back as written (#817, stated rows): a txid-only entry's txid of
-    /// other than 64 hex digits (the reference writes its bytes at their
-    /// length, or pads an odd length with a leading zero, a txid of another
-    /// text: `Invalid txid-only entry txid: expected 64 hex digits, got N`);
+    /// reads back as written (#817, stated rows):
     /// an entry with data whose written bytes are not exactly one
     /// transaction (`from_raw_tx`'s words; its constructor scans them too).
+    /// A txid-only entry's txid of other than 64 hex digits, refused here
+    /// until #843b, cannot be held since (a `Txid`).
     /// The bytes judged are the ones [`written_tx_bytes`](Self::written_tx_bytes)
     /// gives, held with a parse or without (#621's fold): the held bytes,
     /// else the transaction's cached serialization (since #840 one
     /// transaction from every door that sets it; until then
     /// `Transaction::from_binary` and `from_hex` set it to the whole buffer
     /// they read a prefix of, the check holding without that fix), else
-    /// the fields the bytes are written from (an entry mutated through
-    /// `tx_mut` is written from its fields too): a serialization built from
+    /// the fields the bytes are written from: a serialization built from
     /// them is one transaction by construction save an output amount of
     /// 2^53 or more, which the reader refuses since #844 and
     /// [`amount_refusal`](Self::amount_refusal) refuses ahead of every check,
@@ -118,24 +107,13 @@ impl BeefTx {
     /// followed by more bytes was written as a frame the reader refuses and
     /// merged by `merge_beef`. Linear, no allocation.
     pub(crate) fn own_refusal(&self) -> Result<()> {
-        if self.is_txid_only() {
-            let digits = self.txid().len();
-            if digits != 64 {
-                return Err(crate::Error::BeefError(format!(
-                    "Invalid txid-only entry txid: expected 64 hex digits, got {digits}"
-                )));
-            }
-        } else if let Some(ref raw_tx) = self.raw_tx {
+        if let Some(ref raw_tx) = self.raw_tx {
             super::super::beef_raw_frame::one_transaction(raw_tx)
                 .map_err(crate::Error::BeefError)?;
         } else if let Some(ref tx) = self.tx {
-            let cached = if self.mutated {
-                None
-            } else {
-                tx.with_cached_bytes(|bytes| {
-                    bytes.map(super::super::beef_raw_frame::one_transaction)
-                })
-            };
+            let cached = tx.with_cached_bytes(|bytes| {
+                bytes.map(super::super::beef_raw_frame::one_transaction)
+            });
             // Written from the fields: one transaction by construction save
             // an amount of 2^53 or more, which `amount_refusal` refuses ahead
             // of this check, in the reference's writer's words (#844's fold).
@@ -146,32 +124,19 @@ impl BeefTx {
         Ok(())
     }
 
-    /// A txid-only entry whose txid is the empty text: the reference's
-    /// `txid` getter throws `Internal` for it (`BeefTx.ts:105-116`), reached
-    /// by `#ensureSerializableState` ahead of the BUMPs (`Beef.ts:334-340`,
-    /// `:368`), so `Beef`'s check refuses it there, in `own_refusal`'s words.
-    pub(crate) fn empty_txid(&self) -> bool {
-        self.is_txid_only() && self.txid.as_deref() == Some("")
-    }
-
     /// The bytes of an entry [`writable`](Self::writable) accepted under
     /// `version`, as 0.9.0-beta wrote them; for `to_writer` and `Beef`'s
     /// writers, each after the check. The transaction's bytes are
     /// [`written_tx_bytes`](Self::written_tx_bytes), the ones the check
-    /// judged and `merge_beef` merges (#621's fold: an entry mutated through
-    /// `tx_mut` written from its fields by every writer, where `to_writer`
-    /// wrote a cache set after the mutation). An entry with nothing to write
+    /// judged and `merge_beef` merges (#621's fold). An entry with nothing to write
     /// (a txid-only one, which the check refuses outside V2) writes no
     /// transaction bytes: the check is the guard, no panic is left (#817).
     pub(crate) fn write_unchecked(&self, writer: &mut Writer, version: u32) {
         if version == BEEF_V2 {
             if self.is_txid_only() {
-                // TXID only format
+                // TXID only format: the txid's 32 bytes in wire order.
                 writer.write_u8(TxDataFormat::TxidOnly as u8);
-                let txid_bytes = from_hex(&self.txid()).unwrap_or_default();
-                let mut reversed = txid_bytes;
-                reversed.reverse();
-                writer.write_bytes(&reversed);
+                writer.write_bytes(self.txid().as_wire_bytes());
             } else if let Some(bump_idx) = self.bump_index {
                 // Raw tx with bump index
                 writer.write_u8(TxDataFormat::RawTxAndBumpIndex as u8);

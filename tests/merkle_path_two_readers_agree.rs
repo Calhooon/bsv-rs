@@ -130,7 +130,7 @@ fn beef_reader(bytes: &[u8]) -> Answer {
             let mut root = bump.root;
             root.reverse();
             let roots = BTreeSet::from([Some(to_hex(&root))]);
-            valid(&beef.bumps[0], used, roots)
+            valid(&beef.bumps()[0], used, roots)
         }
         Err(e) => refused(e.to_string(), HEADER.len() as u64),
     }
@@ -783,13 +783,14 @@ fn an_even_offset_duplicate_held_in_memory_is_read_as_the_reference_reads_it() {
     let unchecked = MerklePath::new_unchecked(1, path.clone()).unwrap_err();
     assert_eq!(unchecked.to_string(), refusal);
 
+    // `merge_bump` into an empty BEEF appends the BUMP as given.
     let mut beef = Beef::new();
-    beef.bumps.push(MerklePath {
+    beef.merge_bump(MerklePath {
         block_height: 1,
         path,
     });
     assert_eq!(beef.verify_structure(), Err(Kind::LeftDuplicateBelow));
-    let held = &beef.bumps[0];
+    let held = &beef.bumps()[0];
     assert!(held.compute_root(Some(&display(4))).is_ok());
     assert_eq!(
         held.compute_root(Some(&display(8)))

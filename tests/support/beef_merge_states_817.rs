@@ -18,6 +18,23 @@ pub const VECTOR: &str = include_str!("../vectors/beef_v1_txid_only_writer_817.j
 pub const FRESH: &str = "8170000000000000000000000000000000000000000000000000000000000817";
 pub const BAD_WORD: u32 = 0xEFBE_0003;
 
+/// The recorded states this crate can no longer build (#843b): each holds a
+/// txid-only entry whose txid is a text that is not 64 hex digits, which
+/// `merge_txid_only` held as given until the txid became a `Txid`. Their
+/// cells stay in the vector, unread; every includer counts them by name.
+pub const UNBUILDABLE_843B: &[&str] = &[
+    "txid_only_non_hex",
+    "txid_only_62_digits",
+    "txid_only_66_digits",
+    "txid_only_63_digits",
+    "txid_only_non_hex_short",
+    "txid_only_empty_after_merge_threw",
+    "txid_only_empty_with_non_hex_bump_hash",
+    "source_txid_only_non_hex",
+    "source_txid_only_62_digits",
+    "source_version_word_and_txid_only_62_digits",
+];
+
 pub fn vector() -> Value {
     serde_json::from_str(VECTOR).unwrap()
 }
@@ -64,16 +81,26 @@ pub fn fixture(v: &Value) -> Fixture {
     }
 }
 
+/// The leading BUMP's leading leaf given a hash that is no hex, through the
+/// public door (#843b: a write of the public `bumps` until then).
+fn non_hex_leaf(b: &mut Beef) {
+    b.edit_bump(0, |p| p.path[0][0].hash = Some("zz".repeat(32)))
+        .unwrap();
+}
+
 /// The states of the `writers` group, each built here as the recorder built
 /// it. A state this crate's doors refuse (a raw entry that is not one
 /// transaction) has no builder: its cell is pinned at the door.
 pub fn writer_state(name: &str, f: &Fixture) -> Option<Beef> {
     let v1 = || Beef::from_binary(&f.v1).unwrap();
+    // A txid-only entry holds a `Txid` since #843b: a recorded state whose
+    // txid is no txid has no builder (`UNBUILDABLE_843B`).
     let txid_only = |txid: &str| {
         let mut b = Beef::new();
-        b.merge_txid_only(txid.to_string());
-        b
+        b.merge_txid_only(txid.parse().ok()?);
+        Some(b)
     };
+
     Some(match name {
         "version_word_efbe0003" | "version_word_atomic" | "version_word_zero" => {
             let mut b = v1();
@@ -87,33 +114,33 @@ pub fn writer_state(name: &str, f: &Fixture) -> Option<Beef> {
         "version_word_with_txid_only" => {
             let mut b = v1();
             b.version = BAD_WORD;
-            b.merge_txid_only(FRESH.to_string());
+            b.merge_txid_only(FRESH.to_string().parse().unwrap());
             b
         }
         "version_word_with_non_hex_bump_hash" => {
             let mut b = v1();
             b.version = BAD_WORD;
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
+            non_hex_leaf(&mut b);
             b
         }
         "v1_txid_only_with_non_hex_bump_hash" => {
             let mut b = v1();
-            b.merge_txid_only(FRESH.to_string());
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
+            b.merge_txid_only(FRESH.to_string().parse().unwrap());
+            non_hex_leaf(&mut b);
             b
         }
-        "txid_only_non_hex" => txid_only(&"zz".repeat(32)),
-        "txid_only_62_digits" => txid_only(&"ab".repeat(31)),
-        "txid_only_66_digits" => txid_only(&"ab".repeat(33)),
-        "txid_only_63_digits" => txid_only(&format!("a{}", "bc".repeat(31))),
-        "txid_only_upper_case" => txid_only(&"AB".repeat(32)),
-        "txid_only_non_hex_short" => txid_only("zz"),
-        "txid_only_empty_after_merge_threw" => txid_only(""),
+        "txid_only_non_hex" => txid_only(&"zz".repeat(32))?,
+        "txid_only_62_digits" => txid_only(&"ab".repeat(31))?,
+        "txid_only_66_digits" => txid_only(&"ab".repeat(33))?,
+        "txid_only_63_digits" => txid_only(&format!("a{}", "bc".repeat(31)))?,
+        "txid_only_upper_case" => txid_only(&"AB".repeat(32))?,
+        "txid_only_non_hex_short" => txid_only("zz")?,
+        "txid_only_empty_after_merge_threw" => txid_only("")?,
         "txid_only_empty_with_non_hex_bump_hash" => {
             let mut b = v1();
             b.version = BEEF_V2;
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
-            b.merge_txid_only(String::new());
+            non_hex_leaf(&mut b);
+            b.merge_txid_only("".parse().ok()?);
             b
         }
         "raw_index_out_of_range" => {
@@ -132,7 +159,7 @@ pub fn merge_source(name: &str, f: &Fixture) -> Option<Beef> {
     Some(match name {
         "v1_source_with_txid_only" => {
             let mut b = v1();
-            b.merge_txid_only(FRESH.to_string());
+            b.merge_txid_only(FRESH.to_string().parse().unwrap());
             b
         }
         "source_version_word" => {
@@ -147,40 +174,44 @@ pub fn merge_source(name: &str, f: &Fixture) -> Option<Beef> {
             } else {
                 "ab".repeat(31)
             };
-            b.merge_txid_only(digits);
+            // No text of either kind is a `Txid` (`UNBUILDABLE_843B`).
+            b.merge_txid_only(digits.parse().ok()?);
             b
         }
         "source_bump_non_hex_hash" => {
             let mut b = v1();
-            b.bumps[0].path[0][0].hash = Some("zz".repeat(32));
+            non_hex_leaf(&mut b);
             b
         }
         "source_bump_two_leaves_at_one_offset" => {
             let mut b = v1();
-            b.bumps[0].path[0].push(MerklePathLeaf::new(0, "11".repeat(32)));
+            b.edit_bump(0, |p| {
+                p.path[0].push(MerklePathLeaf::new(0, "11".repeat(32)))
+            })
+            .unwrap();
             b
         }
         "source_bump_no_levels" => {
             let mut b = v1();
-            b.bumps[0].path.clear();
+            b.edit_bump(0, |p| p.path.clear()).unwrap();
             b
         }
         "source_bump_duplicate_with_hash" => {
             let mut b = v1();
             let mut dup = MerklePathLeaf::new_duplicate(1);
             dup.hash = Some("11".repeat(32));
-            b.bumps[0].path[0].push(dup);
+            b.edit_bump(0, |p| p.path[0].push(dup)).unwrap();
             b
         }
         "source_version_word_and_txid_only_62_digits" => {
             let mut b = Beef::new();
-            b.merge_txid_only("ab".repeat(31));
+            b.merge_txid_only("ab".repeat(31).parse().ok()?);
             b.version = BAD_WORD;
             b
         }
         "source_version_word_and_bump_no_levels" => {
             let mut b = v1();
-            b.bumps[0].path.clear();
+            b.edit_bump(0, |p| p.path.clear()).unwrap();
             b.version = BAD_WORD;
             b
         }

@@ -399,19 +399,19 @@ mod transaction_tests {
     #[test]
     fn test_beef_new() {
         let beef = Beef::new();
-        assert!(beef.bumps.is_empty());
-        assert!(beef.txs.is_empty());
+        assert!(beef.bumps().is_empty());
+        assert!(beef.txs().is_empty());
     }
 
     #[test]
     fn test_beef_merge_txid_only() {
         let mut beef = Beef::new();
         let txid = "a".repeat(64);
-        beef.merge_txid_only(txid.clone());
+        beef.merge_txid_only(txid.parse().unwrap());
 
-        assert_eq!(beef.txs.len(), 1);
-        assert!(beef.txs[0].is_txid_only());
-        assert!(beef.find_txid(&txid).is_some());
+        assert_eq!(beef.txs().len(), 1);
+        assert!(beef.txs()[0].is_txid_only());
+        assert!(beef.find_txid(txid.parse().unwrap()).is_some());
     }
 
     #[test]
@@ -421,7 +421,7 @@ mod transaction_tests {
         let idx = beef.merge_bump(bump);
 
         assert_eq!(idx, 0);
-        assert_eq!(beef.bumps.len(), 1);
+        assert_eq!(beef.bumps().len(), 1);
     }
 
     #[test]
@@ -561,16 +561,16 @@ mod transaction_tests {
 
             // Verify both are included
             assert!(
-                beef.find_txid(&parent.id()).is_some(),
+                beef.find_txid(parent.txid()).is_some(),
                 "Parent should be included"
             );
             assert!(
-                beef.find_txid(&child.id()).is_some(),
+                beef.find_txid(child.txid()).is_some(),
                 "Child should be included"
             );
 
             // Verify count
-            assert_eq!(beef.txs.len(), 2, "Should have 2 transactions");
+            assert_eq!(beef.txs().len(), 2, "Should have 2 transactions");
         }
 
         #[test]
@@ -592,11 +592,11 @@ mod transaction_tests {
 
             // Both transactions should be in beef1
             assert!(
-                beef1.find_txid(&tx1.id()).is_some(),
+                beef1.find_txid(tx1.txid()).is_some(),
                 "tx1 should be in merged beef"
             );
             assert!(
-                beef1.find_txid(&tx2.id()).is_some(),
+                beef1.find_txid(tx2.txid()).is_some(),
                 "tx2 should be in merged beef"
             );
         }
@@ -617,7 +617,7 @@ mod transaction_tests {
             beef.sort_txs();
 
             // Verify order: grandparent, parent, child
-            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+            let txids: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
             let gp_idx = txids.iter().position(|t| t == &grandparent.id());
             let p_idx = txids.iter().position(|t| t == &parent.id());
             let c_idx = txids.iter().position(|t| t == &child.id());
@@ -637,13 +637,13 @@ mod transaction_tests {
             beef.merge_transaction(tx);
 
             // Serialize as atomic BEEF
-            let atomic = beef.to_binary_atomic(&txid).unwrap();
+            let atomic = beef.to_binary_atomic(txid.parse().unwrap()).unwrap();
 
             // Parse back
             let parsed = Beef::from_binary(&atomic).unwrap();
 
             // Verify atomic_txid is set
-            assert_eq!(parsed.atomic_txid, Some(txid));
+            assert_eq!(parsed.atomic_txid, Some(txid.parse().unwrap()));
         }
 
         #[test]
@@ -687,7 +687,7 @@ mod transaction_tests {
             assert_eq!(idx1, 0);
             assert_eq!(idx2, 1);
             assert_eq!(idx3, 2);
-            assert_eq!(beef.bumps.len(), 3);
+            assert_eq!(beef.bumps().len(), 3);
         }
 
         #[test]
@@ -704,7 +704,7 @@ mod transaction_tests {
         fn test_beef_txid_only_validation() {
             let mut beef = Beef::new();
             let txid = "a".repeat(64);
-            beef.merge_txid_only(txid.clone());
+            beef.merge_txid_only(txid.parse().unwrap());
 
             // No BUMP proves the txid: not valid, whatever the flag says
             // (0.4.2; through 0.4.1 `true` accepted it, bsv-stack-lean NL-8 W5).
@@ -725,7 +725,7 @@ mod transaction_tests {
         #[test]
         fn test_beef_find_transaction_not_found() {
             let beef = Beef::new();
-            let result = beef.find_txid(&"a".repeat(64));
+            let result = beef.find_txid("a".repeat(64).parse().unwrap());
             assert!(result.is_none(), "Should not find non-existent txid");
         }
 
@@ -738,7 +738,7 @@ mod transaction_tests {
             let parsed = Beef::from_hex(&hex).unwrap();
 
             assert_eq!(beef.version, parsed.version);
-            assert_eq!(beef.txs.len(), parsed.txs.len());
+            assert_eq!(beef.txs().len(), parsed.txs().len());
         }
 
         #[test]
@@ -751,7 +751,7 @@ mod transaction_tests {
             let parsed = Beef::from_binary(&binary).unwrap();
 
             assert_eq!(beef.version, parsed.version);
-            assert_eq!(beef.txs.len(), parsed.txs.len());
+            assert_eq!(beef.txs().len(), parsed.txs().len());
         }
 
         #[test]
@@ -765,7 +765,7 @@ mod transaction_tests {
             beef.merge_transaction(tx.clone());
 
             // Should only have one copy
-            let count = beef.txs.iter().filter(|t| t.txid() == txid).count();
+            let count = beef.txs().iter().filter(|t| t.txid() == txid).count();
             assert_eq!(count, 1, "Should deduplicate transactions");
         }
 
@@ -781,7 +781,10 @@ mod transaction_tests {
             beef.merge_raw_tx(raw, None)
                 .expect("the bytes are one transaction");
 
-            assert!(beef.find_txid(&txid).is_some(), "Raw tx should be merged");
+            assert!(
+                beef.find_txid(txid.parse().unwrap()).is_some(),
+                "Raw tx should be merged"
+            );
         }
 
         #[test]
@@ -794,10 +797,10 @@ mod transaction_tests {
                 beef.merge_bump(bump);
             }
 
-            assert_eq!(beef.bumps.len(), 5);
+            assert_eq!(beef.bumps().len(), 5);
 
             // Check that heights are preserved
-            for (i, bump) in beef.bumps.iter().enumerate() {
+            for (i, bump) in beef.bumps().iter().enumerate() {
                 let expected_height = match i {
                     0 => 100,
                     1 => 1000,
@@ -871,9 +874,9 @@ mod transaction_tests {
             let beef_bytes = tx.to_beef(true).unwrap();
 
             let beef = Beef::from_binary(&beef_bytes).unwrap();
-            assert_eq!(beef.txs.len(), 1, "Should have 1 transaction");
+            assert_eq!(beef.txs().len(), 1, "Should have 1 transaction");
             assert!(
-                beef.find_txid(&tx.id()).is_some(),
+                beef.find_txid(tx.txid()).is_some(),
                 "Should find the transaction"
             );
         }
@@ -889,17 +892,17 @@ mod transaction_tests {
             let beef_bytes = child.to_beef(true).unwrap();
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
-            assert_eq!(beef.txs.len(), 3, "Should have 3 transactions");
+            assert_eq!(beef.txs().len(), 3, "Should have 3 transactions");
             assert!(
-                beef.find_txid(&grandparent.id()).is_some(),
+                beef.find_txid(grandparent.txid()).is_some(),
                 "Should include grandparent"
             );
             assert!(
-                beef.find_txid(&parent.id()).is_some(),
+                beef.find_txid(parent.txid()).is_some(),
                 "Should include parent"
             );
             assert!(
-                beef.find_txid(&child.id()).is_some(),
+                beef.find_txid(child.txid()).is_some(),
                 "Should include child"
             );
         }
@@ -915,21 +918,21 @@ mod transaction_tests {
             let beef_bytes = child.to_beef(true).unwrap();
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
-            assert_eq!(beef.txs.len(), 4, "Should have 4 transactions");
+            assert_eq!(beef.txs().len(), 4, "Should have 4 transactions");
             assert!(
-                beef.find_txid(&great_grandparent.id()).is_some(),
+                beef.find_txid(great_grandparent.txid()).is_some(),
                 "Should include great-grandparent"
             );
             assert!(
-                beef.find_txid(&grandparent.id()).is_some(),
+                beef.find_txid(grandparent.txid()).is_some(),
                 "Should include grandparent"
             );
             assert!(
-                beef.find_txid(&parent.id()).is_some(),
+                beef.find_txid(parent.txid()).is_some(),
                 "Should include parent"
             );
             assert!(
-                beef.find_txid(&child.id()).is_some(),
+                beef.find_txid(child.txid()).is_some(),
                 "Should include child"
             );
         }
@@ -946,9 +949,10 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             // Should have grandparent's merkle proof
-            assert!(!beef.bumps.is_empty(), "Should have merkle proofs");
+            assert!(!beef.bumps().is_empty(), "Should have merkle proofs");
             assert_eq!(
-                beef.bumps[0].block_height, 100,
+                beef.bumps()[0].block_height,
+                100,
                 "Proof should be at height 100"
             );
         }
@@ -982,7 +986,7 @@ mod transaction_tests {
 
             // Should have merkle proofs at both heights
             assert!(
-                beef.bumps.len() >= 2,
+                beef.bumps().len() >= 2,
                 "Should have at least 2 merkle proofs"
             );
         }
@@ -1033,7 +1037,11 @@ mod transaction_tests {
             );
 
             let beef = Beef::from_binary(&result.unwrap()).unwrap();
-            assert_eq!(beef.txs.len(), 1, "Should only have the child transaction");
+            assert_eq!(
+                beef.txs().len(),
+                1,
+                "Should only have the child transaction"
+            );
         }
 
         #[test]
@@ -1068,14 +1076,14 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             // Count how many times A appears (should be exactly once)
-            let a_count = beef.txs.iter().filter(|t| t.txid() == a.id()).count();
+            let a_count = beef.txs().iter().filter(|t| t.txid() == a.id()).count();
             assert_eq!(
                 a_count, 1,
                 "Transaction A should appear exactly once (deduplication)"
             );
 
             // Total should be 4: A, B, C, D
-            assert_eq!(beef.txs.len(), 4, "Should have 4 unique transactions");
+            assert_eq!(beef.txs().len(), 4, "Should have 4 unique transactions");
         }
 
         #[test]
@@ -1088,7 +1096,7 @@ mod transaction_tests {
             let beef_bytes = child.to_beef(true).unwrap();
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
-            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+            let txids: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
 
             let gp_idx = txids.iter().position(|t| t == &grandparent.id()).unwrap();
             let p_idx = txids.iter().position(|t| t == &parent.id()).unwrap();
@@ -1115,13 +1123,13 @@ mod transaction_tests {
             assert!(beef.is_atomic(), "Should be atomic BEEF");
             assert_eq!(
                 beef.atomic_txid,
-                Some(child.id()),
+                Some(child.txid()),
                 "Atomic txid should be child's txid"
             );
 
             // Should include full ancestry
             assert_eq!(
-                beef.txs.len(),
+                beef.txs().len(),
                 3,
                 "Atomic BEEF should include all ancestors"
             );
@@ -1136,11 +1144,11 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             assert_eq!(
-                beef.txs.len(),
+                beef.txs().len(),
                 1,
                 "Proven tx with no unproven ancestors should have 1 tx"
             );
-            assert!(!beef.bumps.is_empty(), "Should have merkle proof");
+            assert!(!beef.bumps().is_empty(), "Should have merkle proof");
         }
 
         #[test]
@@ -1192,10 +1200,10 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             // Should have all 5 transactions: 2 roots + 2 children + 1 merge
-            assert_eq!(beef.txs.len(), 5, "Should include both chains");
+            assert_eq!(beef.txs().len(), 5, "Should include both chains");
 
             // Should have proofs at both heights
-            let heights: Vec<u32> = beef.bumps.iter().map(|b| b.block_height).collect();
+            let heights: Vec<u32> = beef.bumps().iter().map(|b| b.block_height).collect();
             assert!(heights.contains(&100), "Should have proof at height 100");
             assert!(heights.contains(&200), "Should have proof at height 200");
         }
@@ -1254,7 +1262,7 @@ mod transaction_tests {
                 let beef = Beef::from_binary(&beef_bytes).unwrap();
 
                 // The consolidation TX must be the LAST transaction
-                let last_tx = beef.txs.last().expect("BEEF should have transactions");
+                let last_tx = beef.txs().last().expect("BEEF should have transactions");
                 assert_eq!(
                     last_tx.txid(),
                     consolidation_txid,
@@ -1264,7 +1272,7 @@ mod transaction_tests {
                 );
 
                 // Verify the order: proven roots should come before their children
-                let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+                let txids: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
                 let last_idx = txids.len() - 1;
                 let consolidation_idx =
                     txids.iter().position(|t| t == &consolidation_txid).unwrap();
@@ -1322,17 +1330,17 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             // We should have 7 TXs: 2 roots + 2 middles + 2 terminals + 1 consolidation
-            assert_eq!(beef.txs.len(), 7, "Should have 7 transactions");
+            assert_eq!(beef.txs().len(), 7, "Should have 7 transactions");
 
             // The consolidation TX MUST be last
-            let last_tx = beef.txs.last().expect("BEEF should have transactions");
-            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+            let last_tx = beef.txs().last().expect("BEEF should have transactions");
+            let txids: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
             assert_eq!(
                 last_tx.txid(),
                 consolidation_txid,
                 "Consolidation TX must be LAST in BEEF. Got {} at last position, expected {}. \
                  TX order (first 8 chars): {:?}",
-                &last_tx.txid()[..8],
+                &last_tx.id()[..8],
                 &consolidation_txid[..8],
                 txids.iter().map(|t| &t[..8]).collect::<Vec<_>>()
             );
@@ -1447,13 +1455,13 @@ mod transaction_tests {
         fn test_brc62_beef_from_hex() {
             let beef = Beef::from_hex(BRC62_HEX).expect("Should parse BRC62 BEEF");
             assert_eq!(beef.version, BEEF_V1);
-            assert!(!beef.txs.is_empty());
+            assert!(!beef.txs().is_empty());
         }
 
         #[test]
         fn test_brc62_beef_find_transaction() {
             let beef = Beef::from_hex(BRC62_HEX).expect("Should parse");
-            let tx = beef.find_txid(BRC62_EXPECTED_TXID);
+            let tx = beef.find_txid(BRC62_EXPECTED_TXID.parse().unwrap());
             assert!(
                 tx.is_some(),
                 "Should find transaction {}",
@@ -1465,14 +1473,14 @@ mod transaction_tests {
         fn test_beef_set_from_hex() {
             let beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse BEEF set");
             assert_eq!(beef.version, BEEF_V2);
-            assert!(beef.txs.len() >= 3, "Should have at least 3 transactions");
-            assert!(!beef.bumps.is_empty(), "Should have BUMPs");
+            assert!(beef.txs().len() >= 3, "Should have at least 3 transactions");
+            assert!(!beef.bumps().is_empty(), "Should have BUMPs");
         }
 
         #[test]
         fn test_beef_set_find_transaction() {
             let beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse");
-            let tx = beef.find_txid(BEEF_SET_FIND_TXID);
+            let tx = beef.find_txid(BEEF_SET_FIND_TXID.parse().unwrap());
             assert!(
                 tx.is_some(),
                 "Should find transaction {}",
@@ -1486,8 +1494,8 @@ mod transaction_tests {
             let binary = beef.to_binary().expect("the BEEF is writable");
             let parsed = Beef::from_binary(&binary).expect("Should parse binary");
             assert_eq!(beef.version, parsed.version);
-            assert_eq!(beef.txs.len(), parsed.txs.len());
-            assert_eq!(beef.bumps.len(), parsed.bumps.len());
+            assert_eq!(beef.txs().len(), parsed.txs().len());
+            assert_eq!(beef.bumps().len(), parsed.bumps().len());
         }
     }
 
@@ -2482,17 +2490,20 @@ mod transaction_tests {
 
             // BEEF should have 2 transactions: tx[0] is the parent, tx[1] is the child
             assert!(
-                beef.txs.len() >= 2,
+                beef.txs().len() >= 2,
                 "BRC62 BEEF should have at least 2 transactions, got {}",
-                beef.txs.len()
+                beef.txs().len()
             );
 
             // Get the parent (first) and child (last) transactions
-            let parent_tx = beef.txs[0]
+            let parent_tx = beef.txs()[0]
                 .tx()
                 .expect("Parent tx should be parsed")
                 .clone();
-            let mut child_tx = beef.txs[1].tx().expect("Child tx should be parsed").clone();
+            let mut child_tx = beef.txs()[1]
+                .tx()
+                .expect("Child tx should be parsed")
+                .clone();
 
             // Link the parent as source_transaction on the child's input
             // The child's input references the parent's output

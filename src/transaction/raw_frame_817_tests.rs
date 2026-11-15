@@ -172,8 +172,9 @@ fn the_writers_refuse_a_raw_entry_held_unframed_which_no_door_holds_817() {
             Err(crate::Error::BeefError(words.to_string()))
         );
         assert!(writer.into_bytes().is_empty(), "nothing written");
-        let mut beef = Beef::with_version(version);
-        beef.txs.push(entry);
+        // Through the test door (#843b: a hand push of the public `txs`
+        // until then): no public door holds such an entry.
+        let mut beef = Beef::with_rows_for_test(version, vec![entry], Vec::new());
         assert_eq!(
             beef.to_binary(),
             Err(crate::Error::BeefError(words.to_string()))

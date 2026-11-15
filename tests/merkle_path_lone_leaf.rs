@@ -181,8 +181,9 @@ fn beef_and_merkle_path_agree_on_both_owned_bodies() {
         let bytes = from_hex(body).unwrap();
         assert_eq!(&bytes[5..46], from_hex(bump).unwrap());
         let stream = verify_stream_structure(bytes.as_slice(), &headers, None).unwrap();
+        // `merge_bump` into an empty BEEF appends the BUMP as given.
         let mut whole = Beef::new();
-        whole.bumps.push(in_memory(if accepted { 0 } else { 1 }));
+        whole.merge_bump(in_memory(if accepted { 0 } else { 1 }));
         if accepted {
             assert!(stream.is_valid());
             for roots in [

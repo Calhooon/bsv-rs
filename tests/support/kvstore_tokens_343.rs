@@ -223,7 +223,7 @@ pub fn assert_spends(h: &Harness) {
     let beef = Beef::from_binary(args.input_beef.as_deref().expect("merged input BEEF")).unwrap();
     for (source, _) in &h.sources {
         assert!(
-            beef.find_txid(&source.id()).is_some(),
+            beef.find_txid(source.txid()).is_some(),
             "merged BEEF must carry every token transaction"
         );
     }

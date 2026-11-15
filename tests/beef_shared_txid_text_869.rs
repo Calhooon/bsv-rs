@@ -67,14 +67,18 @@ fn judge(text: &str) {
     let cid = c.id();
     let mut beef = Beef::new();
     beef.merge_transaction(c.clone());
-    let atomic = beef.find_atomic_transaction(&cid).expect("held");
+    let atomic = beef
+        .find_atomic_transaction(cid.parse().unwrap())
+        .expect("held");
     assert_eq!(atomic.id(), cid, "[{text:?}] find_atomic_transaction's id");
     assert_eq!(
         linked(&atomic),
         ids,
         "[{text:?}] find_atomic_transaction's sources"
     );
-    let signing = beef.find_transaction_for_signing(&cid).expect("held");
+    let signing = beef
+        .find_transaction_for_signing(cid.parse().unwrap())
+        .expect("held");
     assert_eq!(
         signing.id(),
         cid,
@@ -85,7 +89,8 @@ fn judge(text: &str) {
         ids,
         "[{text:?}] find_transaction_for_signing's sources"
     );
-    let back = Transaction::from_beef(&c.to_beef(true).unwrap(), Some(&cid)).unwrap();
+    let back =
+        Transaction::from_beef(&c.to_beef(true).unwrap(), Some(cid.parse().unwrap())).unwrap();
     assert_eq!(back.id(), cid, "[{text:?}] from_beef of to_beef");
 }
 
@@ -113,7 +118,9 @@ fn a_beefs_graph_names_the_outpoints_its_bytes_carry_869() {
         let cid = c.id();
         let mut beef = Beef::new();
         beef.merge_transaction(c);
-        let mut entry = beef.find_txid(&cid).unwrap().input_txids.clone();
+        // As text: a `Txid` has no order of its own.
+        let held = beef.find_txid(cid.parse().unwrap()).unwrap();
+        let mut entry: Vec<String> = held.input_txids().iter().map(Txid::to_string).collect();
         entry.sort();
         let mut want = ids.to_vec();
         want.sort();

@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use bsv_rs::primitives::{from_hex, sha256d};
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{
-    verify_stream, verify_stream_structure, Beef, BeefTx, MerklePath, Progress, StreamVerifier,
+    verify_stream, verify_stream_structure, Beef, MerklePath, Progress, StreamVerifier,
     Transaction, TransactionInput, TransactionOutput,
 };
 use criterion::{black_box, BenchmarkId, Criterion, Throughput};
@@ -60,27 +60,30 @@ fn build_fixture(path: &Path, bytes: usize) -> [u8; 32] {
     let funding = transaction("aa".repeat(32), payload);
     let root = sha256d(&funding.to_binary());
     let mut prev = funding.id();
+    // Through the merge doors (#843b: pushes onto the public `bumps` and
+    // `txs` until then), each entry appended in the chain's order.
     let mut beef = Beef::new();
-    beef.bumps
-        .push(MerklePath::from_coinbase_txid(&prev, HEIGHT as u32));
-    beef.txs.push(
-        BeefTx::from_raw_tx(funding.to_binary(), Some(0)).expect("the bytes are one transaction"),
-    );
+    let index = beef.merge_bump(MerklePath::from_coinbase_txid(&prev, HEIGHT as u32));
+    beef.merge_raw_tx(funding.to_binary(), Some(index))
+        .expect("the bytes are one transaction");
     let count = bytes / 1_000;
     for _ in 1..count - 1 {
         let tx = transaction(prev, payload);
         prev = tx.id();
-        beef.txs.push(
-            BeefTx::from_raw_tx(tx.to_binary(), None).expect("the bytes are one transaction"),
-        );
+        beef.merge_raw_tx(tx.to_binary(), None)
+            .expect("the bytes are one transaction");
     }
     let tail = transaction(prev.clone(), payload);
-    beef.txs
-        .push(BeefTx::from_raw_tx(tail.to_binary(), None).expect("the bytes are one transaction"));
+    let sized = beef
+        .merge_raw_tx(tail.to_binary(), None)
+        .expect("the bytes are one transaction")
+        .txid();
     let overhead = beef.to_binary().expect("the BEEF is writable").len() - bytes;
+    // The tail again at the size that makes the frame `bytes` long.
     let tail = transaction(prev, payload - overhead);
-    *beef.txs.last_mut().expect("tail") =
-        BeefTx::from_raw_tx(tail.to_binary(), None).expect("the bytes are one transaction");
+    beef.retain_txs(|entry| entry.txid() != sized);
+    beef.merge_raw_tx(tail.to_binary(), None)
+        .expect("the bytes are one transaction");
     let encoded = beef.to_binary().expect("the BEEF is writable");
     assert_eq!(encoded.len(), bytes, "fixture byte count");
     std::fs::write(path, encoded).expect("write fixture");
@@ -89,10 +92,21 @@ fn build_fixture(path: &Path, bytes: usize) -> [u8; 32] {
 
 /// The chain at `forward` written newest first, at `path`.
 fn build_reversed(forward: &Path, path: &Path) {
-    let mut beef = Beef::from_binary(&std::fs::read(forward).expect("fixture")).expect("a BEEF");
-    beef.txs.reverse();
+    let beef = Beef::from_binary(&std::fs::read(forward).expect("fixture")).expect("a BEEF");
+    // The frame written entry by entry, the entries in reverse (#843b: a
+    // reverse of the public `txs` and `to_writer` until then).
     let mut writer = bsv_rs::primitives::Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(beef.version);
+    writer.write_var_int(beef.bumps().len() as u64);
+    for bump in beef.bumps() {
+        bump.to_writer(&mut writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(beef.txs().len() as u64);
+    for entry in beef.txs().iter().rev() {
+        entry
+            .to_writer(&mut writer, beef.version)
+            .expect("the entry is writable");
+    }
     std::fs::write(path, writer.into_bytes()).expect("write fixture");
 }
 

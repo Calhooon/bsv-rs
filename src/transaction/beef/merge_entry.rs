@@ -3,8 +3,9 @@
 //! holds, hashed no second time.
 
 use super::super::beef_tx::BeefTx;
+use super::super::txid::Txid;
 use super::Beef;
-use crate::primitives::{sha256d, to_hex};
+use crate::primitives::sha256d;
 
 impl Beef {
     /// Merges one source entry of [`merge_beef`](Self::merge_beef) as the
@@ -22,11 +23,9 @@ impl Beef {
     /// A raw entry is filed under the txid the source entry holds
     /// ([`BeefTx::held_txid`]: the decoder's hash of the same bytes, or
     /// `merge_raw_tx`'s), else under the hash of its bytes, never under
-    /// `txid()`'s reading of its fields. Until #843 a stale serialization
-    /// cached after `tx_mut` could part from that reading; since #843 an
-    /// edit's door empties the transaction's caches, and only the test door
+    /// `txid()`'s reading of its fields (only the test door
     /// `Transaction::with_cached_bytes_for_test` plants a cache that is not
-    /// its fields' serialization. Until #621 every raw entry was hashed
+    /// its fields' serialization). Until #621 every raw entry was hashed
     /// again (one `sha256d` and one clone of the body per entry); the
     /// reference hashes twice per entry (`:842-846`, `BeefTx.ts:105-115`),
     /// go-sdk keeps the map's txid (`beef.go:1010-1017`).
@@ -44,14 +43,10 @@ impl Beef {
         let Some(raw) = tx.written_tx_bytes() else {
             return;
         };
-        let txid = match tx.held_txid() {
-            Some(txid) => txid.to_owned(),
-            None => {
-                let mut hash = sha256d(&raw);
-                hash.reverse();
-                to_hex(&hash)
-            }
-        };
+        // The double SHA-256 of the bytes is the txid in wire order.
+        let txid = tx
+            .held_txid()
+            .unwrap_or_else(|| Txid::from_wire_bytes(sha256d(&raw)));
         if self.holds_a_transaction(&txid) {
             return;
         }
@@ -67,41 +62,34 @@ impl Beef {
     /// `toBinary` would write them (`#getSerializedBytes`, `Beef.ts:360-373`),
     /// the source unchanged: held order for a BEEF read from bytes and not
     /// touched since (the reference returns the bytes it read, `:363-364`,
-    /// `:1268-1270`; `wire_order`), else the sort when it needs one (an entry
-    /// mutated through `tx_mut` read with the input txids its refresh would
-    /// give it, its mutation a reason to sort, as
-    /// `synchronizeNestedTransactionMutations` makes it, `:342-352`), else
-    /// the held order (`:354-358`). #621's second fold; held order always
-    /// until then.
+    /// `:1268-1270`; the rows' wire mark), else the sort when it needs one,
+    /// else the held order (`:354-358`). #621's second fold; held order
+    /// always until then. An edit is a reason to sort, as
+    /// `synchronizeNestedTransactionMutations` makes it (`:342-352`): every
+    /// door that changes an entry sets the sort mark (#843b; an entry
+    /// mutated through `tx_mut` was read here with the inputs its refresh
+    /// would give it until then).
     pub(super) fn written_order(&self) -> Vec<usize> {
-        let refreshed: Vec<Option<Vec<String>>> =
-            self.txs.iter().map(BeefTx::refreshed_input_txids).collect();
-        let mutated = refreshed.iter().any(Option::is_some);
-        if !mutated && (self.wire_order || !self.needs_sort) {
-            return (0..self.txs.len()).collect();
+        if self.wire_order() || !self.needs_sort() {
+            return (0..self.txs().len()).collect();
         }
-        let inputs: Vec<&[String]> = self
-            .txs
-            .iter()
-            .zip(&refreshed)
-            .map(|(tx, fresh)| fresh.as_deref().unwrap_or(&tx.input_txids))
-            .collect();
-        super::dependency_order(&self.txs, &inputs).0
+        let inputs: Vec<&[Txid]> = self.txs().iter().map(BeefTx::input_txids).collect();
+        super::dependency_order(self.txs(), &inputs).0
     }
 
     /// True when the BEEF holds `txid` raw or parsed, not as a txid alone.
-    fn holds_a_transaction(&self, txid: &str) -> bool {
-        self.index_of(txid)
-            .is_some_and(|i| !self.txs[i].is_txid_only())
+    fn holds_a_transaction(&self, txid: &Txid) -> bool {
+        self.position(txid)
+            .is_some_and(|i| !self.txs()[i].is_txid_only())
     }
 
-    /// Stores a raw entry built under `txid` (the display hex of its bytes'
-    /// double SHA-256, the caller's word, not checked here) with its index,
+    /// Stores a raw entry built under `txid` (its bytes' double SHA-256,
+    /// the caller's word, not checked here) with its index,
     /// else the last BUMP holding it, in the place of an entry of the txid
     /// ([`replace_or_append`](Self::replace_or_append), #764): the one body of
     /// both raw doors.
-    pub(super) fn store_raw_entry(&mut self, new_tx: BeefTx, txid: String) -> usize {
-        let idx = self.replace_or_append(new_tx.with_txid(txid.clone()), txid);
+    pub(super) fn store_raw_entry(&mut self, new_tx: BeefTx, txid: Txid) -> usize {
+        let idx = self.replace_or_append(new_tx.with_txid(txid));
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
         idx

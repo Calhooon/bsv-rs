@@ -687,11 +687,11 @@ pub(in crate::transaction) fn outpoint_txid_bytes(input: &TransactionInput) -> [
 
 /// The txid an input's outpoint names, as the BEEF graph keys it (#869's
 /// third fold): the input's own when it holds one, else the linked source's
-/// id, else none.
-pub(in crate::transaction) fn outpoint_txid_name(input: &TransactionInput) -> Option<String> {
+/// id, else none. A `Txid` since #843b (its display text until then).
+pub(in crate::transaction) fn outpoint_txid_name(input: &TransactionInput) -> Option<Txid> {
     match outpoint_txid(input) {
-        OutpointTxid::Named(txid) => Some(txid.to_string()),
-        OutpointTxid::Source(source) => Some(source.id()),
+        OutpointTxid::Named(txid) => Some(txid),
+        OutpointTxid::Source(source) => Some(source.txid()),
         OutpointTxid::Zero => None,
     }
 }

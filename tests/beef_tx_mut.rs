@@ -1,6 +1,6 @@
 //! An entry edited in place is one thing to every reader (#171), through
-//! `Beef::edit_tx` since #817 (the deprecated `BeefTx::tx_mut`'s window
-//! pinned by the last test).
+//! `Beef::edit_tx` since #817, the one door that edits a held transaction
+//! since #843b (`BeefTx::tx_mut` and its window are gone: the last test).
 //!
 //! `BeefTx` caches the txids its inputs spend (`input_txids`) and keeps the
 //! bytes and the txid it was read with. Until #171 `tx_mut` refreshed none of
@@ -11,8 +11,8 @@
 //! reading, as `@bsv/sdk` 3 makes it (`ts-stack@4d0ea63`
 //! `BeefTx.ts:160-177` `syncRawTxFromTransaction`, `Beef.ts:342-351`): the
 //! entry is named by the mutated transaction's hash, the wire carries its
-//! serialization, and each whole-BEEF reader refreshes the input list and the
-//! BEEF's index ahead of its walk.
+//! serialization, and `edit_tx` repairs the entry's input list and the
+//! BEEF's index at once, so every door after it reads the edit.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -79,7 +79,7 @@ fn repointed() -> (Beef, Transaction, Transaction, Transaction, Transaction) {
     ];
     let mut beef = Beef::from_binary(&write(&bumps, &entries, &[(0, 0), (2, 1)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
-    beef.edit_tx(&c.id(), |t| t.inputs_mut()[0].source_txid = Some(q.txid()))
+    beef.edit_tx(c.txid(), |t| t.inputs_mut()[0].source_txid = Some(q.txid()))
         .unwrap();
     let mut mutated = c.clone();
     mutated.inputs_mut()[0].source_txid = Some(q.txid());
@@ -98,16 +98,16 @@ fn an_input_repointed_through_edit_tx_is_what_every_reader_reads() {
     assert!(sr.missing_inputs.is_empty(), "{:?}", sr.missing_inputs);
     assert!(sr.not_valid.is_empty(), "{:?}", sr.not_valid);
     let entry = sorted
-        .find_txid(&mutated.id())
+        .find_txid(mutated.txid())
         .expect("found by its new txid");
     assert_eq!(
-        entry.input_txids,
-        vec![q.id()],
+        entry.input_txids(),
+        [q.txid()],
         "the cache reads the new input"
     );
-    assert!(sorted.find_txid(&c.id()).is_none(), "the old name is gone");
+    assert!(sorted.find_txid(c.txid()).is_none(), "the old name is gone");
     // The sort places it after `Q`, the parent it now has.
-    let order: Vec<String> = sorted.txs.iter().map(|t| t.txid()).collect();
+    let order: Vec<String> = sorted.txs().iter().map(|t| t.id()).collect();
     let at = |id: &str| order.iter().position(|t| t == id).unwrap();
     assert!(at(&q.id()) < at(&mutated.id()), "{order:?}");
 
@@ -121,9 +121,9 @@ fn an_input_repointed_through_edit_tx_is_what_every_reader_reads() {
 
     // The atomic writer finds the subject by its new txid, and its closure
     // is `Q` (proven) and the subject: `P` is no longer an ancestor.
-    let atomic = beef.clone().to_binary_atomic(&mutated.id()).unwrap();
+    let atomic = beef.clone().to_binary_atomic(mutated.txid()).unwrap();
     let reread = Beef::from_binary(&atomic).unwrap();
-    let ids: Vec<String> = reread.txs.iter().map(|t| t.txid()).collect();
+    let ids: Vec<String> = reread.txs().iter().map(|t| t.id()).collect();
     assert_eq!(ids, vec![q.id(), mutated.id()]);
     assert!(Transaction::from_atomic_beef(&atomic).unwrap().id() == mutated.id());
 
@@ -139,10 +139,10 @@ fn an_input_repointed_through_edit_tx_is_what_every_reader_reads() {
     let mut back = Beef::from_binary(&bytes).unwrap();
     assert!(back.verify_structure().is_ok());
     assert_eq!(
-        back.find_txid(&mutated.id()).unwrap().input_txids,
-        vec![q.id()]
+        back.find_txid(mutated.txid()).unwrap().input_txids(),
+        [q.txid()]
     );
-    assert!(back.find_txid(&p.id()).is_some());
+    assert!(back.find_txid(p.txid()).is_some());
 }
 
 #[test]
@@ -151,15 +151,15 @@ fn an_input_repointed_outside_the_beef_through_edit_tx_is_missing() {
     // The old name finds nothing; the new one is found at once, its inputs
     // read already (`edit_tx` re-keys eagerly, #817; through `tx_mut` not
     // before the next whole-BEEF reader).
-    assert!(beef.find_txid(&c.id()).is_none());
+    assert!(beef.find_txid(c.txid()).is_none());
     assert_eq!(
-        beef.find_txid(&mutated.id()).unwrap().input_txids,
-        vec![q.id()]
+        beef.find_txid(mutated.txid()).unwrap().input_txids(),
+        [q.txid()]
     );
     assert!(beef.sort_txs().missing_inputs.is_empty());
     // A second edit of the same entry, found by its new name.
     let outside = "f0".repeat(32);
-    beef.edit_tx(&mutated.id(), |t| {
+    beef.edit_tx(mutated.txid(), |t| {
         t.inputs_mut()[0].source_txid = Some(outside.parse().unwrap())
     })
     .unwrap();
@@ -181,12 +181,17 @@ fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
     let mut beef = Beef::from_binary(&write(&[bump], &[raw.as_slice()], &[(0, 0)])).unwrap();
     assert!(beef.clone().verify_structure().is_ok());
     let edited = beef
-        .edit_tx(&p.id(), |t| {
+        .edit_tx(p.txid(), |t| {
             t.outputs_mut()[0].satoshis = Some(999);
             t.id()
         })
         .unwrap();
-    assert_eq!(beef.find_txid(&edited).unwrap().bump_index(), Some(0));
+    assert_eq!(
+        beef.find_txid(edited.parse().unwrap())
+            .unwrap()
+            .bump_index(),
+        Some(0)
+    );
     assert_eq!(
         beef.clone().verify_structure().err(),
         Some(Kind::TxidNotInBump)
@@ -199,34 +204,44 @@ fn a_proven_entry_edited_keeps_its_bump_index_and_is_not_proven() {
     );
 }
 
-/// The deprecated `BeefTx::tx_mut` keeps beta's #171 window, stated: its
-/// edit is seen by the writers and the whole-BEEF doors, never by the
-/// per-entry doors, so until one of those runs the new txid is not found and
-/// a `merge_raw_tx` of it stores it a second time; `Beef::edit_tx` closes it
-/// (#817). `reindex` re-keys the entry, and the twice-held txid stays.
+/// An edit is seen by the per-entry doors at once: the entry is found by
+/// its new txid, not by its old one, and a merge of the edited bytes stores
+/// them in the entry's place, held once.
+///
+/// Replaces `a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171`,
+/// which pinned the #171 window of the deprecated `BeefTx::tx_mut`: after an
+/// edit through it the new txid was not found until a whole-BEEF door ran,
+/// a `merge_raw_tx` of it stored it a second time, and `reindex` re-keyed
+/// the entry without merging the two. `tx_mut`, `find_txid_mut` and
+/// `reindex` do not compile since #843b (`src/transaction/beef/rows.rs`'
+/// `compile_fail` doc tests); `edit_tx` is the one edit door and the window
+/// is closed.
 #[test]
-#[allow(deprecated)] // the deprecated path itself is what this pins
-fn a_tx_mut_edit_is_unseen_by_the_per_entry_doors_stated_171() {
+fn an_edit_is_seen_by_the_per_entry_doors_at_once_843b() {
     let (mut beef, _, q, c, _) = repointed();
     let mut moved = tx(&q.id());
     moved.set_lock_time(3);
     beef.merge_raw_tx(moved.to_binary(), None)
         .expect("the bytes are one transaction");
-    let entry = beef.find_txid_mut(&moved.id()).unwrap();
-    entry.tx_mut().unwrap().set_lock_time(4);
-    let renamed = entry.txid();
-    assert!(beef.find_txid(&renamed).is_none(), "the window: not found");
-    assert!(beef.find_txid(&moved.id()).is_none(), "nor by its old txid");
+    let renamed = beef
+        .edit_tx(moved.txid(), |t| {
+            t.set_lock_time(4);
+            t.txid()
+        })
+        .unwrap();
+    assert!(beef.find_txid(renamed).is_some(), "found at once");
+    assert!(
+        beef.find_txid(moved.txid()).is_none(),
+        "not by its old txid"
+    );
     let mut again = moved.clone();
     again.set_lock_time(4);
-    assert_eq!(again.id(), renamed);
-    let held = beef.txs.len();
+    assert_eq!(again.txid(), renamed);
+    let held = beef.txs().len();
     beef.merge_raw_tx(again.to_binary(), None)
         .expect("the bytes are one transaction");
-    assert_eq!(beef.txs.len(), held + 1, "stored a second time");
-    beef.reindex();
-    assert!(beef.find_txid(&renamed).is_some());
-    let twice = beef.txs.iter().filter(|t| t.txid() == renamed).count();
-    assert_eq!(twice, 2, "reindex re-keys; it merges nothing");
-    assert!(beef.find_txid(&c.id()).is_none());
+    assert_eq!(beef.txs().len(), held, "stored in its place, held once");
+    let once = beef.txs().iter().filter(|t| t.txid() == renamed).count();
+    assert_eq!(once, 1);
+    assert!(beef.find_txid(c.txid()).is_none());
 }

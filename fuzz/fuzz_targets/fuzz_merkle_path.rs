@@ -58,8 +58,8 @@ fn both_readers_agree(data: &[u8]) {
     match (alone, Beef::from_binary(&whole)) {
         (Ok(path), Ok(beef)) => {
             assert_eq!(reader.position(), used, "the bytes taken");
-            assert_eq!(path.block_height, beef.bumps[0].block_height);
-            assert_eq!(path.path, beef.bumps[0].path, "the levels");
+            assert_eq!(path.block_height, beef.bumps()[0].block_height);
+            assert_eq!(path.path, beef.bumps()[0].path, "the levels");
             let mut root = bump.root;
             root.reverse();
             let root = to_hex(&root);

@@ -1,5 +1,5 @@
-//! #817: `Beef::edit_tx`, the eager edit door, and the index noticing a hand
-//! edit of the public `txs`.
+//! #817: `Beef::edit_tx`, the eager edit door; and since #843b the law of
+//! the rows it rests on.
 //!
 //! `edit_tx` edits a copy of the entry's transaction and repairs the entry
 //! at once (its bytes, txid, `input_txids`, the index re-keyed, the BEEF
@@ -8,32 +8,28 @@
 //! it once. The reference edits its object in place and re-keys at its next
 //! synchronizing door (`ts-stack@edf6e03` `BeefTx.ts:160-175`,
 //! `Beef.ts:342-352`); its answers after each door are the recorded cells of
-//! `tests/beef_door_sync_817.rs`. The deprecated `BeefTx::tx_mut` keeps the
-//! #171 window (an edit seen by the whole-BEEF doors alone).
+//! `tests/beef_door_sync_817.rs`.
 //!
-//! The index notices a hand edit of `txs` in constant time where it can: an
-//! entry count other than the one it was built for, or a hit naming an
-//! entry that holds another txid. A `&self` lookup then scans (the pushed
-//! tail alone after hand pushes, `txs` whole after a shrink or a mismatched
-//! hit); the next `&mut` door indexes the pushed tail alone, or rebuilds
-//! the index whole after a shrink or a hit naming another entry. The stated
-//! window: hand edits that leave a txid the index was never given below the
-//! entry count it was built for (a replacement inside the indexed prefix,
-//! whatever pushes follow it; a `truncate` or a `retain` with pushes back
-//! past it) make a lookup of that txid miss while the count is back at the
-//! indexed one, or past it with the indexed prefix's last position in
-//! place (a reorder misses nothing); `Beef::reindex` closes it. Two entries
-//! of one txid are noted when indexed, so `edit_tx` keeps the other found. On beta `cfbe3c98` a hand `retain` (the toolbox's `wallet.rs:1505`)
-//! made `find_txid` answer `None` for a held entry and `merge_raw_tx` store
-//! it twice.
+//! Until #843b the entries were a public field and the index noticed a hand
+//! edit of it only where it could (a moved entry count, a hit naming another
+//! entry), with a stated window in which a lookup missed a held txid and a
+//! merge stored it twice; `reindex` was its door, and the deprecated
+//! `BeefTx::tx_mut` kept the #171 window. A `Beef` owns its rows now: an
+//! entry changes through a door alone (`retain_txs`, `edit_tx`, the merges),
+//! each of which leaves the index the rows' own. The law the tests named
+//! `_843b` hold: after any door `find_txid(t)` is the LAST entry holding `t`
+//! and `None` for a txid no entry holds, and an edit is seen at once by
+//! every door. A hand edit, `find_txid_mut`, `tx_mut` and `reindex` do not
+//! compile (`src/transaction/beef/rows.rs`' `compile_fail` doc tests).
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
+use bsv_rs::primitives::Writer;
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{
-    Beef, BeefTx, MerklePath, Transaction, TransactionInput, TransactionOutput,
+    Beef, BeefTx, MerklePath, Transaction, TransactionInput, TransactionOutput, BEEF_V2,
 };
 use bsv_rs::Error;
 
@@ -59,7 +55,7 @@ fn locked(mut t: Transaction, lock: u32) -> Transaction {
 
 /// The entries' txids, in the order held.
 fn ids(beef: &Beef) -> Vec<String> {
-    beef.txs.iter().map(BeefTx::txid).collect()
+    beef.txs().iter().map(BeefTx::id).collect()
 }
 
 /// U held raw (read from bytes), and U with lock time 1 (V).
@@ -76,24 +72,24 @@ fn held_raw() -> (Beef, Transaction, Transaction) {
 #[test]
 fn edit_tx_on_a_raw_entry_rekeys_it_at_once_and_keeps_it_raw_817() {
     let (mut beef, u, v) = held_raw();
-    let lock = beef.edit_tx(&u.id(), |t| {
+    let lock = beef.edit_tx(u.txid(), |t| {
         t.set_lock_time(1);
         t.lock_time()
     });
     assert_eq!(lock, Ok(1), "the closure's value comes back");
     assert_eq!(ids(&beef), vec![v.id()]);
-    assert!(beef.find_txid(&u.id()).is_none());
+    assert!(beef.find_txid(u.txid()).is_none());
     let entry = beef
-        .find_txid(&v.id())
+        .find_txid(v.txid())
         .expect("found by its new txid at once");
     assert_eq!(
         entry.raw_tx(),
         Some(v.to_binary().as_slice()),
         "raw, re-written"
     );
-    assert_eq!(entry.input_txids, vec!["bb".repeat(32)]);
+    assert_eq!(entry.input_txids(), ["bb".repeat(32)]);
     let bytes = beef.to_binary().expect("the BEEF writes");
-    assert_eq!(Beef::from_binary(&bytes).unwrap().txs.len(), 1);
+    assert_eq!(Beef::from_binary(&bytes).unwrap().txs().len(), 1);
     assert_eq!(ids(&Beef::from_binary(&bytes).unwrap()), vec![v.id()]);
 }
 
@@ -103,34 +99,34 @@ fn edit_tx_on_a_parsed_entry_rekeys_it_and_keeps_it_parsed_817() {
     let v = locked(u.clone(), 1);
     let mut beef = Beef::new();
     beef.merge_transaction(u.clone());
-    assert!(beef.find_txid(&u.id()).unwrap().raw_tx().is_none());
-    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
-    let entry = beef.find_txid(&v.id()).unwrap();
+    assert!(beef.find_txid(u.txid()).unwrap().raw_tx().is_none());
+    beef.edit_tx(u.txid(), |t| t.set_lock_time(1)).unwrap();
+    let entry = beef.find_txid(v.txid()).unwrap();
     assert!(entry.raw_tx().is_none(), "parsed, as held");
     assert_eq!(entry.tx().unwrap().lock_time(), 1);
-    assert_eq!(beef.txs.len(), 1);
+    assert_eq!(beef.txs().len(), 1);
 }
 
 #[test]
 fn edit_tx_on_a_txid_only_entry_or_an_unknown_txid_is_refused_unchanged_817() {
     let (mut beef, u, _) = held_raw();
     let other = "cc".repeat(32);
-    beef.merge_txid_only(other.clone());
+    beef.merge_txid_only(other.parse().unwrap());
     let before = beef.clone().to_hex().expect("the BEEF writes");
     let mut ran = false;
-    let refused = beef.edit_tx(&other, |_| ran = true);
+    let refused = beef.edit_tx(other.parse().unwrap(), |_| ran = true);
     assert!(
         matches!(refused, Err(Error::BeefError(ref m)) if m.contains("txid alone")),
         "{refused:?}"
     );
-    let unknown = beef.edit_tx(&"dd".repeat(32), |_| ());
+    let unknown = beef.edit_tx("dd".repeat(32).parse().unwrap(), |_| ());
     assert!(
         matches!(unknown, Err(Error::BeefError(ref m)) if m.contains("does not exist")),
         "{unknown:?}"
     );
     assert!(!ran, "no closure runs on a refusal");
     assert_eq!(beef.clone().to_hex().expect("the BEEF writes"), before);
-    assert!(beef.find_txid(&u.id()).is_some());
+    assert!(beef.find_txid(u.txid()).is_some());
 }
 
 #[test]
@@ -140,21 +136,21 @@ fn edit_tx_onto_a_txid_another_entry_holds_is_refused_byte_for_byte_unchanged_81
         .expect("the bytes are one transaction");
     let before = beef.clone().to_binary().expect("the BEEF writes");
     let order = ids(&beef);
-    let refused = beef.edit_tx(&u.id(), |t| t.set_lock_time(1));
+    let refused = beef.edit_tx(u.txid(), |t| t.set_lock_time(1));
     assert!(
         matches!(refused, Err(Error::BeefError(ref m)) if m.contains("already held")),
         "{refused:?}"
     );
     assert_eq!(ids(&beef), order);
     assert_eq!(beef.clone().to_binary().expect("the BEEF writes"), before);
-    assert!(beef.find_txid(&u.id()).is_some() && beef.find_txid(&v.id()).is_some());
+    assert!(beef.find_txid(u.txid()).is_some() && beef.find_txid(v.txid()).is_some());
 }
 
 #[test]
 fn an_edit_that_keeps_the_txid_moves_nothing_and_is_kept_817() {
     let (mut beef, u, _) = held_raw();
     let read = beef.clone().to_binary().expect("the BEEF writes");
-    assert_eq!(beef.edit_tx(&u.id(), |_| 7), Ok(7));
+    assert_eq!(beef.edit_tx(u.txid(), |_| 7), Ok(7));
     assert_eq!(
         beef.clone().to_binary().expect("the BEEF writes"),
         read,
@@ -162,9 +158,9 @@ fn an_edit_that_keeps_the_txid_moves_nothing_and_is_kept_817() {
     );
     // A field the bytes do not carry is kept, under the same key.
     let path = MerklePath::from_coinbase_txid(&u.id(), 900_000);
-    beef.edit_tx(&u.id(), |t| t.merkle_path = Some(path.clone()))
+    beef.edit_tx(u.txid(), |t| t.merkle_path = Some(path.clone()))
         .unwrap();
-    let held = beef.find_txid(&u.id()).unwrap().tx().unwrap();
+    let held = beef.find_txid(u.txid()).unwrap().tx().unwrap();
     assert_eq!(held.merkle_path.as_ref().unwrap().block_height, 900_000);
     assert_eq!(beef.to_binary().expect("the BEEF writes"), read);
 }
@@ -174,40 +170,43 @@ fn a_panic_in_the_edit_leaves_the_beef_untouched_817() {
     let (mut beef, u, v) = held_raw();
     let before = beef.clone().to_hex().expect("the BEEF writes");
     let caught = catch_unwind(AssertUnwindSafe(|| {
-        beef.edit_tx(&u.id(), |t| {
+        beef.edit_tx(u.txid(), |t| {
             t.set_lock_time(1);
             panic!("the caller's edit fails half way");
         })
     }));
     assert!(caught.is_err());
-    assert!(beef.find_txid(&u.id()).is_some(), "U still held");
-    assert!(beef.find_txid(&v.id()).is_none());
+    assert!(beef.find_txid(u.txid()).is_some(), "U still held");
+    assert!(beef.find_txid(v.txid()).is_none());
     assert_eq!(
-        beef.find_txid(&u.id()).unwrap().tx().unwrap().lock_time(),
+        beef.find_txid(u.txid()).unwrap().tx().unwrap().lock_time(),
         0
     );
     assert_eq!(beef.to_hex().expect("the BEEF writes"), before);
 }
 
 /// Every door after an edit holds one entry under the new txid, finds it
-/// and writes it once.
+/// and writes it once. Since #843b the per-entry `&mut` door is
+/// `set_bump_index` (`find_txid_mut` does not compile), and the three doors
+/// of the rows (`retain_txs`, `retain_bumps`, `edit_bump` on a BUMP merged
+/// for it) are in the list.
 #[test]
 fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
     type Door = fn(&mut Beef, &Transaction);
-    let doors: [(&str, Door); 14] = [
+    let doors: [(&str, Door); 17] = [
         ("merge_raw_tx", |b, v| {
             b.merge_raw_tx(v.to_binary(), None)
                 .expect("the bytes are one transaction");
         }),
         ("merge_txid_only", |b, v| {
-            b.merge_txid_only(v.id());
+            b.merge_txid_only(v.txid());
         }),
         ("merge_transaction", |b, v| {
             b.merge_transaction(v.clone());
         }),
         ("merge_bump", |b, v| {
             b.merge_bump(MerklePath::from_coinbase_txid(&v.id(), 900_002));
-            assert_eq!(b.find_txid(&v.id()).unwrap().bump_index(), Some(0));
+            assert_eq!(b.find_txid(v.txid()).unwrap().bump_index(), Some(0));
         }),
         ("merge_beef", |b, v| {
             let mut other = Beef::new();
@@ -217,27 +216,33 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
             b.merge_beef(&other)
                 .expect("the source writes and reads back");
         }),
-        ("find_txid", |b, v| assert!(b.find_txid(&v.id()).is_some())),
-        ("find_txid_mut", |b, v| {
-            assert!(b.find_txid_mut(&v.id()).is_some())
+        ("find_txid", |b, v| assert!(b.find_txid(v.txid()).is_some())),
+        ("set_bump_index", |b, v| {
+            b.set_bump_index(v.txid(), None).unwrap();
+        }),
+        ("retain_txs", |b, _| b.retain_txs(|_| true)),
+        ("retain_bumps", |b, _| b.retain_bumps(|_, _| true)),
+        ("edit_bump", |b, v| {
+            let at = b.merge_bump(MerklePath::from_coinbase_txid(&v.id(), 900_003));
+            b.edit_bump(at, |bump| bump.block_height).unwrap();
         }),
         ("find_transaction_for_signing", |b, v| {
             assert_eq!(
-                b.find_transaction_for_signing(&v.id()).unwrap().id(),
+                b.find_transaction_for_signing(v.txid()).unwrap().id(),
                 v.id()
             );
         }),
         ("find_atomic_transaction", |b, v| {
-            assert_eq!(b.find_atomic_transaction(&v.id()).unwrap().id(), v.id());
+            assert_eq!(b.find_atomic_transaction(v.txid()).unwrap().id(), v.id());
         }),
         ("make_txid_only", |b, v| {
-            assert!(b.make_txid_only(&v.id()).unwrap().is_txid_only());
+            assert!(b.make_txid_only(v.txid()).unwrap().is_txid_only());
         }),
         ("to_binary", |b, _| {
             b.to_binary().expect("the BEEF writes");
         }),
         ("to_binary_atomic", |b, v| {
-            b.to_binary_atomic(&v.id()).unwrap();
+            b.to_binary_atomic(v.txid()).unwrap();
         }),
         ("verify_valid", |b, _| {
             b.verify_valid(true);
@@ -248,15 +253,15 @@ fn every_door_after_an_edit_holds_one_entry_and_writes_it_once_817() {
     ];
     for (door, run) in doors {
         let (mut beef, u, v) = held_raw();
-        beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
+        beef.edit_tx(u.txid(), |t| t.set_lock_time(1)).unwrap();
         run(&mut beef, &v);
         assert_eq!(
             ids(&beef),
             vec![v.id()],
             "{door}: one entry, the edited one"
         );
-        assert!(beef.find_txid(&v.id()).is_some(), "{door}");
-        assert!(beef.find_txid(&u.id()).is_none(), "{door}");
+        assert!(beef.find_txid(v.txid()).is_some(), "{door}");
+        assert!(beef.find_txid(u.txid()).is_none(), "{door}");
         let back = Beef::from_binary(&beef.to_binary().expect("the BEEF writes")).unwrap();
         assert_eq!(ids(&back), vec![v.id()], "{door}: written once");
     }
@@ -275,48 +280,103 @@ fn three() -> (Beef, [Transaction; 3]) {
     (beef, [x, u, w])
 }
 
-/// The toolbox's pattern (`wallet.rs:1505`): a hand `retain`, then the
-/// lookups and a merge. Every held entry is found, the dropped one is not,
-/// and a merge of a held txid replaces it in its place. RED on beta
-/// `cfbe3c98`: `find_txid(W)` `None` and W stored twice.
+/// A V2 BEEF read from a frame of the raw `entries` in the order given, no
+/// BUMP, each entry written by this crate's own writer
+/// (`BeefTx::to_writer`): the one way to a BEEF that holds a txid twice, or
+/// holds its entries in an order no merge left them in, since no door pushes
+/// or reorders an entry (#843b). Such a BEEF is as read (its `merge_beef`
+/// as a source walks the read order) and each entry holds its bytes and
+/// its parse, where a hand push of `BeefTx::from_raw_tx` held the bytes
+/// alone in a BEEF marked for a sort.
+fn read(entries: &[&Transaction]) -> Beef {
+    let mut frame = Writer::new();
+    frame.write_u32_le(BEEF_V2);
+    frame.write_var_int(0);
+    frame.write_var_int(entries.len() as u64);
+    for t in entries {
+        BeefTx::from_raw_tx(t.to_binary(), None)
+            .expect("one transaction")
+            .to_writer(&mut frame, BEEF_V2)
+            .expect("the entry is writable");
+    }
+    Beef::from_binary(&frame.into_bytes()).expect("the frame reads back")
+}
+
+/// The toolbox's pattern (`wallet.rs:1505`) through its door: `retain_txs`,
+/// then the lookups and a merge. Every held entry is found, the dropped one
+/// is not, and a merge of a held txid replaces it in its place.
+///
+/// Replaces `a_hand_retain_then_find_txid_and_merge_raw_tx_holds_each_txid_once_817`,
+/// whose `retain` was a hand edit of the public `txs` (RED on beta
+/// `cfbe3c98`: `find_txid(W)` `None` and W stored twice). The hand edit does
+/// not compile since #843b; `retain_txs` empties the index before it lends
+/// the entries, so the lookups after it read the rows as they stand.
 #[test]
-fn a_hand_retain_then_find_txid_and_merge_raw_tx_holds_each_txid_once_817() {
+fn a_retain_then_find_txid_and_merge_raw_tx_holds_each_txid_once_843b() {
     let (mut beef, [x, u, w]) = three();
-    beef.txs.retain(|t| t.txid() != x.id());
-    assert!(beef.find_txid(&u.id()).is_some());
-    assert!(beef.find_txid(&w.id()).is_some(), "W found after the shift");
-    assert!(beef.find_txid(&x.id()).is_none(), "the dropped X is gone");
+    beef.retain_txs(|t| t.txid() != x.txid());
+    assert!(beef.find_txid(u.txid()).is_some());
+    assert!(
+        beef.find_txid(w.txid()).is_some(),
+        "W found after the shift"
+    );
+    assert!(beef.find_txid(x.txid()).is_none(), "the dropped X is gone");
     beef.merge_raw_tx(w.to_binary(), None)
         .expect("the bytes are one transaction");
     assert_eq!(ids(&beef), vec![u.id(), w.id()], "W held once");
-    // The `&mut` door rebuilt the index: plain hits again.
-    assert_eq!(beef.find_txid(&w.id()).unwrap().txid(), w.id());
+    assert_eq!(beef.find_txid(w.txid()).unwrap().txid(), w.txid());
 }
 
-/// A hand push: the pushed entry is found, and a merge of it replaces it.
+/// An entry a merge appends is found at once, and each merge door of the
+/// same txid after it keeps one entry.
+///
+/// Replaces `a_hand_push_then_a_lookup_finds_the_pushed_entry_817`: a push
+/// onto the public `txs` does not compile since #843b, and an entry enters
+/// through a merge door, which keys it as it appends it.
 #[test]
-fn a_hand_push_then_a_lookup_finds_the_pushed_entry_817() {
+fn an_appended_entry_is_found_at_once_and_merged_into_its_place_843b() {
     let (mut beef, [x, _, _]) = three();
     let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs
-        .push(BeefTx::from_raw_tx(y.to_binary(), None).expect("one transaction"));
-    assert!(beef.find_txid(&y.id()).is_some());
-    assert!(beef.find_txid(&x.id()).is_some());
-    let held = beef.txs.len();
+    assert!(beef.find_txid(y.txid()).is_none(), "not held yet");
     beef.merge_raw_tx(y.to_binary(), None)
         .expect("the bytes are one transaction");
-    assert_eq!(beef.txs.len(), held, "Y held once");
+    assert!(std::ptr::eq(
+        beef.find_txid(y.txid()).unwrap(),
+        &beef.txs()[3]
+    ));
+    assert!(beef.find_txid(x.txid()).is_some());
+    let held = beef.txs().len();
+    beef.merge_raw_tx(y.to_binary(), None)
+        .expect("the bytes are one transaction");
+    beef.merge_transaction(y.clone());
+    beef.merge_txid_only(y.txid());
+    assert_eq!(beef.txs().len(), held, "Y held once");
+    assert!(std::ptr::eq(
+        beef.find_txid(y.txid()).unwrap(),
+        &beef.txs()[3]
+    ));
 }
 
-/// A hand swap of two entries: each is found at its new place (the hit
-/// names the other entry, a scan answers), and a merge of either replaces
-/// it there, the other kept.
+/// A BEEF holding its entries in another order finds each at its place,
+/// and a merge of one replaces it there, the others kept.
+///
+/// Replaces `a_hand_swap_then_a_lookup_of_each_finds_it_817` and
+/// `reindex_after_a_hand_reorder_finds_every_entry_817`: a hand `swap` or
+/// `reverse` of the public `txs` does not compile since #843b, no door
+/// reorders the entries, and there is no `reindex`; the other order is read
+/// from a frame written in it.
 #[test]
-fn a_hand_swap_then_a_lookup_of_each_finds_it_817() {
-    let (mut beef, [x, u, w]) = three();
-    beef.txs.swap(0, 1);
-    assert_eq!(beef.find_txid(&x.id()).unwrap().txid(), x.id());
-    assert_eq!(beef.find_txid(&u.id()).unwrap().txid(), u.id());
+fn a_beef_read_in_another_order_finds_each_entry_and_merges_into_its_place_843b() {
+    let (_, [x, u, w]) = three();
+    let mut beef = read(&[&u, &x, &w]);
+    assert!(std::ptr::eq(
+        beef.find_txid(x.txid()).unwrap(),
+        &beef.txs()[1]
+    ));
+    assert!(std::ptr::eq(
+        beef.find_txid(u.txid()).unwrap(),
+        &beef.txs()[0]
+    ));
     beef.merge_raw_tx(x.to_binary(), None)
         .expect("the bytes are one transaction");
     assert_eq!(
@@ -324,76 +384,66 @@ fn a_hand_swap_then_a_lookup_of_each_finds_it_817() {
         vec![u.id(), x.id(), w.id()],
         "U kept, X in its place"
     );
-}
-
-/// The stated window: a hand replacement that keeps the count makes the
-/// new entry's lookup miss (a miss cannot be told from an absent txid
-/// without a scan on every miss), so a merge of it stores it twice, as the
-/// reference does too; `reindex` closes it.
-#[test]
-fn a_hand_replace_keeping_the_count_misses_until_reindex_stated_817() {
-    let (mut beef, [x, u, _]) = three();
-    let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs[0] = BeefTx::from_raw_tx(y.to_binary(), None).expect("one transaction");
-    assert!(beef.find_txid(&y.id()).is_none(), "the window: a miss");
-    assert!(
-        beef.find_txid(&x.id()).is_none(),
-        "the replaced X: its hit names Y"
-    );
-    let mut windowed = beef.clone();
-    windowed
-        .merge_raw_tx(y.to_binary(), None)
-        .expect("the bytes are one transaction");
-    let twice = windowed.txs.iter().filter(|t| t.txid() == y.id()).count();
-    assert_eq!(twice, 2, "stored twice inside the window");
-    beef.reindex();
-    assert!(beef.find_txid(&y.id()).is_some(), "reindex: found");
-    let held = beef.txs.len();
-    beef.merge_raw_tx(y.to_binary(), None)
-        .expect("the bytes are one transaction");
-    assert_eq!(beef.txs.len(), held, "after reindex, held once");
-    assert!(beef.find_txid(&u.id()).is_some());
-}
-
-/// A hand reorder that keeps the count with no miss is noticed by the hit
-/// check alone; `reindex` after it leaves every lookup a plain hit.
-#[test]
-fn reindex_after_a_hand_reorder_finds_every_entry_817() {
-    let (mut beef, txs) = three();
-    beef.txs.reverse();
-    beef.reindex();
-    for t in &txs {
-        assert_eq!(beef.find_txid(&t.id()).unwrap().txid(), t.id());
+    let reversed = read(&[&w, &u, &x]);
+    for (at, t) in [&w, &u, &x].into_iter().enumerate() {
+        assert!(std::ptr::eq(
+            reversed.find_txid(t.txid()).unwrap(),
+            &reversed.txs()[at]
+        ));
     }
 }
 
-/// The deprecated `tx_mut` keeps the #171 window, and `reindex` re-keys an
-/// entry edited through it.
+/// A transaction replaced in place, the entry count kept, is found at once
+/// by its new txid and not by the old one, a merge of it holds it once, and
+/// a copy of the BEEF answers the same.
+///
+/// Replaces `a_hand_replace_keeping_the_count_misses_until_reindex_stated_817`,
+/// which pinned the stated window: after a hand replacement of an entry the
+/// new txid's lookup missed, a merge of it stored it twice (as the
+/// reference does too), and `reindex` closed it. The hand replacement and
+/// `reindex` do not compile since #843b; the replacement goes through
+/// `edit_tx`, which re-keys the entry, and the window is closed.
 #[test]
-#[allow(deprecated)] // the deprecated path itself is what this pins
-fn reindex_rekeys_an_entry_edited_through_the_deprecated_tx_mut_817() {
-    let (mut beef, u, v) = held_raw();
-    beef.find_txid_mut(&u.id())
-        .unwrap()
-        .tx_mut()
-        .unwrap()
-        .set_lock_time(1);
-    assert!(beef.find_txid(&v.id()).is_none(), "the #171 window");
-    beef.reindex();
-    assert_eq!(
-        beef.find_txid(&v.id()).unwrap().input_txids,
-        vec!["bb".repeat(32)]
+fn a_replacement_in_place_is_found_at_once_and_held_once_843b() {
+    let (mut beef, [x, u, _]) = three();
+    let y = tx(&"cc".repeat(32), 7_000);
+    let replacement = y.clone();
+    beef.edit_tx(x.txid(), |t| *t = replacement).unwrap();
+    assert_eq!(beef.txs().len(), 3, "the count kept");
+    assert!(std::ptr::eq(
+        beef.find_txid(y.txid()).unwrap(),
+        &beef.txs()[0]
+    ));
+    assert!(beef.find_txid(x.txid()).is_none(), "the replaced X is gone");
+    let copy = beef.clone();
+    assert!(
+        copy.find_txid(y.txid()).is_some(),
+        "the copy's index is its own"
     );
-    beef.merge_raw_tx(v.to_binary(), None)
+    assert!(copy.find_txid(x.txid()).is_none());
+    beef.merge_raw_tx(y.to_binary(), None)
         .expect("the bytes are one transaction");
-    assert_eq!(ids(&beef), vec![v.id()]);
+    assert_eq!(beef.txs().len(), 3, "Y held once");
+    let once = beef.txs().iter().filter(|t| t.txid() == y.txid()).count();
+    assert_eq!(once, 1);
+    assert!(beef.find_txid(u.txid()).is_some());
 }
 
+// Removed: `reindex_rekeys_an_entry_edited_through_the_deprecated_tx_mut_817`.
+// It pinned the #171 window of `BeefTx::tx_mut` (an edit unseen by
+// `find_txid` until `reindex`). `tx_mut`, `find_txid_mut` and `reindex` do
+// not compile since #843b: `src/transaction/beef/rows.rs`' `compile_fail`
+// doc tests. The law it left is pinned above by
+// `edit_tx_on_a_raw_entry_rekeys_it_at_once_and_keeps_it_raw_817` (the
+// entry found by its new txid at once, its input list read).
+
 /// `Beef` and `BeefTx` are `Send` and not `Sync`, exactly as on beta
-/// `cfbe3c98`: `Transaction`'s serialization caches are `RefCell`s; this
-/// change adds no interior mutability (the index's count is a plain
-/// `usize`). Compile-time: the second impl makes the path ambiguous when
-/// the type is `Sync`.
+/// `cfbe3c98`: every `Transaction` holds a `Script`, whose chunks and
+/// caches are `RefCell`s. The txid index is a `OnceLock` since #843b
+/// (filled through `&self` on the lookup after a door emptied it), which is
+/// `Sync` where what it holds is, so it changes neither answer.
+/// Compile-time: the second impl makes the path ambiguous when the type is
+/// `Sync`.
 #[test]
 fn beef_and_beef_tx_are_send_and_not_sync_as_on_beta_817() {
     fn send<T: Send>() {}
@@ -410,45 +460,59 @@ fn beef_and_beef_tx_are_send_and_not_sync_as_on_beta_817() {
     let _ = <BeefTx as AmbiguousIfSync<_>>::some_item;
 }
 
-/// The cold read's case (#817's fold of the rebuild): a hand push, a `&mut`
-/// door (which indexes the pushed entry), a hand `retain` back to the old
-/// count, then a lookup of the pushed txid: found, as the door's index
-/// noticed the push and the hit check notices the shift. RED with the
-/// door's index left unsynced (the count then matches the stale index and
-/// the lookup misses).
+/// An append, a lookup (the index filled, the appended entry keyed), then a
+/// `retain_txs` back to the earlier count: the appended entry is found at
+/// its new place and a merge of it holds it once.
+///
+/// Replaces `a_hand_push_a_door_then_a_retain_back_to_the_count_finds_the_pushed_entry_817`
+/// (the cold read's case of #817's fold of the rebuild), whose push and
+/// `retain` were hand edits and whose `&mut` door was `find_txid_mut`: none
+/// compiles since #843b. An index that kept its keys across the retain
+/// would answer the appended txid with a position past the entries.
 #[test]
-fn a_hand_push_a_door_then_a_retain_back_to_the_count_finds_the_pushed_entry_817() {
+fn an_append_a_lookup_then_a_retain_back_to_the_count_finds_the_appended_entry_843b() {
     let (mut beef, [x, u, _]) = three();
     let z = tx(&"cc".repeat(32), 7_000);
-    beef.txs
-        .push(BeefTx::from_raw_tx(z.to_binary(), None).unwrap());
-    beef.find_txid_mut(&u.id()).unwrap();
-    beef.txs.retain(|t| t.txid() != x.id());
-    assert_eq!(beef.txs.len(), 3);
-    assert_eq!(beef.find_txid(&z.id()).map(BeefTx::txid), Some(z.id()));
-    let held = beef.txs.len();
     beef.merge_raw_tx(z.to_binary(), None).unwrap();
-    assert_eq!(beef.txs.len(), held, "Z held once");
+    assert!(beef.find_txid(u.txid()).is_some());
+    beef.retain_txs(|t| t.txid() != x.txid());
+    assert_eq!(beef.txs().len(), 3);
+    assert!(std::ptr::eq(
+        beef.find_txid(z.txid()).unwrap(),
+        &beef.txs()[2]
+    ));
+    let held = beef.txs().len();
+    beef.merge_raw_tx(z.to_binary(), None).unwrap();
+    assert_eq!(beef.txs().len(), held, "Z held once");
 }
 
-/// A hand push of a txid the BEEF already holds (stated): a `&self` lookup
-/// answers the earlier entry until a `&mut` door runs, the later after it
-/// (the door indexes the pushed entry, the last position winning as the
-/// rebuild has it); both entries stay.
+/// A txid a BEEF holds twice is answered by the later entry, before any
+/// door and after one; both entries stay.
+///
+/// Replaces `a_hand_push_of_a_held_txid_is_answered_by_the_later_entry_after_a_door_stated_817`,
+/// which stated a hole: after a hand push of a held txid a `&self` lookup
+/// answered the EARLIER entry until a `&mut` door ran, the later after it.
+/// No door holds a txid twice since #843b but the reader, and the answer is
+/// the last entry in every state.
 #[test]
-fn a_hand_push_of_a_held_txid_is_answered_by_the_later_entry_after_a_door_stated_817() {
-    let (mut beef, [x, _, _]) = three();
-    beef.txs
-        .push(BeefTx::from_raw_tx(x.to_binary(), None).unwrap());
-    let found = beef.find_txid(&x.id()).unwrap();
+fn a_txid_held_twice_is_answered_by_the_later_entry_before_and_after_a_door_843b() {
+    let (_, [x, u, w]) = three();
+    let mut beef = read(&[&x, &u, &w, &x]);
+    let found = beef.find_txid(x.txid()).unwrap();
     assert!(
-        std::ptr::eq(found, &beef.txs[0]),
-        "the earlier before a door"
+        std::ptr::eq(found, &beef.txs()[3]),
+        "the later, before any door"
     );
-    beef.merge_txid_only("ab".repeat(32));
-    let found = beef.find_txid(&x.id()).unwrap();
-    assert!(std::ptr::eq(found, &beef.txs[3]), "the later after a door");
-    assert_eq!(beef.txs.iter().filter(|t| t.txid() == x.id()).count(), 2);
+    beef.merge_txid_only("ab".repeat(32).parse().unwrap());
+    let found = beef.find_txid(x.txid()).unwrap();
+    assert!(
+        std::ptr::eq(found, &beef.txs()[3]),
+        "the later after a door"
+    );
+    assert_eq!(
+        beef.txs().iter().filter(|t| t.txid() == x.txid()).count(),
+        2
+    );
 }
 
 /// The two states of #817's fold that only unframed raw bytes reach (bytes
@@ -474,16 +538,42 @@ fn the_unframed_raw_states_are_refused_at_the_public_doors_817() {
             Err(Error::BeefError(_))
         ));
     }
-    assert!(beef.txs.is_empty());
+    assert!(beef.txs().is_empty());
 }
 
-/// The no-op edit keeps the entry's `is_valid` (the strength read's S4).
+/// The no-op edit keeps the sort's word on the entry (the strength read's
+/// S4), and an edit that moves the txid drops it.
+///
+/// Replaces `a_no_op_edit_keeps_the_entrys_is_valid_817`, which wrote
+/// `is_valid = Some(true)` by hand through `find_txid_mut`: the write does
+/// not compile since #843b (`src/transaction/beef/rows.rs`' `compile_fail`
+/// doc tests). The sort alone says whether an entry is valid, so the word
+/// is the sort's here: `Some(true)` for an entry a BUMP proves.
 #[test]
-fn a_no_op_edit_keeps_the_entrys_is_valid_817() {
+fn a_no_op_edit_keeps_the_sorts_word_on_the_entry_843b() {
     let (mut beef, u, _) = held_raw();
-    beef.find_txid_mut(&u.id()).unwrap().is_valid = Some(true);
-    beef.edit_tx(&u.id(), |_| ()).unwrap();
-    assert_eq!(beef.find_txid(&u.id()).unwrap().is_valid, Some(true));
+    let word = |beef: &Beef, t: &Transaction| beef.find_txid(t.txid()).unwrap().is_valid();
+    assert_eq!(word(&beef, &u), None, "no sort has run");
+    beef.merge_bump(MerklePath::from_coinbase_txid(&u.id(), 900_000));
+    beef.sort_txs();
+    assert_eq!(word(&beef, &u), Some(true), "proven, as the sort found it");
+    beef.edit_tx(u.txid(), |_| ()).unwrap();
+    assert_eq!(
+        word(&beef, &u),
+        Some(true),
+        "kept by an edit moving nothing"
+    );
+    let edited = beef
+        .edit_tx(u.txid(), |t| {
+            t.set_lock_time(1);
+            t.txid()
+        })
+        .unwrap();
+    assert_eq!(
+        beef.find_txid(edited).unwrap().is_valid(),
+        None,
+        "another transaction: the sort has not judged it"
+    );
 }
 
 /// A closure returning an `Err` as its value still has its edit stored.
@@ -491,123 +581,148 @@ fn a_no_op_edit_keeps_the_entrys_is_valid_817() {
 fn a_closure_returning_an_err_value_still_has_its_edit_stored_817() {
     let (mut beef, u, v) = held_raw();
     let value: Result<(), &str> = beef
-        .edit_tx(&u.id(), |t| {
+        .edit_tx(u.txid(), |t| {
             t.set_lock_time(1);
             Err("the caller's own")
         })
         .unwrap();
     assert_eq!(value, Err("the caller's own"));
-    assert!(beef.find_txid(&v.id()).is_some());
+    assert!(beef.find_txid(v.txid()).is_some());
 }
 
-/// The rule read's two cells inside the stated window (#817's fold of the
-/// rebuild). After a hand replacement keeping the count, `edit_tx`'s
-/// collision check misses the held Y (its lookup misses), so an edit of X'
-/// onto Y stores Y twice. After a deprecated `tx_mut` edit of U to V,
-/// `edit_tx(V)` refuses (a miss, the count standing) and `edit_tx(U)`
-/// refuses too (its hit names V); that mismatched hit rebuilds the index,
-/// so `edit_tx(V)` then finds V, as it does after `reindex`.
+/// The rule read's two cells of #817's fold of the rebuild, on the law:
+/// `edit_tx`'s collision check sees every held txid, and after an edit of U
+/// to V the new txid is found at once and the old one names nothing.
+///
+/// Replaces `the_two_edit_tx_cells_inside_the_window_stated_817`, which
+/// stated both inside the hand-edit window: after a hand replacement
+/// keeping the count the collision check missed the held Y and an edit onto
+/// Y stored it twice; after a `tx_mut` edit of U to V, `edit_tx(V)` refused
+/// (a miss) until `edit_tx(U)`'s mismatched hit rebuilt the index. Neither
+/// state can be built since #843b.
 #[test]
-#[allow(deprecated)] // the deprecated path's cell
-fn the_two_edit_tx_cells_inside_the_window_stated_817() {
-    let (mut beef, [x, _, _]) = three();
+fn the_two_edit_tx_cells_of_the_closed_window_843b() {
+    let (mut beef, [x, u, _]) = three();
     let y = locked(x.clone(), 5);
-    beef.txs[1] = BeefTx::from_raw_tx(y.to_binary(), None).unwrap();
-    beef.edit_tx(&x.id(), |t| t.set_lock_time(5)).unwrap();
-    let held = beef.txs.iter().filter(|t| t.txid() == y.id()).count();
-    assert_eq!(held, 2, "the collision missed inside the window");
+    let replacement = y.clone();
+    beef.edit_tx(u.txid(), |t| *t = replacement).unwrap();
+    let refused = beef.edit_tx(x.txid(), |t| t.set_lock_time(5));
+    assert!(
+        matches!(refused, Err(Error::BeefError(ref m)) if m.contains("already held")),
+        "{refused:?}"
+    );
+    let held = beef.txs().iter().filter(|t| t.txid() == y.txid()).count();
+    assert_eq!(held, 1, "the collision seen: Y held once");
+    assert!(beef.find_txid(x.txid()).is_some(), "X unchanged");
 
     let (mut beef, u, v) = held_raw();
-    beef.find_txid_mut(&u.id())
-        .unwrap()
-        .tx_mut()
-        .unwrap()
-        .set_lock_time(1);
-    assert!(beef.edit_tx(&v.id(), |_| ()).is_err(), "V missed");
-    assert!(beef.edit_tx(&u.id(), |_| ()).is_err(), "U's hit names V");
-    assert_eq!(
-        beef.edit_tx(&v.id(), |_| 3),
-        Ok(3),
-        "found after the rebuild"
+    beef.edit_tx(u.txid(), |t| t.set_lock_time(1)).unwrap();
+    assert_eq!(beef.edit_tx(v.txid(), |_| 3), Ok(3), "V found at once");
+    let gone = beef.edit_tx(u.txid(), |_| ());
+    assert!(
+        matches!(gone, Err(Error::BeefError(ref m)) if m.contains("does not exist")),
+        "{gone:?}"
     );
 }
 
-/// The second fold of the rebuild, the cold read's attack C (the pin of
-/// `indexed_prefix_holds`, and of `index_of`'s and `sync_index`'s use of
-/// it): a hand removal of an early entry then two pushes leaves the count
-/// grown past the indexed one with the indexed prefix moved (P sits where W
-/// was), so a `&self` lookup scans `txs` whole and the next `&mut` door
-/// rebuilds the index whole: P and Q each found, and each merged into its
-/// place, held once. RED with the prefix check forced true (P missed and
-/// stored twice), with it dropped from `index_of` (P missed), and with the
-/// rebuild deleted from `sync_index` (P stored twice).
+/// A `retain_txs` of an early entry then two appends: each appended entry
+/// is found at its place and a merge of it holds it once.
+///
+/// Replaces `a_hand_removal_then_two_pushes_finds_each_pushed_entry_817`
+/// (the cold read's attack C on the second fold of the rebuild), whose
+/// removal and pushes were hand edits of the public `txs`; they do not
+/// compile since #843b and the index has no prefix to check: it is emptied
+/// by the retain and filled from the rows.
 #[test]
-fn a_hand_removal_then_two_pushes_finds_each_pushed_entry_817() {
+fn a_retain_then_two_appends_finds_each_appended_entry_843b() {
     let (mut beef, [x, u, w]) = three();
-    beef.txs.retain(|t| t.txid() != x.id());
+    beef.retain_txs(|t| t.txid() != x.txid());
     let p = tx(&"ab".repeat(32), 7_000);
     let q = tx(&"cd".repeat(32), 9_000);
-    beef.txs
-        .push(BeefTx::from_raw_tx(p.to_binary(), None).unwrap());
-    beef.txs
-        .push(BeefTx::from_raw_tx(q.to_binary(), None).unwrap());
-    for t in [&u, &w, &p, &q] {
-        assert_eq!(beef.find_txid(&t.id()).map(BeefTx::txid), Some(t.id()));
+    beef.merge_raw_tx(p.to_binary(), None).unwrap();
+    beef.merge_raw_tx(q.to_binary(), None).unwrap();
+    for (at, t) in [&u, &w, &p, &q].into_iter().enumerate() {
+        assert!(std::ptr::eq(
+            beef.find_txid(t.txid()).unwrap(),
+            &beef.txs()[at]
+        ));
     }
     beef.merge_raw_tx(p.to_binary(), None).unwrap();
     beef.merge_raw_tx(q.to_binary(), None).unwrap();
     assert_eq!(ids(&beef), vec![u.id(), w.id(), p.id(), q.id()]);
 }
 
-/// The second fold of the rebuild, the strength read's F4: two entries of
-/// one txid pushed by hand past the indexed count are answered by the
-/// later, the last position winning as the index's rebuild has it (the
-/// tail scanned from the end down). RED with the tail scanned from its
-/// start (the earlier answered).
+/// Two entries of one txid at the end of a BEEF are answered by the later.
+///
+/// Replaces `two_hand_pushed_twins_are_answered_by_the_later_817` (the
+/// strength read's F4), whose twins were pushed by hand past the indexed
+/// count; since #843b they come from the reader alone.
 #[test]
-fn two_hand_pushed_twins_are_answered_by_the_later_817() {
-    let (mut beef, _) = three();
+fn two_twins_read_from_bytes_are_answered_by_the_later_843b() {
+    let (_, [x, u, w]) = three();
     let y = tx(&"cc".repeat(32), 7_000);
-    beef.txs
-        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
-    beef.txs
-        .push(BeefTx::from_raw_tx(y.to_binary(), None).unwrap());
-    let found = beef.find_txid(&y.id()).unwrap();
-    assert!(std::ptr::eq(found, &beef.txs[4]), "the later twin");
+    let beef = read(&[&x, &u, &w, &y, &y]);
+    let found = beef.find_txid(y.txid()).unwrap();
+    assert!(std::ptr::eq(found, &beef.txs()[4]), "the later twin");
 }
 
-/// The second fold of the rebuild, the strength read's F1 by a hand push:
-/// U pushed by hand beside the U held, then `edit_tx(U)` edits the entry
-/// the index names (the pushed one, the last position) to V; the U still
-/// held is found and not merged again, as the reference's index rebuilt
-/// after the edit finds it (`Beef.ts:342-352,516-524`). The twin read
-/// from bytes is the recorded cell of `tests/beef_door_sync_817.rs`. RED
-/// on `ba0dc50e` (`edit_tx` removed U's key: U not found, stored again).
+/// The second fold of the rebuild, the strength read's F1, with two raw
+/// twins: U held twice, `edit_tx(U)` edits the entry the index names (the
+/// later) to V; the U still held is found and not merged again, as the
+/// reference's index rebuilt after the edit finds it
+/// (`Beef.ts:342-352,516-524`). The twin held as a txid alone and then raw
+/// is the recorded cell of `tests/beef_door_sync_817.rs`.
+///
+/// Replaces `an_edit_of_a_hand_pushed_twin_keeps_the_other_entry_found_817`,
+/// whose twin was pushed by hand; since #843b it is read from bytes.
 #[test]
-fn an_edit_of_a_hand_pushed_twin_keeps_the_other_entry_found_817() {
-    let (mut beef, [_, u, _]) = three();
-    beef.txs
-        .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
+fn an_edit_of_a_twin_read_from_bytes_keeps_the_other_entry_found_843b() {
+    let (_, [x, u, w]) = three();
+    let mut beef = read(&[&x, &u, &w, &u]);
     let v = locked(u.clone(), 1);
-    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
-    assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
-    assert!(std::ptr::eq(beef.find_txid(&v.id()).unwrap(), &beef.txs[3]));
-    beef.merge_txid_only(u.id());
-    assert_eq!(beef.txs.len(), 4, "U not stored again");
-    assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
+    beef.edit_tx(u.txid(), |t| t.set_lock_time(1)).unwrap();
+    assert!(std::ptr::eq(
+        beef.find_txid(u.txid()).unwrap(),
+        &beef.txs()[1]
+    ));
+    assert!(std::ptr::eq(
+        beef.find_txid(v.txid()).unwrap(),
+        &beef.txs()[3]
+    ));
+    beef.merge_txid_only(u.txid());
+    assert_eq!(beef.txs().len(), 4, "U not stored again");
+    assert!(std::ptr::eq(
+        beef.find_txid(u.txid()).unwrap(),
+        &beef.txs()[1]
+    ));
 }
 
-/// The same twin seen by a whole rebuild (`reindex`) rather than by the
-/// pushed tail: the rebuild notes it, so `edit_tx` keeps the U still held
-/// found. RED with the rebuild's twin note removed.
+/// The same twin on a copy of a BEEF whose index is filled: the copy
+/// carries the index with its note of the twin, so `edit_tx` on the copy
+/// keeps the U still held found, and the BEEF copied is untouched.
+///
+/// Replaces `an_edit_of_a_twin_after_reindex_keeps_the_other_entry_found_817`,
+/// which reached the whole rebuild through `reindex`; `reindex` does not
+/// compile since #843b, and the other way to an index not filled by this
+/// BEEF's own lookups is a copy.
 #[test]
-fn an_edit_of_a_twin_after_reindex_keeps_the_other_entry_found_817() {
-    let (mut beef, [_, u, _]) = three();
-    beef.txs
-        .push(BeefTx::from_raw_tx(u.to_binary(), None).unwrap());
-    beef.reindex();
-    beef.edit_tx(&u.id(), |t| t.set_lock_time(1)).unwrap();
-    assert!(std::ptr::eq(beef.find_txid(&u.id()).unwrap(), &beef.txs[1]));
-    beef.merge_txid_only(u.id());
-    assert_eq!(beef.txs.len(), 4, "U not stored again");
+fn an_edit_of_a_twin_on_a_copy_keeps_the_other_entry_found_843b() {
+    let (_, [x, u, w]) = three();
+    let beef = read(&[&x, &u, &w, &u]);
+    assert!(std::ptr::eq(
+        beef.find_txid(u.txid()).unwrap(),
+        &beef.txs()[3]
+    ));
+    let mut copy = beef.clone();
+    copy.edit_tx(u.txid(), |t| t.set_lock_time(1)).unwrap();
+    assert!(std::ptr::eq(
+        copy.find_txid(u.txid()).unwrap(),
+        &copy.txs()[1]
+    ));
+    copy.merge_txid_only(u.txid());
+    assert_eq!(copy.txs().len(), 4, "U not stored again");
+    assert!(
+        std::ptr::eq(beef.find_txid(u.txid()).unwrap(), &beef.txs()[3]),
+        "the BEEF copied is untouched"
+    );
 }

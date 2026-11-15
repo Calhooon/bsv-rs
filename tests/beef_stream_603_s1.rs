@@ -471,19 +471,23 @@ fn funding(n: usize) -> (Vec<u8>, MerklePath, HashMap<u64, Hash32>) {
     (funding, bump, HashMap::from([(beef_chain::HEIGHT, root)]))
 }
 
-/// `raws` under `bump`, the first proven by it, in the order given, by this
-/// crate's writer without its sort (`to_writer`).
+/// `raws` under `bump`, the one at position 0 proven by it, in the order
+/// given: a V1 frame written element by element by this crate's own writers
+/// (`MerklePath::to_writer`, `BeefTx::to_writer`), no sort. Until #843b the
+/// rows were pushed by hand onto the public `bumps` and `txs` and written by
+/// `Beef::to_writer`.
 fn written(bump: MerklePath, raws: &[Vec<u8>]) -> Vec<u8> {
-    let mut beef = Beef::with_version(BEEF_V1);
-    beef.bumps.push(bump);
-    for (i, raw) in raws.iter().enumerate() {
-        beef.txs.push(
-            BeefTx::from_raw_tx(raw.clone(), (i == 0).then_some(0))
-                .expect("the bytes are one transaction"),
-        );
-    }
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(BEEF_V1);
+    writer.write_var_int(1);
+    bump.to_writer(&mut writer).expect("the BUMP is writable");
+    writer.write_var_int(raws.len() as u64);
+    for (i, raw) in raws.iter().enumerate() {
+        BeefTx::from_raw_tx(raw.clone(), (i == 0).then_some(0))
+            .expect("the bytes are one transaction")
+            .to_writer(&mut writer, BEEF_V1)
+            .expect("the entry is writable");
+    }
     writer.into_bytes()
 }
 
@@ -685,12 +689,18 @@ fn a_cursor_edge_of_a_transaction_not_held_raw_is_refused_wire_atomic_beef_023()
     assert!(Cursor::from_binary(&not_raw).is_err());
 
     let beef023 = Beef::from_binary(&row("beef-023")).unwrap();
-    let mut beef = Beef::with_version(BEEF_V2);
-    beef.bumps.push(beef023.bumps[0].clone());
-    beef.txs
-        .push(BeefTx::from_txid(BLOCK_9_COINBASE.to_string()));
+    // The V2 frame of beef-023's BUMP as read and the coinbase's txid alone,
+    // each written by its own writer (a merge would flag the BUMP's leaf).
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(BEEF_V2);
+    writer.write_var_int(1);
+    beef023.bumps()[0]
+        .to_writer(&mut writer)
+        .expect("the BUMP is writable");
+    writer.write_var_int(1);
+    BeefTx::from_txid(BLOCK_9_COINBASE.parse().unwrap())
+        .to_writer(&mut writer, BEEF_V2)
+        .expect("the entry is writable");
     let txid_only = writer.into_bytes();
     let whole_verdict = StreamVerifier::new(&txid_only[..], &tracker, None)
         .run()

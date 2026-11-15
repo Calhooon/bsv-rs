@@ -43,9 +43,9 @@ fn rebuilt(name: &str) -> (Vec<u8>, serde_json::Value) {
     );
     // the shape is what its name says: every entry held, one txid twice
     let parsed = sdk::transaction::Beef::from_binary(&beef).unwrap();
-    let distinct: HashSet<String> = parsed.txs.iter().map(BeefTx::txid).collect();
+    let distinct: HashSet<String> = parsed.txs().iter().map(BeefTx::id).collect();
     assert_eq!(
-        (parsed.txs.len() as u64, distinct.len() as u64),
+        (parsed.txs().len() as u64, distinct.len() as u64),
         (
             case["entries"].as_u64().unwrap(),
             case["distinct_txids"].as_u64().unwrap()
@@ -104,7 +104,7 @@ fn a_repeated_entry_counts_toward_the_transactions_bound_818() {
 /// The entries of `beef` holding `txid`.
 fn written(beef: &[u8], txid: &str) -> usize {
     let parsed = sdk::transaction::Beef::from_binary(beef).unwrap();
-    parsed.txs.iter().filter(|tx| tx.txid() == txid).count()
+    parsed.txs().iter().filter(|tx| tx.txid() == txid).count()
 }
 
 #[test]
@@ -121,9 +121,9 @@ fn the_parsers_door_reads_the_bound_and_fails_the_discovery_over_it_907() {
         assert_eq!(written(&beef, repeated), 2, "{name}: the repeated txid");
         let parsed = sdk::transaction::Beef::from_binary(&beef).unwrap();
         let twice: Vec<String> = parsed
-            .txs
+            .txs()
             .iter()
-            .map(BeefTx::txid)
+            .map(BeefTx::id)
             .filter(|txid| written(&beef, txid) > 1)
             .collect();
         assert_eq!(twice, [repeated, repeated], "{name}: no other txid twice");

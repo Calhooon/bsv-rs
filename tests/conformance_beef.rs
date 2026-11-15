@@ -502,7 +502,7 @@ fn conformance_serialization() {
             }
             "tx-003" => {
                 let mut beef = Beef::from_binary(&from_hex(s(input, "beef_hex"))).expect(id);
-                let root = beef.bumps[0].compute_root(None).expect(id);
+                let root = beef.bumps()[0].compute_root(None).expect(id);
                 // Also require overall structural validity of the parsed BEEF.
                 let valid = beef.is_valid(false);
                 suite.check(
@@ -750,8 +750,8 @@ fn conformance_transactions_regressions() {
         match parsed {
             Ok(beef) => suite.check(
                 id,
-                want_parse && beef.txs.is_empty() != want_txid,
-                format!("parsed, txs={}", beef.txs.len()),
+                want_parse && beef.txs().is_empty() != want_txid,
+                format!("parsed, txs={}", beef.txs().len()),
             ),
             Err(e) => suite.check(id, !want_parse, format!("parse err: {}", e)),
         }
@@ -778,7 +778,7 @@ fn conformance_transactions_regressions() {
                 // Full parse-and-extract path: the newest tx must come out
                 // with a real txid.
                 let beef = Beef::from_binary(&bytes).expect(id);
-                let has_tx = !beef.txs.is_empty();
+                let has_tx = !beef.txs().is_empty();
                 let tx = Transaction::from_beef(&bytes, None);
                 let txid_ok = tx.map(|t| t.id().len() == 64).unwrap_or(false);
                 suite.check(

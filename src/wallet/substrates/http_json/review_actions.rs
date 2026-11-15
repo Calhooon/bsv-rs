@@ -374,7 +374,9 @@ fn competing_beef(index: usize, value: &Value, txids: Option<&[String]>) -> Resu
     let txids = txids.filter(|t| !t.is_empty()).ok_or_else(refused)?;
     let bytes = byte_array(value).ok_or_else(refused)?;
     let beef = Beef::from_binary(&bytes).map_err(|_| refused())?;
-    if txids.iter().any(|t| beef.find_txid(t).is_none()) {
+    // The BEEF's doors take a `Txid` (#843b); each text here is 64 hex digits.
+    let held = |t: &String| t.parse().is_ok_and(|t| beef.find_txid(t).is_some());
+    if !txids.iter().all(held) {
         return Err(refused());
     }
     Ok(bytes)

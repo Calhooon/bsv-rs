@@ -13,7 +13,7 @@
 
 use crate::overlay::TopicBroadcaster;
 use crate::primitives::to_hex;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, Txid};
 use crate::wallet::ReviewActionResultStatus;
 use crate::{Error, Result};
 use std::collections::HashSet;
@@ -88,9 +88,17 @@ async fn synchronize(
             if synchronized.contains(txid) {
                 continue;
             }
-            let competing = Transaction::from_beef(item.beef, Some(txid)).map_err(|_| {
-                refused("Wallet returned malformed competing transaction evidence.".into())
-            })?;
+            // The BEEF's doors take a `Txid` (#843b). The wallet's text names
+            // an entry only as its 64 lower-case hex digits, as the text key
+            // it was compared with until then did.
+            let malformed =
+                || refused("Wallet returned malformed competing transaction evidence.".into());
+            let named = Txid::from_hex(txid)
+                .ok()
+                .filter(|_| !txid.bytes().any(|b| b.is_ascii_uppercase()))
+                .ok_or_else(malformed)?;
+            let competing =
+                Transaction::from_beef(item.beef, Some(named)).map_err(|_| malformed())?;
             if competing.id() != *txid {
                 return Err(refused(
                     "Wallet competing transaction evidence does not match its transaction ID."

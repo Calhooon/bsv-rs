@@ -84,7 +84,7 @@ fn each_736_shape_is_judged_as_the_reference_parse_evidence_judges_it_736() {
 fn each_alone_within_bounds(beef: &[u8]) -> (usize, usize) {
     let parsed = sdk::transaction::Beef::from_binary(beef).unwrap();
     let (mut inputs, mut scripts) = (0, 0);
-    for entry in &parsed.txs {
+    for entry in parsed.txs() {
         let tx = entry.tx().unwrap();
         assert!(tx.inputs().len() <= INPUTS, "{}: inputs alone", tx.id());
         assert!(
@@ -127,7 +127,7 @@ fn a_proven_parent_s_scripts_count_toward_the_script_bytes_bound_736() {
     ] {
         let (beef, case) = rebuilt(name);
         let parsed = sdk::transaction::Beef::from_binary(&beef).unwrap();
-        let parent = parsed.txs.iter().find(|e| e.bump_index().is_some());
+        let parent = parsed.txs().iter().find(|e| e.bump_index().is_some());
         assert!(parent.is_some(), "{name}: the parent proven");
         assert_eq!(each_alone_within_bounds(&beef).1, total, "{name}");
         let refused = parse_evidence(&beef, 0).err();
@@ -152,14 +152,18 @@ fn a_parent_written_twice_is_read_by_its_later_entry_736() {
         let (beef, case) = rebuilt(name);
         let parsed = sdk::transaction::Beef::from_binary(&beef).unwrap();
         let held: Vec<bool> = parsed
-            .txs
+            .txs()
             .iter()
             .filter(|e| e.txid() == parent)
             .map(|e| e.tx().is_some())
             .collect();
         assert_eq!(held.len(), 2, "{name}: both entries held");
         assert_eq!(
-            parsed.find_txid(&parent).unwrap().tx().is_some(),
+            parsed
+                .find_txid(parent.parse().unwrap())
+                .unwrap()
+                .tx()
+                .is_some(),
             raw_wins,
             "{name}: the index's entry"
         );

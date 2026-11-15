@@ -207,8 +207,10 @@ fn a_level_zero_of_duplicates_alone_is_refused_at_the_stream() {
             "{}: {whole:?}",
             shape.name
         );
+        // `merge_bump` into an empty BEEF appends the BUMP as given (no BUMP
+        // to combine with, no entry to flag a leaf for).
         let mut in_memory = Beef::new();
-        in_memory.bumps.push(held(&shape));
+        in_memory.merge_bump(held(&shape));
         assert_eq!(
             in_memory.verify_structure().err(),
             Some(Kind::NoTxidAtLevelZero),

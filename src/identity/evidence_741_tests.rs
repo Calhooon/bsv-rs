@@ -52,7 +52,7 @@ fn path_inputs(beef: &sdk::transaction::Beef, built: &build::Built, parent: &str
     [built.subject.as_str(), parent, built.g.as_str()]
         .iter()
         .map(|t| {
-            beef.find_txid(t)
+            beef.find_txid(t.parse().unwrap())
                 .and_then(BeefTx::tx)
                 .unwrap()
                 .inputs()
@@ -73,7 +73,7 @@ fn the_inputs_bound_sums_over_two_unproven_branches_741() {
         let (built, case) = rebuilt(name);
         let beef = sdk::transaction::Beef::from_binary(&built.beef).unwrap();
         let graph: usize = beef
-            .txs
+            .txs()
             .iter()
             .map(|e| e.tx().unwrap().inputs().len())
             .sum();

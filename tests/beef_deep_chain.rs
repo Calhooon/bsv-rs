@@ -192,7 +192,9 @@ fn a_deep_chain_links_through_from_beef_on_a_small_stack() {
 fn a_deep_chain_links_through_from_atomic_beef_on_a_small_stack() {
     let n = depth(DEFAULT_DEPTH);
     let (mut beef, subject) = chain_beef(n);
-    let bytes = beef.to_binary_atomic(&subject).expect("atomic bytes");
+    let bytes = beef
+        .to_binary_atomic(subject.parse().unwrap())
+        .expect("atomic bytes");
     let (tx, elapsed) = on_small_stack("from_atomic_beef", move || {
         Transaction::from_atomic_beef(&bytes).expect("the chain parses and links")
     });
@@ -210,7 +212,7 @@ fn a_deep_chain_verify_valid_on_a_small_stack() {
     let (bytes, _) = chain_bytes(n);
     let ((valid, txs), elapsed) = on_small_stack("verify_valid", move || {
         let mut beef = Beef::from_binary(&bytes).expect("the chain parses");
-        (beef.verify_valid(false).valid, beef.txs.len())
+        (beef.verify_valid(false).valid, beef.txs().len())
     });
     println!("verify_valid: N={n} valid={valid} in {elapsed:?}");
     assert!(
@@ -244,8 +246,8 @@ fn a_deep_chain_round_trips_through_to_beef_on_a_small_stack() {
     drop_on_big_stack(tx);
     assert_eq!(beef, original, "the round trip is byte-identical");
     let reparsed = Beef::from_binary(&atomic).expect("the atomic bytes parse");
-    assert_eq!(reparsed.atomic_txid.as_deref(), Some(subject.as_str()));
-    assert_eq!(reparsed.txs.len(), n);
+    assert_eq!(reparsed.atomic_txid, Some(subject.parse().unwrap()));
+    assert_eq!(reparsed.txs().len(), n);
 }
 
 #[test]
@@ -322,10 +324,10 @@ fn a_deep_chain_built_in_memory_hashes_and_serializes_on_a_small_stack() {
     drop_on_big_stack(tx);
     let subject = Beef::from_binary(&original)
         .expect("parses")
-        .txs
+        .txs()
         .last()
         .expect("a tx")
-        .txid();
+        .id();
     assert_eq!(id, subject, "the same id as the parsed chain");
     assert_eq!(beef, original, "the same bytes as the parsed chain");
 }
@@ -369,8 +371,8 @@ fn a_deep_chain_whose_txid_texts_do_not_parse_hashes_serializes_and_verifies_on_
     println!("unparsable chain id + to_binary + verify: N={n} in {elapsed:?}");
     drop_on_big_stack(tx);
     let subject = Beef::from_binary(&original).expect("parses");
-    let subject = subject.txs.last().expect("a tx");
-    assert_eq!(id, subject.txid(), "the same id as the parsed chain");
+    let subject = subject.txs().last().expect("a tx");
+    assert_eq!(id, subject.id(), "the same id as the parsed chain");
     assert_eq!(Some(bin.as_slice()), subject.raw_tx(), "the same bytes");
     assert_eq!(verified, Ok(true));
 }
@@ -420,7 +422,7 @@ fn a_reversed_deep_chain_is_valid_on_the_three_readers_in_linear_time_on_a_small
     let n = depth(DEFAULT_DEPTH);
     let (mut beef, _) = chain_beef(n);
     beef.sort_txs();
-    let root = beef.bumps[0].path[0][0]
+    let root = beef.bumps()[0].path[0][0]
         .hash
         .clone()
         .expect("the funding txid");
@@ -429,9 +431,22 @@ fn a_reversed_deep_chain_is_valid_on_the_three_readers_in_linear_time_on_a_small
         .try_into()
         .unwrap();
     root.reverse();
-    beef.txs.reverse();
+    // The frame written from the newest entry to the oldest, entry by
+    // entry with the crate's own writers: no door reorders the entries a
+    // `Beef` holds (#843b; until then `txs` was reversed by hand and
+    // written by `Beef::to_writer`).
     let mut writer = bsv_rs::primitives::Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(beef.version);
+    writer.write_var_int(beef.bumps().len() as u64);
+    for bump in beef.bumps() {
+        bump.to_writer(&mut writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(beef.txs().len() as u64);
+    for entry in beef.txs().iter().rev() {
+        entry
+            .to_writer(&mut writer, beef.version)
+            .expect("the entry is writable");
+    }
     let bytes = std::sync::Arc::new(writer.into_bytes());
     let whole = {
         let bytes = bytes.clone();

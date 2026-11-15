@@ -130,7 +130,7 @@ fn absent_atomic_txid(t: &Txs, absent: &str) -> Vec<u8> {
 fn txid_only_parent(t: &Txs) -> Beef {
     let mut beef = Beef::new();
     beef.merge_bump(lone_leaf(&t.parent));
-    beef.merge_txid_only(t.parent.id());
+    beef.merge_txid_only(t.parent.txid());
     beef.merge_raw_tx(t.subject.to_binary(), None)
         .expect("the bytes are one transaction");
     beef
@@ -243,8 +243,8 @@ async fn an_atomic_header_naming_an_absent_txid_is_skipped_by_both_parsers_725()
     );
     // The BEEF itself parses, its one entry the token's transaction
     let parsed = Beef::from_binary(&beef).unwrap();
-    assert_eq!(parsed.txs.len(), 1);
-    assert_eq!(parsed.txs[0].txid(), t.alone.id());
+    assert_eq!(parsed.txs().len(), 1);
+    assert_eq!(parsed.txs()[0].txid(), t.alone.id());
     assert!(Transaction::from_beef(&beef, None).is_err());
     assert_eq!(read(beef, &subject).await, (0, 0));
 }
@@ -267,7 +267,7 @@ async fn a_txid_only_parent_before_an_unproven_subject_is_skipped_as_the_referen
         .to_binary()
         .expect("the BEEF is writable");
     let atomic = txid_only_parent(&t)
-        .to_binary_atomic(&t.subject.id())
+        .to_binary_atomic(t.subject.txid())
         .unwrap();
     for (name, beef) in [
         ("txid_only_parent", plain),
@@ -304,7 +304,7 @@ async fn a_three_transaction_chain_is_read_from_its_subject_by_both_parsers_725(
     let (token, subject) = token_and_subject();
     let t = txs(&v, &token);
     let plain = chain(&t).to_binary().expect("the BEEF is writable");
-    let atomic = chain(&t).to_binary_atomic(&t.tip.id()).unwrap();
+    let atomic = chain(&t).to_binary_atomic(t.tip.txid()).unwrap();
     for (name, beef) in [("chain", plain), ("chain_atomic", atomic)] {
         let (outcome, refused_at) = recorded(&v, name, &beef, &t.tip.id());
         assert_eq!(
@@ -313,7 +313,7 @@ async fn a_three_transaction_chain_is_read_from_its_subject_by_both_parsers_725(
             "{name}: the reference"
         );
         let parsed = Beef::from_binary(&beef).unwrap();
-        let order: Vec<String> = parsed.txs.iter().map(|tx| tx.txid()).collect();
+        let order: Vec<String> = parsed.txs().iter().map(|tx| tx.id()).collect();
         assert_eq!(
             order,
             [t.parent.id(), t.middle.id(), t.tip.id()],

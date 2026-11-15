@@ -15,6 +15,13 @@
 //! (`mergeBeef`, the target's bytes before and after) and `bump_door`
 //! (`mergeBump`). Every fixture is this crate's writer's (`to_beef_v1`), its
 //! bytes the recording's.
+//!
+//! Since #843b a `Beef` owns its rows and a txid is a `Txid`: the recorded
+//! states that hold a txid-only entry whose txid text is not 64 hex digits
+//! cannot be built (`beef_merge_states_817::UNBUILDABLE_843B`), so the three
+//! writer refusals for such a text are gone with the states. Each such cell
+//! is counted by name where its group is replayed, and every recorded cell
+//! is replayed, refused at its door, or on that list.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -23,15 +30,26 @@ mod beef_merge_states_817;
 #[path = "support/beef_seeds_817.rs"]
 mod beef_seeds_817;
 
-use beef_merge_states_817::{fixture, merge_source, vector, writer_state, BAD_WORD, FRESH};
+use beef_merge_states_817::{
+    fixture, merge_source, vector, writer_state, BAD_WORD, FRESH, UNBUILDABLE_843B,
+};
 
 use bsv_rs::primitives::{from_hex, Writer};
-use bsv_rs::transaction::{Beef, BeefTx, MerklePath, MerklePathLeaf, BEEF_V1, BEEF_V2};
+use bsv_rs::transaction::{Beef, BeefTx, MerklePath, MerklePathLeaf, Txid, BEEF_V1, BEEF_V2};
 use bsv_rs::Error;
 use serde_json::Value;
 
-/// A change written into a source through its public fields.
+/// A change made to a source through its public doors.
 type Change = Box<dyn Fn(&mut Beef)>;
+
+/// The words `Txid::from_hex` refuses a text in, the reference's
+/// `requireTXID` (`Transaction.ts:95-100` at `ts-stack@edf6e03`).
+const NOT_A_TXID: &str = "txid must be a 32-byte hexadecimal transaction ID.";
+
+/// `name` is on the list of recorded states no door builds since #843b.
+fn unbuildable(name: &str) -> bool {
+    UNBUILDABLE_843B.contains(&name)
+}
 
 fn cell<'a>(v: &'a Value, group: &str, name: &str) -> &'a Value {
     v[group]
@@ -53,8 +71,6 @@ fn words<T: std::fmt::Debug>(result: bsv_rs::Result<T>) -> String {
 fn version_words(word: u32) -> String {
     format!("Serialized BEEF must start with 4022206465 or 4022206466 but starts with {word}")
 }
-
-const LENGTH_WORDS: &str = "Invalid txid-only entry txid: expected 64 hex digits, got";
 
 /// Each writer refuses `beef` in `expected`, a caller's writer untouched.
 fn refused_by_every_writer(beef: &mut Beef, expected: &str, name: &str) {
@@ -81,36 +97,46 @@ fn stated_refusal(name: &str) -> Option<String> {
         "version_word_efbe0003" => version_words(BAD_WORD),
         "version_word_atomic" => version_words(0x0101_0101),
         "version_word_zero" => version_words(0),
-        "txid_only_62_digits" => format!("{LENGTH_WORDS} 62"),
-        "txid_only_66_digits" => format!("{LENGTH_WORDS} 66"),
-        "txid_only_63_digits" => format!("{LENGTH_WORDS} 63"),
-        // The reference's `Internal` (its txid getter, `BeefTx.ts:105-116`),
-        // ahead of every BUMP as there.
-        "txid_only_empty_after_merge_threw" | "txid_only_empty_with_non_hex_bump_hash" => {
-            format!("{LENGTH_WORDS} 0")
-        }
         _ => return None,
     })
 }
 
 /// The `writers` group: where the reference throws, this crate refuses in
-/// its words (the empty txid's `Internal` stated); where it writes bytes its
-/// own reader reads back as written, this crate writes the same bytes; where
-/// its bytes do not read back as written, this crate refuses (stated).
+/// its words; where it writes bytes its own reader reads back as written,
+/// this crate writes the same bytes; where its bytes do not read back as
+/// written, this crate refuses (stated); and where the recorded state holds
+/// a txid text that is no txid, this crate has no state (counted by name).
+///
+/// Replaces `each_writer_cell_is_the_reference_s_or_a_stated_refusal_817`,
+/// which built sixteen of the nineteen cells. Seven of them held a
+/// txid-only entry whose txid was `zz`, the empty text or a text of 62, 63
+/// or 66 digits, taken as given by `merge_txid_only` and refused late by
+/// the writers (`Invalid txid-only entry txid: expected 64 hex digits, got
+/// N`, `Invalid hex string`, the empty txid ahead of everything). A txid is
+/// a `Txid` since #843b, so those states and their three refusals are gone;
+/// the cells stay in the vector and are counted here by name.
 #[test]
-fn each_writer_cell_is_the_reference_s_or_a_stated_refusal_817() {
+fn each_writer_cell_is_the_reference_s_a_stated_refusal_or_counted_unbuildable_843b() {
     let v = vector();
     let f = fixture(&v);
-    let mut pinned = 0;
+    let (mut pinned, mut no_state, mut at_the_door) = (0, Vec::new(), 0);
     for c in v["writers"].as_array().unwrap() {
         let name = c["name"].as_str().unwrap();
         let Some(mut beef) = writer_state(name, &f) else {
-            assert!(
-                name.starts_with("raw_with") || name.starts_with("raw_without"),
-                "{name}"
-            );
+            // Either the raw door refuses the bytes (pinned at the door,
+            // below) or the state's txid text is no `Txid`.
+            if unbuildable(name) {
+                no_state.push(name);
+            } else {
+                assert!(
+                    name.starts_with("raw_with") || name.starts_with("raw_without"),
+                    "{name}: a recorded cell neither replayed nor counted"
+                );
+                at_the_door += 1;
+            }
             continue;
         };
+        assert!(!unbuildable(name), "{name}: listed unbuildable, yet built");
         pinned += 1;
         let reference = &c["write"];
         if let Some(stated) = stated_refusal(name) {
@@ -119,7 +145,7 @@ fn each_writer_cell_is_the_reference_s_or_a_stated_refusal_817() {
                 // The stated rows' premise: the reference's bytes are not
                 // read back strictly as the state written.
                 let strict = &c["read_back"]["from_binary_strict"];
-                let held = beef.txs.first().map(|t| t.txid());
+                let held = beef.txs().first().map(BeefTx::id);
                 let same_text = strict["ok"]["txids"][0].as_str() == held.as_deref();
                 assert!(
                     strict.get("thrown").is_some() || !same_text,
@@ -143,7 +169,61 @@ fn each_writer_cell_is_the_reference_s_or_a_stated_refusal_817() {
             Beef::from_binary(&from_hex(ok).unwrap()).expect("this crate reads them too");
         }
     }
-    assert_eq!(pinned, 16, "every writer cell this crate can build");
+    assert_eq!(pinned, 9, "every writer cell this crate can build");
+    assert_eq!(at_the_door, 3, "the three raw frames the raw door refuses");
+    // The seven cells whose txid text is no txid, by name: each stays in the
+    // vector, and none has a state here (#843b).
+    assert_eq!(
+        no_state,
+        [
+            "txid_only_non_hex",
+            "txid_only_62_digits",
+            "txid_only_66_digits",
+            "txid_only_63_digits",
+            "txid_only_non_hex_short",
+            "txid_only_empty_after_merge_threw",
+            "txid_only_empty_with_non_hex_bump_hash",
+        ]
+    );
+    // The texts those cells hold, each refused where it would enter.
+    for text in [
+        "zz".repeat(32),
+        "ab".repeat(31),
+        "ab".repeat(33),
+        format!("a{}", "bc".repeat(31)),
+        "zz".to_string(),
+        String::new(),
+    ] {
+        assert_eq!(
+            Txid::from_hex(&text),
+            Err(Error::TransactionError(NOT_A_TXID.to_string())),
+            "a text of {} characters",
+            text.len()
+        );
+    }
+}
+
+/// The upper-case cell on the law (#843b): an upper-case text and its
+/// lower-case twin are one `Txid`, so the two merges hold one entry, found
+/// by either text, and the bytes are the reference's for the upper-case
+/// text. Until #843b the texts were compared as text and held as two
+/// entries.
+#[test]
+fn an_upper_case_txid_and_its_lower_case_twin_are_one_entry_843b() {
+    let v = vector();
+    let recorded = cell(&v, "writers", "txid_only_upper_case")["write"]["ok"]
+        .as_str()
+        .unwrap();
+    let (upper, lower) = ("AB".repeat(32), "ab".repeat(32));
+    let mut beef = Beef::new();
+    beef.merge_txid_only(upper.parse().unwrap());
+    beef.merge_txid_only(lower.parse().unwrap());
+    assert_eq!(beef.txs().len(), 1, "one entry");
+    for text in [&upper, &lower] {
+        let found = beef.find_txid(text.parse().unwrap()).expect("found");
+        assert_eq!(found.id(), lower, "shown in lower case");
+    }
+    assert_eq!(beef.to_hex().unwrap(), recorded);
 }
 
 /// The atomic word is stated beside the other words: the reference's reader
@@ -201,7 +281,7 @@ fn the_raw_door_refuses_bytes_that_are_not_one_transaction_817() {
         }
         let refused = words(ours);
         assert_eq!(beef.to_hex().unwrap(), before, "{name}: the BEEF untouched");
-        assert!(beef.txs.is_empty());
+        assert!(beef.txs().is_empty());
         match (c["merge"]["thrown"].as_str(), name) {
             (Some(thrown), _) => assert_eq!(refused, thrown, "{name}: the reference's words"),
             // Stated: the reference's door takes these bytes.
@@ -244,34 +324,50 @@ fn the_writers_cells_of_the_three_raw_frames_are_pinned_as_recorded_817() {
     }
 }
 
-/// `merge_txid_only` is unchanged: it takes any text, `""` included, where
-/// the reference's door throws `Internal` for `""` (stated); the writer
-/// refuses `""` and a short text in this crate's words, non-hex in the
-/// reference's.
+/// `merge_txid_only` takes a `Txid`, so the three texts of the `txid_door`
+/// group are refused where they would enter and no entry is held, where the
+/// reference's door holds each (after throwing `Internal` for `""`) and its
+/// writer throws or writes two bytes.
+///
+/// Replaces `the_txid_door_takes_any_text_and_the_writer_judges_it_817`,
+/// which pinned the hole: `merge_txid_only` held any text and the writers
+/// refused it late. A call with a text does not compile
+/// (`src/transaction/beef/rows.rs`' `compile_fail` doc tests); the text is
+/// parsed at the caller, in `Txid::from_hex`'s words.
 #[test]
-fn the_txid_door_takes_any_text_and_the_writer_judges_it_817() {
+fn the_txid_door_takes_a_txid_and_a_text_that_is_none_is_refused_where_it_enters_843b() {
     let v = vector();
+    let cells = v["txid_door"].as_array().unwrap();
+    assert_eq!(cells.len(), 3, "the recorded cells");
     for (name, text) in [("empty", ""), ("non_hex", "zz"), ("short_hex", "abcd")] {
         let c = cell(&v, "txid_door", name);
-        let mut beef = Beef::new();
-        beef.merge_txid_only(text.to_string());
-        assert_eq!(beef.txs.len(), 1, "{name}: taken");
-        assert_eq!(c["txs_after"], 1, "{name}: taken there too");
-        let ours = words(beef.to_hex());
+        // The reference's recorded side, kept: the entry is held there.
+        assert_eq!(c["txs_after"], 1, "{name}: taken there");
         match name {
-            "empty" => {
-                assert_eq!(c["merge"]["thrown"], "Internal");
-                assert_eq!(ours, format!("{LENGTH_WORDS} 0"));
-            }
-            "non_hex" => assert_eq!(ours, c["write_after"]["thrown"].as_str().unwrap()),
-            _ => {
-                assert_eq!(
-                    c["write_after"]["ok"], "0200beef000102cdab",
-                    "two bytes there"
-                );
-                assert_eq!(ours, format!("{LENGTH_WORDS} 4"));
-            }
+            "empty" => assert_eq!(c["merge"]["thrown"], "Internal"),
+            "non_hex" => assert_eq!(c["write_after"]["thrown"], "Invalid hex string"),
+            _ => assert_eq!(
+                c["write_after"]["ok"], "0200beef000102cdab",
+                "two bytes there"
+            ),
         }
+        // Stated: no text that is not 64 hex digits is a txid, so nothing is
+        // held and nothing is left for a writer to refuse (#843b).
+        let mut beef = Beef::new();
+        let parsed = text.parse::<Txid>().map(|txid| {
+            beef.merge_txid_only(txid);
+        });
+        assert_eq!(
+            parsed,
+            Err(Error::TransactionError(NOT_A_TXID.to_string())),
+            "{name}"
+        );
+        assert!(beef.txs().is_empty(), "{name}: nothing held");
+        assert_eq!(
+            beef.to_hex().unwrap(),
+            "0200beef0000",
+            "{name}: an empty BEEF"
+        );
     }
 }
 
@@ -282,19 +378,31 @@ fn the_txid_door_takes_any_text_and_the_writer_judges_it_817() {
 /// reader refuses a BUMP (#477's row); this crate's writer's words where the
 /// reference's writer and reader carry a state this crate cannot write
 /// faithfully (stated).
+///
+/// Replaces `merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_817`,
+/// which built eleven of the twelve sources: three held a txid-only entry
+/// whose txid text was `zz` repeated or 62 digits, a state no door builds
+/// since #843b; they are counted by name and the other eight replayed.
 #[test]
-fn merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_817() {
+fn merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_843b() {
     let v = vector();
     let f = fixture(&v);
-    let mut pinned = 0;
+    let (mut pinned, mut no_state) = (0, Vec::new());
     for c in v["merge_door"].as_array().unwrap() {
         let name = c["name"].as_str().unwrap();
         let Some(source) = merge_source(name, &f) else {
+            if unbuildable(name) {
+                // A source holding a txid text that is no txid: no state
+                // since #843b, counted by name below.
+                no_state.push(name);
+                continue;
+            }
             // The raw entry with a byte after its frame: the door refuses it.
             assert_eq!(name, "source_raw_trailing_byte_with_index");
             assert!(BeefTx::from_raw_tx([f.child_raw.as_slice(), &[0]].concat(), Some(0)).is_err());
             continue;
         };
+        assert!(!unbuildable(name), "{name}: listed unbuildable, yet built");
         pinned += 1;
         let mut target = Beef::new();
         target
@@ -315,9 +423,6 @@ fn merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_817() {
                     words(ours),
                     "Duplicate leaf at height 0, offset 1 carries a hash, which a BUMP's duplicate flag cannot write"
                 );
-            }
-            ("source_txid_only_62_digits", Some(_)) => {
-                assert_eq!(words(ours), format!("{LENGTH_WORDS} 62"), "stated");
             }
             ("source_bump_two_leaves_at_one_offset" | "source_bump_no_levels", Some(_)) => {
                 // This crate's reader's refusal of the snapshot, in its words.
@@ -345,16 +450,33 @@ fn merge_beef_refuses_what_the_snapshot_refuses_the_target_untouched_817() {
             "{name}: the target untouched"
         );
     }
-    assert_eq!(pinned, 11);
+    assert_eq!(pinned, 8, "every source this crate can build");
+    // The three sources whose txid-only entry held a text that is no txid
+    // (`merge_txid_only` held it as given until #843b), by name.
+    assert_eq!(
+        no_state,
+        [
+            "source_txid_only_non_hex",
+            "source_txid_only_62_digits",
+            "source_version_word_and_txid_only_62_digits",
+        ]
+    );
 }
 
 /// The verdict is the literal round trip: on every BEEF this tree's vectors
-/// hold (read, then each of six states this change refuses written into it
-/// through the public fields), `merge_beef`'s Ok or Err is that of
+/// hold (read, then each of five states made in it through the public
+/// doors), `merge_beef`'s Ok or Err is that of
 /// `Beef::from_binary(&source.clone().to_binary()?)`, and its words the
 /// writer's where the writer refuses.
+///
+/// Replaces `merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_817`,
+/// whose six states were written through the public fields. One of them, a
+/// txid-only entry of 62 hex digits, has no state since #843b (a txid is a
+/// `Txid`); the two BUMP states are made through `edit_bump`, which marks
+/// the source for a sort and no longer as read, where the hand write left a
+/// BEEF read from bytes as read.
 #[test]
-fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_817() {
+fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_843b() {
     let mut compared = 0;
     for (name, bytes) in beef_seeds_817::seeds() {
         let Ok(read) = Beef::from_binary(&bytes) else {
@@ -364,21 +486,25 @@ fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_8
             Box::new(|_| {}),
             Box::new(|b| b.version = BAD_WORD),
             Box::new(|b| {
-                b.merge_txid_only("ab".repeat(31));
+                b.merge_txid_only(FRESH.parse().unwrap());
             }),
+            // A second leaf at an offset of the leading BUMP's level 0.
             Box::new(|b| {
-                b.merge_txid_only(FRESH.to_string());
-            }),
-            Box::new(|b| {
-                if let Some(level) = b.bumps.first_mut().and_then(|p| p.path.first_mut()) {
-                    if let Some(leaf) = level.first().cloned() {
-                        level.push(leaf);
-                    }
+                if !b.bumps().is_empty() {
+                    b.edit_bump(0, |p| {
+                        if let Some(level) = p.path.first_mut() {
+                            if let Some(leaf) = level.first().cloned() {
+                                level.push(leaf);
+                            }
+                        }
+                    })
+                    .unwrap();
                 }
             }),
+            // No levels in the leading BUMP.
             Box::new(|b| {
-                if let Some(p) = b.bumps.first_mut() {
-                    p.path.clear();
+                if !b.bumps().is_empty() {
+                    b.edit_bump(0, |p| p.path.clear()).unwrap();
                 }
             }),
         ];
@@ -412,16 +538,25 @@ fn merge_beef_s_verdict_is_the_write_then_read_round_trip_on_every_vector_beef_8
     // holds two V2 BEEFs; 363 until #904's `contacts_listed_spend.json`
     // brought nine distinct V1 BEEFs (three listings, six Atomic signable
     // transactions over V1).
-    assert_eq!(compared, 6 * 372, "six states of every BEEF read");
+    assert_eq!(compared, 5 * 372, "five states of every BEEF read");
 }
 
-/// The order of the checks is the order the reference meets them: an empty
-/// txid ahead of a BUMP's non-hex hash (its `Internal` first), a BUMP's
-/// non-hex hash ahead of an entry V1 cannot carry, and the version word
-/// after the reference's writer's throws and before the states only this
-/// crate refuses (`mergeBeef`'s reader at byte 0).
+/// The order of the checks is the order the reference meets them: a BUMP's
+/// non-hex hash ahead of an entry V1 cannot carry, that entry ahead of the
+/// version word, and the version word after the reference's writer's throws
+/// and before the states only this crate refuses (`mergeBeef`'s reader at
+/// byte 0).
+///
+/// Replaces `the_checks_run_in_the_order_the_reference_meets_them_817`. Its
+/// cells of a txid-only entry of 62 digits (the recorded
+/// `source_version_word_and_txid_only_62_digits`, and two hand states under
+/// the V2 word) have no state since #843b, and with them the refusal that
+/// was ordered: this crate's own refusal of an entry's txid text. The
+/// recorded cell is counted by name; the two hand states are restated with
+/// a txid-only entry that is a txid, where the BUMP's refusal is the one
+/// left and an entry V1 cannot carry is still met ahead of it.
 #[test]
-fn the_checks_run_in_the_order_the_reference_meets_them_817() {
+fn the_checks_run_in_the_order_the_reference_meets_them_843b() {
     let v = vector();
     let f = fixture(&v);
     // Writer cells pinned by name in the cell test; the merge order cells here.
@@ -430,26 +565,41 @@ fn the_checks_run_in_the_order_the_reference_meets_them_817() {
         "source_version_word_and_bump_no_levels",
     ] {
         let c = cell(&v, "merge_door", name);
+        let Some(source) = merge_source(name, &f) else {
+            assert!(unbuildable(name), "{name}: neither replayed nor counted");
+            assert_eq!(name, "source_version_word_and_txid_only_62_digits");
+            continue;
+        };
         let mut target = Beef::new();
-        let ours = words(target.merge_beef(&merge_source(name, &f).unwrap()));
+        let ours = words(target.merge_beef(&source));
         assert_eq!(ours, c["merge"]["thrown"].as_str().unwrap(), "{name}");
     }
-    // A 62-digit txid-only entry under the V2 word beside a BUMP of no
-    // levels: the BUMP's state is written by both (the readers judge it),
-    // the entry's refused here.
+    // A txid-only entry under the V2 word beside a BUMP of no levels: the
+    // BUMP's state is written by both (the readers judge it), and since
+    // #843b the entry has nothing to be refused for, so the BEEF is written.
     let mut beef = Beef::from_binary(&f.v1).unwrap();
     beef.version = BEEF_V2;
-    beef.bumps[0].path.clear();
-    beef.merge_txid_only("ab".repeat(31));
-    assert_eq!(words(beef.to_binary()), format!("{LENGTH_WORDS} 62"));
-    // A BUMP hash of 62 digits (MerklePath's own refusal) ahead of the entry's.
+    beef.edit_bump(0, |bump| bump.path.clear()).unwrap();
+    beef.merge_txid_only(FRESH.parse().unwrap());
+    let written = beef.to_binary().expect("written, the readers' to judge");
+    assert!(words(Beef::from_binary(&written)).contains("TreeHeightZero"));
+    // A BUMP hash of 62 digits under the V2 word: MerklePath's own refusal,
+    // the one left beside a txid-only entry.
     let mut beef = Beef::from_binary(&f.v1).unwrap();
     beef.version = BEEF_V2;
-    beef.bumps[0].path[0][0].hash = Some("ab".repeat(31));
-    beef.merge_txid_only("ab".repeat(31));
+    beef.edit_bump(0, |bump| bump.path[0][0].hash = Some("ab".repeat(31)))
+        .unwrap();
+    beef.merge_txid_only(FRESH.parse().unwrap());
     assert_eq!(
         words(beef.to_binary()),
         "Invalid hash at height 0, offset 0: expected 64 hex digits, got 62"
+    );
+    // The same BEEF under the V1 word: the entry V1 cannot carry is met
+    // ahead of the BUMP's own refusal (the reference's writer throws there).
+    beef.version = BEEF_V1;
+    assert_eq!(
+        words(beef.to_binary()),
+        "a valid serialized Transaction is expected"
     );
     assert_eq!(BEEF_V1, 0xEFBE_0001);
 }
@@ -477,7 +627,7 @@ fn a_bump_index_out_of_range_is_written_as_the_reference_writes_it_817() {
 fn a_bump_whose_root_does_not_compute_is_appended_where_the_reference_throws_817() {
     let v = vector();
     let f = fixture(&v);
-    let txid = Beef::from_binary(&f.v1).unwrap().bumps[0].path[0][0]
+    let txid = Beef::from_binary(&f.v1).unwrap().bumps()[0].path[0][0]
         .hash
         .clone()
         .unwrap();
@@ -501,7 +651,7 @@ fn a_bump_whose_root_does_not_compute_is_appended_where_the_reference_throws_817
         1,
         "appended beside the held BUMP"
     );
-    assert_eq!(beef.bumps.len(), 2);
+    assert_eq!(beef.bumps().len(), 2);
     // The writer refuses the hashless txid leaf (MerklePath's words).
     assert_eq!(
         words(beef.to_binary()),
@@ -525,12 +675,12 @@ fn a_bump_whose_root_does_not_compute_is_appended_where_the_reference_throws_817
         1,
         "the second rootless BUMP appended"
     );
-    assert_eq!(beef.bumps.len(), 2);
+    assert_eq!(beef.bumps().len(), 2);
     // A BUMP of the same height and root is combined, once.
     let mut beef = Beef::from_binary(&f.v1).unwrap();
-    let again = beef.bumps[0].clone();
+    let again = beef.bumps()[0].clone();
     assert_eq!(beef.merge_bump(again), 0);
-    assert_eq!(beef.bumps.len(), 1);
+    assert_eq!(beef.bumps().len(), 1);
 }
 
 /// The #764 row's residues this change answers, beyond the recorded cells:
@@ -542,25 +692,25 @@ fn the_764_rows_bump_residues_are_refused_by_merge_beef_817() {
     let v = vector();
     let f = fixture(&v);
     let mut empty = Beef::from_binary(&f.v1).unwrap();
-    empty.bumps[0].path[0].clear();
+    empty.edit_bump(0, |bump| bump.path[0].clear()).unwrap();
     let mut target = Beef::new();
     let refused = words(target.merge_beef(&empty));
     assert!(refused.starts_with("invalid BEEF at byte "), "{refused}");
     assert!(
-        target.txs.is_empty() && target.bumps.is_empty(),
+        target.txs().is_empty() && target.bumps().is_empty(),
         "the target untouched"
     );
 
     let mut flagged = Beef::from_binary(&f.v1).unwrap();
     let mut dup = MerklePathLeaf::new_duplicate(1);
     dup.txid = true;
-    flagged.bumps[0].path[0].push(dup);
+    flagged.edit_bump(0, |bump| bump.path[0].push(dup)).unwrap();
     assert_eq!(
         words(target.merge_beef(&flagged)),
         "Duplicate leaf at height 0, offset 1 is flagged txid, which a BUMP's duplicate flag cannot write"
     );
     assert!(
-        target.txs.is_empty() && target.bumps.is_empty(),
+        target.txs().is_empty() && target.bumps().is_empty(),
         "the target untouched"
     );
 }
@@ -568,14 +718,25 @@ fn the_764_rows_bump_residues_are_refused_by_merge_beef_817() {
 /// A BEEF's entries as the readers and writers see them: each txid, whether
 /// it is a txid alone, and its BUMP index.
 fn entries_of(beef: &Beef) -> Vec<(String, bool, Option<usize>)> {
-    beef.txs
+    beef.txs()
         .iter()
-        .map(|t| (t.txid(), t.is_txid_only(), t.bump_index()))
+        .map(|t| (t.id(), t.is_txid_only(), t.bump_index()))
         .collect()
 }
 
-/// The `doubled_txid` cell's entries pushed by hand into `txs`, as the
-/// recorder pushes them (`BeefTx.fromRawTx`, `BeefTx.fromTxid`).
+/// The `doubled_txid` cell's entries held as the recorder holds them after
+/// its hand pushes (`BeefTx.fromRawTx`, `BeefTx.fromTxid`): two entries of
+/// one txid, in a BEEF that is not as read.
+///
+/// No merge door holds a txid twice and no door pushes an entry since #843b,
+/// so the rows are written as a frame by this crate's own writers
+/// (`MerklePath::to_writer`, `BeefTx::to_writer`) and read by
+/// `Beef::from_binary`, which keeps both entries in the order written. A
+/// BEEF read from bytes is "as read" (its `merge_beef` as a source walks
+/// the read order) and each raw entry holds its bytes and its parse;
+/// `retain_txs` keeping every entry then marks it no longer as read, the
+/// state a hand push left, so `to_hex` sorts it and `merge_beef` walks its
+/// sorted order.
 fn doubled_pushed(v: &Value, name: &str, version: u32, bytes: &str) -> Beef {
     let (child, parent) = (
         v["child_raw"].as_str().unwrap(),
@@ -593,18 +754,30 @@ fn doubled_pushed(v: &Value, name: &str, version: u32, bytes: &str) -> Beef {
         "proven_raw_then_txid_only" => &[("proven", parent), ("txid", p)],
         other => panic!("no doubled cell {other}"),
     };
-    let mut beef = Beef::with_version(version);
-    if name.starts_with("proven") {
-        let read = Beef::from_hex(bytes).unwrap();
-        beef.merge_bump(read.bumps[0].clone());
+    let bumps = if name.starts_with("proven") {
+        vec![Beef::from_hex(bytes).unwrap().bumps()[0].clone()]
+    } else {
+        Vec::new()
+    };
+    let mut frame = Writer::new();
+    frame.write_u32_le(version);
+    frame.write_var_int(bumps.len() as u64);
+    for bump in &bumps {
+        bump.to_writer(&mut frame).expect("the BUMP is writable");
     }
+    frame.write_var_int(entries.len() as u64);
     for &(kind, x) in entries {
-        beef.txs.push(match kind {
-            "txid" => BeefTx::from_txid(x.to_string()),
+        let entry = match kind {
+            "txid" => BeefTx::from_txid(x.parse().unwrap()),
             "raw" => BeefTx::from_raw_tx(from_hex(x).unwrap(), None).unwrap(),
             _ => BeefTx::from_raw_tx(from_hex(x).unwrap(), Some(0)).unwrap(),
-        });
+        };
+        entry
+            .to_writer(&mut frame, version)
+            .expect("the entry is writable");
     }
+    let mut beef = Beef::from_binary(&frame.into_bytes()).expect("the frame reads back");
+    beef.retain_txs(|_| true);
     beef
 }
 
@@ -642,7 +815,7 @@ fn a_beef_holding_one_txid_twice_is_written_and_read_back_as_held_817() {
                 "read" => Beef::from_hex(bytes).unwrap(),
                 _ => doubled_pushed(&v, name, version, bytes),
             };
-            assert_eq!(beef.txs.len(), 2, "{at}: two entries held");
+            assert_eq!(beef.txs().len(), 2, "{at}: two entries held");
             assert_eq!(recorded["held"], 2, "{at}: the reference holds two");
             let written = beef.to_hex().unwrap_or_else(|e| panic!("{at}: {e}"));
             let expected = if how == "read" && !READ_SORTED_HERE.contains(&(name, version)) {
@@ -659,7 +832,7 @@ fn a_beef_holding_one_txid_twice_is_written_and_read_back_as_held_817() {
             );
             for reader in ["from_binary", "from_binary_strict"] {
                 let theirs = &recorded["read_back"][reader]["ok"];
-                let txids: Vec<String> = back.txs.iter().map(BeefTx::txid).collect();
+                let txids: Vec<String> = back.txs().iter().map(BeefTx::id).collect();
                 assert_eq!(theirs["txs"], 2, "{at}: {reader} reads two");
                 assert_eq!(theirs["txids"], serde_json::json!(txids), "{at}: {reader}");
             }
@@ -670,8 +843,8 @@ fn a_beef_holding_one_txid_twice_is_written_and_read_back_as_held_817() {
             let mut target = Beef::new();
             target.merge_beef(&source).unwrap();
             let merged = &recorded["merge_into_empty"]["ok"];
-            let txids: Vec<String> = target.txs.iter().map(BeefTx::txid).collect();
-            let txid_only: Vec<bool> = target.txs.iter().map(BeefTx::is_txid_only).collect();
+            let txids: Vec<String> = target.txs().iter().map(BeefTx::id).collect();
+            let txid_only: Vec<bool> = target.txs().iter().map(BeefTx::is_txid_only).collect();
             assert_eq!(merged["txids"], serde_json::json!(txids), "{at}: merged");
             assert_eq!(
                 merged["txid_only"],
@@ -693,11 +866,45 @@ fn a_beef_holding_one_txid_twice_is_written_and_read_back_as_held_817() {
 /// its own, stated rows), and its `txs` after `to_hex` the reference's
 /// order on all four cells, the version word's included (written there
 /// after its sort, refused here after the same sort).
+///
+/// Replaces `the_entries_order_after_a_refusal_is_the_reference_s_817`,
+/// which replayed all four cells. Two of them (`empty_txid`,
+/// `non_hex_txid`) merged a txid-only entry whose text is no txid; since
+/// #843b neither state can be held, so neither refusal exists and there is
+/// no order after it to read: both are counted by name, and the reference's
+/// recorded words for them are asserted as recorded. The refusal met before
+/// the sort was the empty txid's alone, so every refusal left is met after
+/// the sort.
 #[test]
-fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
+fn the_entries_order_after_a_refusal_is_the_reference_s_843b() {
     let v = vector();
     let f = fixture(&v);
-    let order = |b: &Beef| b.txs.iter().map(BeefTx::txid).collect::<Vec<_>>();
+    // The two cells with no state here, by name, and why.
+    let no_state = [
+        ("empty_txid", String::new(), "Internal"),
+        ("non_hex_txid", "zz".repeat(32), "Invalid hex string"),
+    ];
+    for (name, text, thrown) in &no_state {
+        let c = cell(&v, "sort_on_refusal", name);
+        assert_eq!(
+            c["write"]["thrown"], *thrown,
+            "{name}: the reference's words"
+        );
+        assert_eq!(c["before"][2], text.as_str(), "{name}: the text held there");
+        assert!(
+            text.parse::<Txid>().is_err(),
+            "{name}: no txid, so no state"
+        );
+    }
+    let replayed = ["v1_txid_only", "version_word"];
+    for c in v["sort_on_refusal"].as_array().unwrap() {
+        let name = c["name"].as_str().unwrap();
+        assert!(
+            replayed.contains(&name) || no_state.iter().any(|(n, ..)| *n == name),
+            "{name}: a recorded cell neither replayed nor counted"
+        );
+    }
+    let order = |b: &Beef| b.txs().iter().map(BeefTx::txid).collect::<Vec<_>>();
     let recorded = |c: &Value, key: &str| -> Vec<String> {
         c[key]
             .as_array()
@@ -706,26 +913,12 @@ fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
             .map(|t| t.as_str().unwrap().to_string())
             .collect()
     };
-    let faults: [(&str, Change, String); 4] = [
-        (
-            "empty_txid",
-            Box::new(|b| {
-                b.merge_txid_only(String::new());
-            }),
-            format!("{LENGTH_WORDS} 0"),
-        ),
-        (
-            "non_hex_txid",
-            Box::new(|b| {
-                b.merge_txid_only("zz".repeat(32));
-            }),
-            "Invalid hex string".to_string(),
-        ),
+    let faults: [(&str, Change, String); 2] = [
         (
             "v1_txid_only",
             Box::new(|b| {
                 b.version = BEEF_V1;
-                b.merge_txid_only(FRESH.to_string());
+                b.merge_txid_only(FRESH.parse().unwrap());
             }),
             "a valid serialized Transaction is expected".to_string(),
         ),
@@ -736,6 +929,7 @@ fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
         ),
     ];
     for (name, fault, expected) in faults {
+        assert!(replayed.contains(&name));
         let c = cell(&v, "sort_on_refusal", name);
         let mut beef = Beef::new();
         beef.merge_raw_tx(f.child_raw.clone(), None).unwrap();
@@ -747,21 +941,22 @@ fn the_entries_order_after_a_refusal_is_the_reference_s_817() {
     }
 }
 
-/// The other side of #621's fold: an entry edited through the deprecated
-/// `tx_mut` is written from its fields by every writer, as `to_binary`
-/// (after its refresh) and `merge_beef` write it; `to_writer` wrote the
-/// transaction's cache, stale after the edit, bytes another transaction's.
-/// The state through public calls until #843: X parsed by
-/// `Transaction::from_binary`, `to_binary` called (the cache X's bytes),
-/// `lock_time` changed through the public field without `invalidate_caches`,
-/// the result assigned through `*tx_mut()`. Since #843 the edit goes through
-/// `set_lock_time`, which clears the caches, so the stale state is
-/// unbuildable and the cell pins that the edited bytes are written; the unit
-/// twin is `beef/merge_entry_621_tests.rs`'
-/// `to_writer_writes_a_tx_mut_entry_from_its_fields_843`.
+/// The other side of #621's fold: an entry edited in place is written from
+/// its fields by every writer, `to_writer`, `to_binary` and `merge_beef`
+/// alike. Until #843 `to_writer` wrote the transaction's cache, stale after
+/// an edit through the public field, bytes another transaction's; since
+/// #843 an edit goes through `set_lock_time`, which clears the caches.
+///
+/// Replaces `an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621`,
+/// which assigned the edited transaction through `*tx_mut()`, the entry
+/// then waiting for a whole-BEEF door to re-key it. `tx_mut` does not
+/// compile since #843b (`src/transaction/beef/rows.rs`' `compile_fail` doc
+/// tests); the assignment goes through `edit_tx`, which stores the edited
+/// bytes and re-keys the entry at once. The unit twin is
+/// `beef/merge_entry_621_tests.rs`'
+/// `to_writer_writes_an_edited_entry_from_its_fields_843b`.
 #[test]
-#[allow(deprecated)]
-fn an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621() {
+fn an_entry_edited_through_edit_tx_is_written_from_its_fields_by_to_writer_843b() {
     let f = fixture(&vector());
     let mut stale = bsv_rs::transaction::Transaction::from_binary(&f.parent_raw).unwrap();
     assert_eq!(
@@ -776,14 +971,20 @@ fn an_entry_edited_through_tx_mut_is_written_from_its_fields_by_to_writer_621() 
     assert_ne!(edited, f.parent_raw, "the edit moves the bytes");
 
     let mut beef = Beef::new();
-    beef.merge_raw_tx(f.parent_raw.clone(), None).unwrap();
-    *beef.txs[0].tx_mut().unwrap() = stale;
+    let held = beef
+        .merge_raw_tx(f.parent_raw.clone(), None)
+        .unwrap()
+        .txid();
+    let renamed = stale.txid();
+    beef.edit_tx(held, |tx| *tx = stale).unwrap();
+    assert!(beef.find_txid(held).is_none(), "re-keyed at once");
+    assert!(beef.find_txid(renamed).is_some());
     let mut writer = Writer::new();
     beef.to_writer(&mut writer).unwrap();
     let written = writer.into_bytes();
     let back = Beef::from_binary(&written).expect("to_writer's bytes read back");
     assert_eq!(
-        back.txs[0].raw_tx().unwrap(),
+        back.txs()[0].raw_tx().unwrap(),
         edited.as_slice(),
         "to_writer writes the edited fields, not the stale cache"
     );

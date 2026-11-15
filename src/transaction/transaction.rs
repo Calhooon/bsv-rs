@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use super::amount::{read_amount, unnamed_source_amounts, written_amount, AmountRule};
 use super::beef::Beef;
-use super::beef_tx::{BEEF_V1, BEEF_V2};
+use super::beef_tx::{BeefTx, BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
@@ -529,12 +529,14 @@ impl Transaction {
     /// # Arguments
     ///
     /// * `beef` - The BEEF binary data
-    /// * `txid` - Optional txid to extract. If None, returns the last transaction.
+    /// * `txid` - Optional txid to extract (a [`Txid`] since #843b:
+    ///   `Some(text.parse()?)` from text). If None, returns the Atomic BEEF's
+    ///   subject, else the last transaction.
     ///
     /// # Returns
     ///
     /// The parsed transaction.
-    pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self> {
+    pub fn from_beef(beef: &[u8], txid: Option<Txid>) -> Result<Self> {
         let parsed = Beef::from_binary(beef)?;
 
         // Route through `find_atomic_transaction` so the returned transaction
@@ -554,15 +556,15 @@ impl Transaction {
         // zanaadu#284 stored-BEEF corruption and a wrong-subject hazard for any
         // caller validating "the" transaction of an atomic submit.
         let target = match txid {
-            Some(id) => id.to_string(),
-            None => match parsed.atomic_txid.clone() {
+            Some(id) => id,
+            None => match parsed.atomic_txid {
                 Some(atomic) => atomic,
-                None => parsed.txs.last().map(|btx| btx.txid()).ok_or_else(|| {
+                None => parsed.txs().last().map(BeefTx::txid).ok_or_else(|| {
                     crate::Error::TransactionError("No transactions in BEEF".to_string())
                 })?,
             },
         };
-        parsed.find_atomic_transaction(&target).ok_or_else(|| {
+        parsed.find_atomic_transaction(target).ok_or_else(|| {
             crate::Error::TransactionError(format!("Transaction {} not found in BEEF", target))
         })
     }
@@ -573,7 +575,7 @@ impl Transaction {
     pub fn from_atomic_beef(beef: &[u8]) -> Result<Self> {
         let parsed = Beef::from_binary(beef)?;
 
-        let txid = parsed.atomic_txid.as_ref().ok_or_else(|| {
+        let txid = parsed.atomic_txid.ok_or_else(|| {
             crate::Error::TransactionError("Not an Atomic BEEF format".to_string())
         })?;
 
@@ -665,8 +667,7 @@ impl Transaction {
     /// its source transaction.
     pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
         let mut beef = self.ancestry_beef(BEEF_V2, allow_partial)?;
-        let txid = self.id();
-        beef.to_binary_atomic_subject_last(&txid)
+        beef.to_binary_atomic_subject_last(self.txid())
     }
 
     /// The BEEF of this transaction and its ancestry under `version`'s word,
@@ -706,7 +707,7 @@ impl Transaction {
 
         // The ancestors in dependency order, each entry alone (#764's fold)
         for ancestor in ancestors {
-            beef.push_transaction(ancestor.id(), ancestor, None);
+            beef.push_transaction(ancestor.txid(), ancestor, None);
         }
 
         beef.hold_order();
@@ -2667,8 +2668,8 @@ mod from_beef_subject_tests {
         let parsed =
             Beef::from_binary(&crate::primitives::encoding::from_hex(CHAIN_BEEF_HEX).unwrap())
                 .unwrap();
-        let parent = parsed.txs[0].tx().unwrap().clone();
-        let child = parsed.txs[1].tx().unwrap().clone();
+        let parent = parsed.txs()[0].tx().unwrap().clone();
+        let child = parsed.txs()[1].tx().unwrap().clone();
         let (parent_id, child_id) = (parent.id(), child.id());
         assert_ne!(parent_id, child_id);
 
@@ -2720,7 +2721,11 @@ mod from_beef_subject_tests {
     #[test]
     fn explicit_txid_outranks_everything() {
         let (bytes, child_id, parent_id) = wire_order_beef(true);
-        let tx = Transaction::from_beef(&as_atomic(&bytes, &child_id), Some(&parent_id)).unwrap();
+        let tx = Transaction::from_beef(
+            &as_atomic(&bytes, &child_id),
+            Some(parent_id.parse().unwrap()),
+        )
+        .unwrap();
         assert_eq!(tx.id(), parent_id);
     }
 }

@@ -505,16 +505,16 @@ fn what_this_crates_writer_writes_its_own_two_readers_accept() {
             beef.merge_raw_tx(node.raw.clone(), node.bump)
                 .expect("the bytes are one transaction");
         }
-        let bytes = beef.to_binary_atomic(&subject).unwrap();
+        let bytes = beef.to_binary_atomic(subject.parse().unwrap()).unwrap();
         let written = Beef::from_binary(&bytes).unwrap();
-        let txids: HashSet<String> = written.txs.iter().map(|t| t.txid()).collect();
+        let txids: HashSet<String> = written.txs().iter().map(|t| t.id()).collect();
         let expected: HashSet<String> = ["S", "P", "C", "Z", "W"]
             .iter()
             .map(|n| graph.node(n).txid.clone())
             .collect();
         assert_eq!(txids, expected, "merged {}", names(order));
-        assert_eq!(written.txs.last().unwrap().txid(), subject);
-        assert_eq!(written.bumps.len(), 3);
+        assert_eq!(written.txs().last().unwrap().txid(), subject);
+        assert_eq!(written.bumps().len(), 3);
         assert_eq!(
             verdicts(&bytes, &roots),
             [Ok(()), Ok(()), Ok(()), Ok(())],
@@ -533,16 +533,16 @@ fn what_this_crates_writer_writes_its_own_two_readers_accept() {
 /// and of no txid-only entry; atomic when that closure is every entry.
 fn ts3_accepts(bytes: &[u8]) -> bool {
     let beef = Beef::from_binary(bytes).unwrap();
-    let Some(subject) = beef.atomic_txid.clone() else {
+    let Some(subject) = beef.atomic_txid.map(|t| t.to_string()) else {
         return false;
     };
     let at: HashMap<String, usize> = beef
-        .txs
+        .txs()
         .iter()
         .enumerate()
-        .map(|(i, t)| (t.txid(), i))
+        .map(|(i, t)| (t.id(), i))
         .collect();
-    if at.len() != beef.txs.len() {
+    if at.len() != beef.txs().len() {
         return false;
     }
     let Some(&root) = at.get(&subject) else {
@@ -554,11 +554,11 @@ fn ts3_accepts(bytes: &[u8]) -> bool {
         if !included.insert(i) {
             continue;
         }
-        let entry = &beef.txs[i];
+        let entry = &beef.txs()[i];
         let proven = entry
             .bump_index()
-            .and_then(|b| beef.bumps.get(b))
-            .is_some_and(|b| b.contains(&entry.txid()));
+            .and_then(|b| beef.bumps().get(b))
+            .is_some_and(|b| b.contains(&entry.id()));
         if proven || entry.is_txid_only() {
             continue;
         }
@@ -572,7 +572,7 @@ fn ts3_accepts(bytes: &[u8]) -> bool {
             }
         }
     }
-    included.len() == beef.txs.len()
+    included.len() == beef.txs().len()
 }
 
 #[test]
@@ -604,10 +604,10 @@ fn the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest() {
     }
     let all = beef.clone().to_binary().expect("the BEEF is writable");
     let subject = graph.node("S").txid.clone();
-    let bytes = beef.to_binary_atomic(&subject).unwrap();
+    let bytes = beef.to_binary_atomic(subject.parse().unwrap()).unwrap();
 
     let written = Beef::from_binary(&bytes).unwrap();
-    let txids: Vec<String> = written.txs.iter().map(|t| t.txid()).collect();
+    let txids: Vec<String> = written.txs().iter().map(|t| t.id()).collect();
     for absent in [
         x.id(),
         y.id(),
@@ -619,10 +619,10 @@ fn the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest() {
     assert_eq!(txids.len(), 5);
     assert_eq!(txids.last(), Some(&subject));
     // The BUMPs of `P`, `Z`, `W`, renumbered from 0; each proves its entry.
-    assert_eq!(written.bumps.len(), 3);
-    for entry in &written.txs {
+    assert_eq!(written.bumps().len(), 3);
+    for entry in written.txs() {
         if let Some(b) = entry.bump_index() {
-            assert!(written.bumps[b].contains(&entry.txid()));
+            assert!(written.bumps()[b].contains(&entry.id()));
         }
     }
     assert_eq!(verdicts(&bytes, &roots), [Ok(()), Ok(()), Ok(()), Ok(())]);
@@ -637,7 +637,7 @@ fn the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest() {
         [Err(Kind::UnrelatedTransaction); 4]
     );
     // The non-atomic writer is unchanged: all nine.
-    assert_eq!(Beef::from_binary(&all).unwrap().txs.len(), 9);
+    assert_eq!(Beef::from_binary(&all).unwrap().txs().len(), 9);
 }
 
 #[test]
@@ -664,7 +664,7 @@ fn every_accepted_vector_round_trips_through_the_atomic_writer() {
             .collect();
         let subject = vector["expected"]["subject_txid"].as_str().unwrap();
         let mut beef = Beef::from_binary(&bytes).unwrap();
-        let again = beef.to_binary_atomic(subject).unwrap();
+        let again = beef.to_binary_atomic(subject.parse().unwrap()).unwrap();
         assert_eq!(
             verdicts(&again, &roots),
             [Ok(()), Ok(()), Ok(()), Ok(())],
@@ -677,7 +677,7 @@ fn every_accepted_vector_round_trips_through_the_atomic_writer() {
             "{id}: the TS 3 model's verdict on the vector"
         );
         let written = Beef::from_binary(&again).unwrap();
-        assert_eq!(written.txs.last().unwrap().txid(), subject, "{id}");
+        assert_eq!(written.txs().last().unwrap().txid(), subject, "{id}");
         accepted += 1;
     }
     assert_eq!(accepted, 4);
@@ -719,7 +719,7 @@ fn the_leans_w4_bytes_are_refused_under_the_graph_rule() {
     for (name, offset, named, scripted) in rows {
         let bytes = std::fs::read(dir.join(format!("{name}.bin"))).unwrap();
         let beef = Beef::from_binary(&bytes).unwrap();
-        let txid = internal(named.unwrap_or(&beef.txs.last().unwrap().txid()));
+        let txid = internal(named.unwrap_or(&beef.txs().last().unwrap().id()));
         let expected = Verdict::Invalid {
             offset,
             kind: Kind::UnrelatedTransaction,
@@ -784,7 +784,7 @@ fn the_edges_are_kept_only_under_a_subject() {
             let (bytes, roots) = proven_with_inputs(INPUTS, atomic);
             let subject = named.then(|| {
                 let beef = Beef::from_binary(&bytes).unwrap();
-                internal(&beef.txs[0].txid())
+                internal(&beef.txs()[0].id())
             });
             let mut reader = if scripts {
                 StreamVerifier::new(bytes.as_slice(), &roots, subject)

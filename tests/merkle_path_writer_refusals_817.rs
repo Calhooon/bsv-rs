@@ -553,7 +553,7 @@ fn paths_of(bytes: &[u8], out: &mut Vec<MerklePath>) {
     );
     if beefish {
         if let Ok(beef) = Beef::from_binary(bytes) {
-            out.extend(beef.bumps);
+            out.extend(beef.bumps().iter().cloned());
         }
     }
 }

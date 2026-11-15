@@ -107,7 +107,7 @@ fn witness_bytes() -> Vec<(&'static str, Vec<u8>)> {
             .unwrap();
         let mut beef = with_parent();
         beef.merge_transaction(child.clone());
-        beef.to_binary_atomic(&child.id()).unwrap()
+        beef.to_binary_atomic(child.txid()).unwrap()
     };
     vec![
         (
@@ -169,7 +169,7 @@ fn the_action_witnesses_are_this_crates_bytes() {
     }
     // listOutputs' output is the parent's, which its `BEEF` carries (the
     // reference's reader asks the output of it, `WalletResultValidation.ts:2116-2121`)
-    let parent = Beef::from_binary(bytes("inputBEEF")).unwrap().txs[0].txid();
+    let parent = Beef::from_binary(bytes("inputBEEF")).unwrap().txs()[0].txid();
     let outpoint = serde_json::json!(format!("{parent}.0"));
     let pointer = "/result/outputs/0/outpoint";
     let listed = vector["cases"]

@@ -144,13 +144,17 @@ fn from_beef_attaches_the_last_bump_holding_the_txid_732() {
         }
         let read = Beef::from_binary(&bytes).unwrap();
         assert_eq!(
-            read.bumps.len() as u64,
+            read.bumps().len() as u64,
             case["bumps_read"].as_u64().unwrap()
         );
-        let last = read.bumps.last().map(held).unwrap();
-        let earliest = read.bumps.first().map(held).unwrap();
+        let last = read.bumps().last().map(held).unwrap();
+        let earliest = read.bumps().first().map(held).unwrap();
         assert_ne!(earliest, last, "{name}: two proofs of one txid, two roots");
-        let tx = Transaction::from_beef(&bytes, Some(case["subject"].as_str().unwrap())).unwrap();
+        let tx = Transaction::from_beef(
+            &bytes,
+            Some(case["subject"].as_str().unwrap().parse().unwrap()),
+        )
+        .unwrap();
         let attached = held(tx.merkle_path.as_ref().unwrap());
         assert_eq!(attached, recorded(&case["attached"][0]), "{name}");
         assert_eq!(attached, last, "{name}: the last BUMP, not the earliest");
@@ -164,7 +168,7 @@ fn find_bump_answers_the_last_bump_holding_the_txid_732() {
     for (bytes, case) in cases() {
         let read = Beef::from_binary(&bytes).unwrap();
         let p = vector()["parent"]["txid"].as_str().unwrap().to_string();
-        let found = held(read.find_bump(&p).unwrap());
+        let found = held(read.find_bump(p.parse().unwrap()).unwrap());
         assert_eq!(found, recorded(&case["find_bump"]), "{}", case["name"]);
     }
 }
@@ -178,7 +182,11 @@ fn a_parent_proven_twice_carries_the_last_bump_on_every_input_732() {
         .into_iter()
         .find(|(_, c)| c["name"] == "a_parent_proven_twice")
         .unwrap();
-    let tx = Transaction::from_beef(&bytes, Some(case["subject"].as_str().unwrap())).unwrap();
+    let tx = Transaction::from_beef(
+        &bytes,
+        Some(case["subject"].as_str().unwrap().parse().unwrap()),
+    )
+    .unwrap();
     assert!(tx.merkle_path.is_none(), "the child is unproven");
     let attached: Vec<(u32, String)> = tx
         .inputs()
@@ -211,14 +219,14 @@ fn both_bumps_are_read_and_the_wire_index_names_the_earliest_732() {
     for (bytes, case) in cases() {
         let read = Beef::from_binary(&bytes).unwrap();
         let p = vector()["parent"]["txid"].as_str().unwrap().to_string();
-        let index = read.find_txid(&p).unwrap().bump_index();
+        let index = read.find_txid(p.parse().unwrap()).unwrap().bump_index();
         assert_eq!(
             index.map(|i| i as u64),
             case["parent_bump_index"].as_u64(),
             "{}",
             case["name"]
         );
-        let roots: Vec<(u32, String)> = read.bumps.iter().map(held).collect();
+        let roots: Vec<(u32, String)> = read.bumps().iter().map(held).collect();
         let expected: Vec<(u32, String)> = case["bump_roots"]
             .as_array()
             .unwrap()

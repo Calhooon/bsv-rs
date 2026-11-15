@@ -153,8 +153,10 @@ fn readers(shape: &Shape) -> Result<BTreeMap<String, String>, String> {
     };
     // The whole BEEF, and a BUMP held in memory.
     let mut whole = Beef::from_binary(&beef_of(&bytes));
+    // `merge_bump` into an empty BEEF appends the BUMP as given (no BUMP to
+    // combine with, no entry to flag a leaf for).
     let mut held = Beef::new();
-    held.bumps.push(MerklePath {
+    held.merge_bump(MerklePath {
         block_height: shape.block_height,
         path: path.clone(),
     });

@@ -193,7 +193,7 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
         let Ok(parsed) = Beef::from_binary(data) else {
             continue;
         };
-        for (i, entry) in parsed.txs.iter().enumerate() {
+        for (i, entry) in parsed.txs().iter().enumerate() {
             let Some(tx) = entry.tx() else {
                 continue;
             };
@@ -223,8 +223,10 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
         }
     }
     let hash = |i: u8| hex::encode([i; 32]);
+    // Through `merge_bump` (#843b: a push onto the public `bumps` until
+    // then), which appends a BUMP whose root does not compute as it is.
     let mut beef = Beef::new();
-    beef.bumps.push(MerklePath {
+    beef.merge_bump(MerklePath {
         block_height: 1,
         path: vec![
             vec![
@@ -311,7 +313,7 @@ fn beef_corpora(base: &Path) {
                 .or_insert(format!("lean-{name}"));
         }
         if let Ok(parsed) = Beef::from_binary(data) {
-            for (i, path) in parsed.bumps.iter().enumerate() {
+            for (i, path) in parsed.bumps().iter().enumerate() {
                 bump.add(&format!("lean-{name}-bump{i}"), &path.to_binary().unwrap());
             }
         }

@@ -12,7 +12,7 @@ use crate::transaction::{
 };
 
 /// A transaction spending `<byte>`x32:0, proven by a block of its own.
-fn proven(beef: &mut Beef, byte: &str, height: u32) -> String {
+fn proven(beef: &mut Beef, byte: &str, height: u32) -> Txid {
     let mut input = TransactionInput::new(byte.repeat(32).parse().unwrap(), 0);
     input.set_unlocking_script(UnlockingScript::from_hex("").unwrap());
     let mut tx = Transaction::new();
@@ -26,18 +26,18 @@ fn proven(beef: &mut Beef, byte: &str, height: u32) -> String {
     let index = beef.merge_bump(path);
     beef.merge_raw_tx(tx.to_binary(), Some(index))
         .expect("the bytes are one transaction");
-    tx.id()
+    tx.txid()
 }
 
 /// Two proven transactions in one BEEF: its bytes, the txids and each
 /// txid's Atomic BEEF length.
-fn two() -> (Vec<u8>, String, String, usize, usize) {
+fn two() -> (Vec<u8>, Txid, Txid, usize, usize) {
     let mut beef = Beef::new();
     let a = proven(&mut beef, "11", 900);
     let b = proven(&mut beef, "22", 901);
     let bytes = beef.to_binary().expect("the BEEF is writable");
-    let la = beef.to_binary_atomic(&a).unwrap().len();
-    let lb = beef.to_binary_atomic(&b).unwrap().len();
+    let la = beef.to_binary_atomic(a).unwrap().len();
+    let lb = beef.to_binary_atomic(b).unwrap().len();
     (bytes, a, b, la, lb)
 }
 
@@ -59,7 +59,7 @@ fn the_bound_is_the_references_64_mib_735() {
 #[test]
 fn generated_bytes_past_the_bound_refuse_the_answer_in_the_references_words_735() {
     let (bytes, a, b, la, lb) = two();
-    let outpoints = || vec![(a.clone(), 0, None), (b.clone(), 0, None)];
+    let outpoints = || vec![(a, 0, None), (b, 0, None)];
     let read = atomic_outputs_within(outpoints(), &bytes, la + lb, usize::MAX).unwrap();
     assert_eq!(read.len(), 2);
     assert_eq!(
@@ -79,15 +79,14 @@ fn generated_bytes_past_the_bound_refuse_the_answer_in_the_references_words_735(
 #[test]
 fn a_txid_named_twice_is_generated_and_counted_once_735() {
     let (bytes, a, _, la, _) = two();
-    let outpoints = vec![
-        (a.clone(), 0, None),
-        (a.clone(), 0, Some(vec![7])),
-        (a.clone(), 0, None),
-    ];
+    let outpoints = vec![(a, 0, None), (a, 0, Some(vec![7])), (a, 0, None)];
     let read = atomic_outputs_within(outpoints, &bytes, la, usize::MAX).unwrap();
     assert_eq!(read.len(), 3);
     assert!(read.iter().all(|o| o.beef == read[0].beef));
-    assert!(read.iter().all(|o| o.txid.as_deref() == Some(a.as_str())));
+    let hint = a.to_string();
+    assert!(read
+        .iter()
+        .all(|o| o.txid.as_deref() == Some(hint.as_str())));
     assert_eq!(read[1].context, Some(vec![7]));
 }
 
@@ -98,13 +97,7 @@ fn a_txid_named_twice_is_generated_and_counted_once_735() {
 #[test]
 fn extracted_bytes_count_each_outpoints_atomic_beef_and_context_775() {
     let (bytes, a, b, la, lb) = two();
-    let outpoints = || {
-        vec![
-            (a.clone(), 0, Some(vec![1, 2, 3])),
-            (a.clone(), 1, None),
-            (b.clone(), 0, None),
-        ]
-    };
+    let outpoints = || vec![(a, 0, Some(vec![1, 2, 3])), (a, 1, None), (b, 0, None)];
     let total = la + 3 + la + lb;
     assert!(total < 3 * bytes.len() + 3);
     let read = atomic_outputs_within(outpoints(), &bytes, usize::MAX, total).unwrap();
@@ -115,13 +108,14 @@ fn extracted_bytes_count_each_outpoints_atomic_beef_and_context_775() {
     );
 }
 
-/// #817: the answer's closures share one preparation of its BEEF (a
-/// refresh, an amount check and a position map over every entry), and each
+/// #817: the answer's closures share one preparation of its BEEF (an
+/// amount check over every entry; a refresh and a position map beside it
+/// until #843b), and each
 /// closure's loops visit the entries it keeps alone. The counts are of
 /// entries VISITED, taken at each loop's own turn: 32 proven transactions,
-/// each named by two outpoints, are 32 entries refreshed, 32 checked for
-/// their amounts and 32 mapped (beside the one entry each of the 32
-/// closures' own sort refreshes and own check reads, and none mapped) and
+/// each named by two outpoints, are 32 entries checked for
+/// their amounts (beside the one entry each of the 32
+/// closures' own check reads) and
 /// 32 turns of each closure loop, where
 /// `Beef::to_binary_atomic` a distinct txid ran each pass 32 times (1,024
 /// entries) and each loop over all 32 entries a closure (1,024 turns).
@@ -129,24 +123,24 @@ fn extracted_bytes_count_each_outpoints_atomic_beef_and_context_775() {
 #[test]
 fn the_answers_closures_share_one_preparation_of_its_beef_817() {
     let mut beef = Beef::new();
-    let txids: Vec<String> = (0..32u32)
+    let txids: Vec<Txid> = (0..32u32)
         .map(|k| proven(&mut beef, &format!("{:02x}", k + 1), 900 + k))
         .collect();
     let bytes = beef.to_binary().expect("the BEEF is writable");
     let expected: Vec<Vec<u8>> = txids
         .iter()
-        .map(|t| beef.to_binary_atomic(t).unwrap())
+        .map(|t| beef.to_binary_atomic(*t).unwrap())
         .collect();
     let outpoints: Vec<Outpoint> = txids
         .iter()
         .chain(txids.iter())
-        .map(|t| (t.clone(), 0, None))
+        .map(|t| (*t, 0, None))
         .collect();
 
     Beef::atomic_cost_taken();
     let read = atomic_outputs(outpoints, &bytes, usize::MAX).unwrap();
     let cost = Beef::atomic_cost_taken();
-    assert_eq!(cost.passes(), (32 + 32, 32 + 32, 32));
+    assert_eq!(cost.passes(), 32 + 32);
     assert_eq!(cost.loops(), (32, 32));
     // The bytes are each txid's own Atomic BEEF, as before.
     assert_eq!(read.len(), 64);
@@ -165,6 +159,6 @@ fn an_answer_of_no_outpoint_prepares_nothing_817() {
         .unwrap()
         .is_empty());
     let cost = Beef::atomic_cost_taken();
-    assert_eq!(cost.passes(), (0, 0, 0));
+    assert_eq!(cost.passes(), 0);
     assert_eq!(cost.loops(), (0, 0));
 }

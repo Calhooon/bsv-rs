@@ -25,6 +25,29 @@ fn hash_of(bytes: &[u8]) -> String {
     to_hex(&h)
 }
 
+/// A source entry that holds no txid (one built by the public
+/// `BeefTx::from_raw_tx` and held as given, a state only the crate's test
+/// door reaches: every merge door stores the txid) is filed under the hash
+/// of its bytes, read as a txid in wire order (#843b: the hash is 32 bytes,
+/// and `Txid::from_wire_bytes` names the order; in the display order the
+/// entry is filed under the reversed id and the transaction is not found).
+#[test]
+fn an_entry_holding_no_txid_is_merged_under_its_bytes_hash_in_wire_order_843b() {
+    let bytes = raw();
+    let txid = Transaction::from_binary(&bytes).unwrap().txid();
+    let entry = BeefTx::from_raw_tx(bytes.clone(), None).expect("one transaction");
+    assert_eq!(entry.held_txid(), None, "the public constructor holds none");
+    let source = Beef::with_rows_for_test(crate::transaction::BEEF_V2, vec![entry], Vec::new());
+
+    let mut merged = Beef::new();
+    merged.merge_beef(&source).expect("the source writes");
+    assert_eq!(merged.txs().len(), 1);
+    assert_eq!(merged.txs()[0].held_txid(), Some(txid));
+    assert_eq!(*txid.as_wire_bytes(), sha256d(&bytes));
+    let found = merged.find_txid(txid).expect("found under its txid");
+    assert_eq!(found.raw_tx(), Some(bytes.as_slice()));
+}
+
 /// The source entry holds a sentinel txid that is NOT its bytes' hash, an
 /// entry no reachable state carries (`with_txid` is crate-private and every
 /// caller passes the bytes' hash): it breaks the invariant on purpose, the
@@ -39,11 +62,10 @@ fn merge_beef_keeps_the_source_entrys_txid_621() {
     assert_ne!(sentinel, hash);
 
     let mut source = Beef::new();
-    source.push_tx(
+    source.append_entry(
         BeefTx::from_raw_tx(bytes.clone(), None)
             .expect("the bytes are one transaction")
-            .with_txid(sentinel.clone()),
-        sentinel.clone(),
+            .with_txid(sentinel.parse().unwrap()),
     );
 
     let mut merged = Beef::new();
@@ -52,70 +74,73 @@ fn merge_beef_keeps_the_source_entrys_txid_621() {
         .expect("the source BEEF writes and reads back");
 
     let entry = merged
-        .find_txid(&sentinel)
+        .find_txid(sentinel.parse().unwrap())
         .expect("merged under the source's txid");
     assert_eq!(entry.raw_tx(), Some(bytes.as_slice()));
-    assert!(merged.find_txid(&hash).is_none());
-    assert_eq!(merged.txs.len(), 1);
+    assert!(merged.find_txid(hash.parse().unwrap()).is_none());
+    assert_eq!(merged.txs().len(), 1);
 }
 
-/// The strength read's FIX (#621's fold), restated under #843's law: an
-/// entry whose id is read inside the `tx_mut` borrow, a field then edited,
-/// and given bytes by `raw_tx_or_compute`. Until #843 those bytes were the
-/// stale pre-edit serialization (the cache the id filled) and `merge_beef`
-/// filed them under the edited `txid()` (`abbda405`); since #843 the edit
-/// clears the transaction's caches at its door, so the bytes are the edited
-/// fields' and the merged entry's bytes hash to the txid it is filed under.
+/// The strength read's FIX (#621's fold), restated twice: under #843's law
+/// (an edit clears the transaction's caches at its door) and under #843b's
+/// (no door lends a held entry: `tx_mut`, `find_txid_mut` and the caching
+/// `raw_tx_or_compute(&mut self)` are gone). An entry whose id is read
+/// inside the edit, a field then edited, is held under its edited fields'
+/// hash and gives their serialization, and `merge_beef` files those bytes
+/// under that hash. Until #843 the bytes were the stale pre-edit
+/// serialization filed under the edited `txid()` (`abbda405`). It replaces
+/// `an_entry_edited_inside_tx_mut_is_filed_under_its_fields_hash_843`.
 #[test]
-#[allow(deprecated)] // the edit inside the deprecated `tx_mut` borrow
-fn an_entry_edited_inside_tx_mut_is_filed_under_its_fields_hash_843() {
+fn an_entry_edited_after_its_id_was_read_is_filed_under_its_fields_hash_843b() {
     let bytes = raw();
     let old = hash_of(&bytes);
     let mut source = Beef::new();
     source
         .merge_raw_tx(bytes.clone(), None)
         .expect("the bytes are one transaction");
-    let entry = source.find_txid_mut(&old).unwrap();
-    {
-        let tx = entry.tx_mut().unwrap();
-        // The id read inside the borrow fills the caches; the edit clears them.
-        assert_eq!(tx.id(), old);
-        tx.set_lock_time(7);
-    }
+    source
+        .edit_tx(old.parse().unwrap(), |tx| {
+            // The id read inside the edit fills the caches; the edit clears them.
+            assert_eq!(tx.id(), old);
+            tx.set_lock_time(7);
+        })
+        .unwrap();
+    let entry = &source.txs()[0];
     let written = entry.raw_tx_or_compute().unwrap();
     assert_ne!(
         written, bytes,
         "the edited fields' serialization, never the stale one"
     );
-    assert!(entry.held_txid().is_none());
-    assert_eq!(entry.txid(), hash_of(&written), "txid() is the bytes' hash");
+    assert_eq!(entry.id(), hash_of(&written), "txid() is the bytes' hash");
+    assert!(source.find_txid(old.parse().unwrap()).is_none());
 
     let mut merged = Beef::new();
     merged
         .merge_beef(&source)
         .expect("the source BEEF writes and reads back");
-    for e in &merged.txs {
+    for e in merged.txs() {
         let held = e.raw_tx().expect("a raw entry");
         assert_eq!(
-            e.txid(),
+            e.id(),
             hash_of(held),
             "the merged entry's bytes hash to the txid it is filed under"
         );
     }
-    assert!(merged.find_txid(&old).is_none());
-    assert!(merged.find_txid(&hash_of(&written)).is_some());
+    assert!(merged.find_txid(old.parse().unwrap()).is_none());
+    assert!(merged
+        .find_txid(hash_of(&written).parse().unwrap())
+        .is_some());
 }
 
-/// #621's fold, the `to_writer` change's pin, restated under #843's law:
-/// an entry edited through the deprecated `tx_mut` after its caches were
-/// filled is written from its fields by `Beef::to_writer` and
-/// `BeefTx::to_writer`, as `to_binary` and `merge_beef` write it. On
-/// `7df16cf6` `to_writer` wrote a stale cache (planted here through the
-/// crate's test door until #843; since #843 a door clears the caches before
-/// every edit, so the cache is the fields' whatever the order).
+/// #621's fold, the `to_writer` change's pin, restated under #843's law and
+/// then #843b's: an entry edited after its caches were filled is written
+/// from its fields by `Beef::to_writer` and `BeefTx::to_writer`, as
+/// `to_binary` and `merge_beef` write it. On `7df16cf6` `to_writer` wrote a
+/// stale cache; since #843 a door clears the caches before every edit, and
+/// since #843b the edit goes through `Beef::edit_tx` alone. It replaces
+/// `to_writer_writes_a_tx_mut_entry_from_its_fields_843`.
 #[test]
-#[allow(deprecated)] // the edit inside the deprecated `tx_mut` borrow
-fn to_writer_writes_a_tx_mut_entry_from_its_fields_843() {
+fn to_writer_writes_an_edited_entry_from_its_fields_843b() {
     use crate::primitives::Writer;
     use crate::transaction::BEEF_V2;
     let bytes = raw();
@@ -125,15 +150,15 @@ fn to_writer_writes_a_tx_mut_entry_from_its_fields_843() {
     assert_ne!(fields, bytes);
 
     let mut beef = Beef::new();
-    beef.merge_raw_tx(bytes.clone(), None).unwrap();
-    {
-        let tx = beef.txs[0].tx_mut().unwrap();
+    let txid = beef.merge_raw_tx(bytes.clone(), None).unwrap().txid();
+    beef.edit_tx(txid, |tx| {
         assert_eq!(tx.to_binary(), bytes, "the caches filled before the edit");
         tx.set_lock_time(7);
-    }
+    })
+    .unwrap();
 
     let mut entry = Writer::new();
-    beef.txs[0].to_writer(&mut entry, BEEF_V2).unwrap();
+    beef.txs()[0].to_writer(&mut entry, BEEF_V2).unwrap();
     let entry = entry.into_bytes();
     assert_eq!(
         &entry[1..],
@@ -146,7 +171,7 @@ fn to_writer_writes_a_tx_mut_entry_from_its_fields_843() {
     let written = writer.into_bytes();
     let back = Beef::from_binary(&written).unwrap();
     assert_eq!(
-        back.txs[0].raw_tx().unwrap(),
+        back.txs()[0].raw_tx().unwrap(),
         fields.as_slice(),
         "Beef::to_writer"
     );

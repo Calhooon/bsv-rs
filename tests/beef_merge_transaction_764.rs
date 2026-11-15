@@ -87,7 +87,7 @@ fn assert_merged_as_recorded(name: &str) {
     let mut returned = None;
     if !c["merge"].is_null() {
         for _ in 0..c["times"].as_u64().unwrap_or(1) {
-            returned = Some(beef.merge_transaction(materialize(&v, &c["merge"])).txid());
+            returned = Some(beef.merge_transaction(materialize(&v, &c["merge"])).id());
         }
     }
     let recorded = c["returned"]
@@ -100,7 +100,7 @@ fn assert_merged_as_recorded(name: &str) {
         "{name}: the bytes the reference's mergeTransaction then toHex writes"
     );
     assert_eq!(
-        beef.bumps.len() as u64,
+        beef.bumps().len() as u64,
         c["bumps"].as_u64().unwrap(),
         "{name}: BUMPs"
     );
@@ -118,9 +118,9 @@ fn assert_merged_as_recorded(name: &str) {
         })
         .collect();
     let held: Vec<(String, Option<u64>, bool)> = beef
-        .txs
+        .txs()
         .iter()
-        .map(|t| (t.txid(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
+        .map(|t| (t.id(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
         .collect();
     assert_eq!(held, names, "{name}: the entries, their indices and forms");
 }
@@ -178,10 +178,10 @@ fn the_merged_transaction_keeps_its_links_and_an_ancestor_is_held_without_them_7
     let c = case(&v, "chain_proven_at_the_root");
     let mut beef = Beef::new();
     beef.merge_transaction(materialize(&v, &c["merge"]));
-    let grandchild = beef.find_txid(&tx(&v, "grandchild").id()).unwrap();
+    let grandchild = beef.find_txid(tx(&v, "grandchild").txid()).unwrap();
     let held = grandchild.tx().unwrap();
     assert!(held.inputs()[0].source_transaction.is_some());
-    let child = beef.find_txid(&tx(&v, "child").id()).unwrap();
+    let child = beef.find_txid(tx(&v, "child").txid()).unwrap();
     let child = child.tx().unwrap();
     assert!(child
         .inputs()
@@ -241,7 +241,7 @@ fn a_graph_merged_twice_moves_no_entry_and_writes_one_merges_bytes_764() {
         beef.to_hex().expect("the BEEF is writable"),
         once["beef"].as_str().unwrap()
     );
-    let order = |b: &Beef| b.txs.iter().map(|t| t.txid()).collect::<Vec<_>>();
+    let order = |b: &Beef| b.txs().iter().map(|t| t.txid()).collect::<Vec<_>>();
     let first = order(&beef);
     beef.merge_transaction(materialize(&v, &once["merge"]));
     assert_eq!(order(&beef), first, "the second merge moved an entry");

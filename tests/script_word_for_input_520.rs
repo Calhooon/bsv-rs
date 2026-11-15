@@ -277,8 +277,8 @@ mod streaming {
 
     fn with_wide_height(tx: &Transaction, height: u64) -> Vec<u8> {
         let beef = Beef::from_binary(&tx.to_beef(false).unwrap()).unwrap();
-        assert_eq!(beef.bumps.len(), 1);
-        let bump = beef.bumps[0]
+        assert_eq!(beef.bumps().len(), 1);
+        let bump = beef.bumps()[0]
             .to_binary()
             .expect("the path holds only states a BUMP writes (#817)");
         let mut reader = Reader::new(&bump);
@@ -288,8 +288,8 @@ mod streaming {
         writer.write_var_int(1);
         writer.write_var_int(height);
         writer.write_bytes(reader.read_remaining());
-        writer.write_var_int(beef.txs.len() as u64);
-        for tx in &beef.txs {
+        writer.write_var_int(beef.txs().len() as u64);
+        for tx in beef.txs() {
             tx.to_writer(&mut writer, BEEF_V1)
                 .expect("the BEEF is writable");
         }

@@ -127,15 +127,14 @@ fn stream(bytes: &[u8], chunk_size: usize) -> Value {
 
 fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
     let bytes = if atomic {
-        beef.to_binary_atomic(beef.atomic_txid.clone().as_deref().unwrap())
-            .unwrap()
+        beef.to_binary_atomic(beef.atomic_txid.unwrap()).unwrap()
     } else {
         beef.to_binary().expect("the BEEF is writable")
     };
     let mut parsed = Beef::from_binary(&bytes).unwrap();
     let roundtrip = if atomic {
         parsed
-            .to_binary_atomic(parsed.atomic_txid.clone().as_deref().unwrap())
+            .to_binary_atomic(parsed.atomic_txid.unwrap())
             .unwrap()
     } else {
         parsed.to_binary().expect("the BEEF is writable")
@@ -150,9 +149,12 @@ fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
         );
     }
     assert_eq!(expected_stream["version"], parsed.version);
-    assert_eq!(expected_stream["subject"], json!(parsed.atomic_txid));
+    assert_eq!(
+        expected_stream["subject"],
+        json!(parsed.atomic_txid.map(|t| t.to_string()))
+    );
     // Independently compare each streamed payload with the whole parser.
-    for (i, bump) in parsed.bumps.iter().enumerate() {
+    for (i, bump) in parsed.bumps().iter().enumerate() {
         assert_eq!(
             expected_stream["elements"][i]["hex"],
             bump.to_hex()
@@ -160,10 +162,10 @@ fn beef_entry(name: &str, input: Value, mut beef: Beef, atomic: bool) -> Value {
             "{name}: bump {i}"
         );
     }
-    for (i, tx) in parsed.txs.iter().enumerate() {
+    for (i, tx) in parsed.txs().iter().enumerate() {
         assert_eq!(
-            expected_stream["elements"][parsed.bumps.len() + i]["txid"],
-            tx.txid(),
+            expected_stream["elements"][parsed.bumps().len() + i]["txid"],
+            tx.id(),
             "{name}: txid {i}"
         );
     }
@@ -184,7 +186,7 @@ pub fn record(suite: &mut Suite) {
         ),
         (
             "examples/beef_spv.rs",
-            "acb43937ddac4e2a12c611b43398dfde16d5a87b3d010d04e7e18fb937526aae",
+            "37f36d2bddcc6fffb3965c23e35a15b6a0707402decf09d7d2a584ab343c56b5",
         ),
         (
             "examples/overlay.rs",
@@ -332,7 +334,7 @@ pub fn record(suite: &mut Suite) {
     atomic
         .merge_raw_tx(spend.to_binary(), None)
         .expect("the bytes are one transaction");
-    atomic.atomic_txid = Some(spend.id());
+    atomic.atomic_txid = Some(spend.txid());
     let existing = Beef::from_binary(&file(
         "tests/vectors/beef_of_any_size/example_atomic_payment.bin",
     ))
@@ -359,7 +361,7 @@ pub fn record(suite: &mut Suite) {
         ],
     );
     let mut stub = Beef::new();
-    stub.merge_txid_only(funding.id());
+    stub.merge_txid_only(funding.txid());
     suite.add(
         "beef/txid_only.json",
         &[("transactions/0096.md", "Specification")],

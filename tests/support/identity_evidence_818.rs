@@ -1,18 +1,20 @@
 //! #818: the BEEFs of `tests/vectors/identity_evidence_818.json`, built by
 //! this crate's writer as `tests/support/identity_evidence_818.mjs` builds
 //! them with the reference's: an Atomic BEEF prefix naming the subject
-//! (`0x01010101`, its txid reversed) by `primitives::Writer`, then
-//! `Beef::to_writer` over `txs` set by hand, unsorted: `n` txid-only entries
-//! (`00..01` up), the entry `00..01` again, then #730's subject raw under a
-//! BUMP of its own at 900 (no merge writes one txid twice: `merge_txid_only`
-//! deduplicates, as the reference's does). Read by the check's unit pin
+//! (`0x01010101`, its txid reversed) by `primitives::Writer`, then the
+//! frame written element by element (`MerklePath::to_writer`,
+//! `BeefTx::to_writer`), unsorted: `n` txid-only entries (`00..01` up), the
+//! entry `00..01` again, then #730's subject raw under a BUMP of its own at
+//! 900 (no merge writes one txid twice: `merge_txid_only` deduplicates, as
+//! the reference's does; until #843b the entries were set by hand on the
+//! public `txs` and written by `Beef::to_writer`). Read by the check's unit pin
 //! (`src/identity/evidence_818_tests.rs`, `use crate as sdk;`).
 #![allow(dead_code, clippy::unwrap_used)]
 
 use super::sdk::primitives::{from_hex, Writer};
 use super::sdk::script::{LockingScript, UnlockingScript};
 use super::sdk::transaction::{
-    Beef, BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+    BeefTx, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
 };
 use serde_json::Value;
 
@@ -54,23 +56,41 @@ pub fn build(n: usize) -> Vec<u8> {
     build_repeating(n, false)
 }
 
+/// A V2 BEEF frame of `bumps` and `entries` as given, each written by this
+/// crate's own writer (`MerklePath::to_writer`, `BeefTx::to_writer`), in
+/// the order given: the form that carries one txid twice, which no merge
+/// door holds (#843b: until then the entries were pushed by hand onto the
+/// public `txs` and written by `Beef::to_writer`).
+fn frame(writer: &mut Writer, bumps: &[MerklePath], entries: &[BeefTx]) {
+    const BEEF_V2: u32 = 0xEFBE_0002;
+    writer.write_u32_le(BEEF_V2);
+    writer.write_var_int(bumps.len() as u64);
+    for bump in bumps {
+        bump.to_writer(writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(entries.len() as u64);
+    for entry in entries {
+        entry
+            .to_writer(writer, BEEF_V2)
+            .expect("the entry is writable");
+    }
+}
+
 /// As [`build`], the entry written twice the proven subject, raw, when `raw`
 /// (#907's two shapes), else the txid-only `00..01`.
 pub fn build_repeating(n: usize, raw: bool) -> Vec<u8> {
     let subject = subject();
-    let mut beef = Beef::new();
-    let index = beef.merge_bump(
-        MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, subject.id())]]).unwrap(),
-    );
-    beef.txs
-        .extend((1..=n).map(|i| BeefTx::from_txid(format!("{i:064x}"))));
-    beef.txs.push(if raw {
+    let bump = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, subject.id())]]).unwrap();
+    let index = 0;
+    let numbered = |i: usize| BeefTx::from_txid(format!("{i:064x}").parse().unwrap());
+    let mut entries: Vec<BeefTx> = (1..=n).map(numbered).collect();
+    entries.push(if raw {
         BeefTx::from_raw_tx(subject.to_binary(), Some(index))
             .expect("the bytes are one transaction")
     } else {
-        BeefTx::from_txid(format!("{:064x}", 1))
+        numbered(1)
     });
-    beef.txs.push(
+    entries.push(
         BeefTx::from_raw_tx(subject.to_binary(), Some(index))
             .expect("the bytes are one transaction"),
     );
@@ -79,6 +99,6 @@ pub fn build_repeating(n: usize, raw: bool) -> Vec<u8> {
     let mut reversed = from_hex(&subject.id()).unwrap();
     reversed.reverse();
     writer.write_bytes(&reversed);
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    frame(&mut writer, &[bump], &entries);
     writer.into_bytes()
 }

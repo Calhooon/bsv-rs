@@ -135,13 +135,16 @@ fn linked(
     );
     beef.merge_transaction(c);
     after(&mut beef);
-    let held: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+    let held: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
     assert_eq!(
         recorded["held"],
         json!(held),
         "state {state}: the entries held"
     );
-    let ours = describe(beef.find_atomic_transaction(&cid).as_ref(), 3);
+    let ours = describe(
+        beef.find_atomic_transaction(cid.parse().unwrap()).as_ref(),
+        3,
+    );
     let mut theirs = recorded["atomic"].clone();
     let stated = without_materialized_texts(&ours, &mut theirs);
     (ours, theirs, stated)
@@ -190,8 +193,7 @@ fn an_input_naming_no_txid_over_a_source_the_beef_does_not_hold_keeps_its_own_86
     let s = root("33", 1000);
     let sid = s.id();
     let (ours, theirs, stated) = linked("d", Beef::new(), spend(s, 5), |beef| {
-        beef.txs.retain(|t| t.txid() != sid);
-        beef.reindex();
+        beef.retain_txs(|t| t.txid() != sid);
     });
     assert_eq!(ours, theirs, "state d: its own source, descended, no path");
     assert_eq!(stated, 1);
@@ -220,7 +222,7 @@ fn an_input_linking_nothing_and_naming_nothing_is_left_as_it_is_stated_869() {
     let cid = c.id();
     let mut beef = Beef::new();
     beef.merge_transaction(c);
-    let a = beef.find_atomic_transaction(&cid).unwrap();
+    let a = beef.find_atomic_transaction(cid.parse().unwrap()).unwrap();
     assert_eq!(a.id(), cid);
     assert!(a.inputs()[0].source_txid.is_none());
     assert!(a.inputs()[0].source_transaction.is_none());
@@ -237,7 +239,7 @@ fn the_reference_writes_the_sources_id_into_the_input_at_the_merge_stated_869() 
     let c = spend(s, 5);
     let cid = c.id();
     beef.merge_transaction(c);
-    let a = beef.find_atomic_transaction(&cid).unwrap();
+    let a = beef.find_atomic_transaction(cid.parse().unwrap()).unwrap();
     assert!(a.inputs()[0].source_txid.is_none(), "stored as given");
     assert_eq!(
         json!(a.inputs()[0].source_transaction.as_ref().unwrap().id()),

@@ -617,7 +617,7 @@ fn parse_binary_lookup_response(
     data: &[u8],
     options: &LookupRequestOptions,
 ) -> Result<LookupAnswer> {
-    use crate::primitives::{bounded_capacity, to_hex, Reader};
+    use crate::primitives::{bounded_capacity, Reader};
 
     let mut reader = Reader::new(data);
 
@@ -640,7 +640,10 @@ fn parse_binary_lookup_response(
         let txid_bytes = reader
             .read_bytes(32)
             .map_err(|e| Error::OverlayError(format!("Failed to read txid: {}", e)))?;
-        let txid = to_hex(txid_bytes);
+        // Display order: the txid as its hex text reads (the reference's `toHex`).
+        let mut display = [0u8; 32];
+        display.copy_from_slice(txid_bytes);
+        let txid = crate::transaction::Txid::from_display_bytes(display);
 
         // Read output index: past `0xffffffff` the whole answer refused in
         // the reference's words (`:888`, a plain `Error`, a host failure),

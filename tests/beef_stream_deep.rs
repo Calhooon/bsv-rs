@@ -454,7 +454,7 @@ fn the_wide_bump_is_accepted_at_8_192_and_16_384_leaves_when_its_root_checks() {
         read_wide("flat", 1 << k, &bytes, root);
         // The in-memory reader computes the same root.
         let beef = Beef::from_binary(&bytes).unwrap();
-        assert_eq!(beef.bumps[0].compute_root(None).unwrap(), display(&root));
+        assert_eq!(beef.bumps()[0].compute_root(None).unwrap(), display(&root));
     }
     for count in [8_192usize, 16_384] {
         let k = if count == 16_384 { 15 } else { 14 };
@@ -483,9 +483,9 @@ fn the_stream_and_the_in_memory_reader_compute_the_same_roots() {
             let beef = Beef::from_binary(&bytes).unwrap();
             // A walk per txid is the in-memory reader's cost, not the
             // stream's: a few of them say the same thing.
-            for txid in beef.bumps[0].txids().into_iter().take(4) {
+            for txid in beef.bumps()[0].txids().into_iter().take(4) {
                 assert_eq!(
-                    beef.bumps[0].compute_root(Some(&txid)).unwrap(),
+                    beef.bumps()[0].compute_root(Some(&txid)).unwrap(),
                     display(&root)
                 );
             }
@@ -494,7 +494,7 @@ fn the_stream_and_the_in_memory_reader_compute_the_same_roots() {
                     .unwrap()
                     .to_binary()
                     .expect("the path holds only states a BUMP writes (#817)"),
-                beef.bumps[0]
+                beef.bumps()[0]
                     .to_binary()
                     .expect("the path holds only states a BUMP writes (#817)")
             );

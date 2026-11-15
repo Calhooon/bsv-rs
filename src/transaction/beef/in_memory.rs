@@ -15,6 +15,7 @@ use super::super::beef_stream::{
 };
 use super::super::beef_tx::BeefTx;
 use super::super::merkle_path::{MerklePath, MerklePathLeaf};
+use super::super::txid::Txid;
 use super::super::Transaction;
 
 impl Bump {
@@ -176,9 +177,10 @@ pub(super) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
     bump_root(0, &levels)
 }
 
-/// A display-hex hash in wire order (a txid as the stream's tables key it),
-/// if it is 32 bytes of hex.
-pub(super) fn wire_hash(display: &str) -> Option<Hash32> {
+/// A display-hex hash in wire order (a BUMP leaf's hash, which is text, as
+/// the stream's walk reads it), if it is 32 bytes of hex. A txid is a
+/// `Txid` and gives its wire bytes itself (#843b).
+fn wire_hash(display: &str) -> Option<Hash32> {
     let mut h: Hash32 = crate::primitives::from_hex(display).ok()?.try_into().ok()?;
     h.reverse();
     Some(h)
@@ -192,8 +194,8 @@ fn parsed(tx: &BeefTx) -> Option<Cow<'_, Transaction>> {
     }
 }
 
-/// The txids a raw transaction's inputs spend (display hex), proven or not.
-pub(super) fn spent_txids(tx: &BeefTx) -> Vec<String> {
+/// The txids a raw transaction's inputs spend, proven or not.
+pub(super) fn spent_txids(tx: &BeefTx) -> Vec<Txid> {
     parsed(tx).map_or_else(Vec::new, |t| {
         t.inputs()
             .iter()
@@ -216,9 +218,7 @@ pub(super) fn content_refused(tx: &BeefTx) -> Option<Kind> {
             // A hand-built input naming no txid is no outpoint the rules know.
             // The outpoint the bytes carry (#869's third fold).
             prev: crate::transaction::transaction::outpoint_txid_name(i)
-                .as_deref()
-                .and_then(wire_hash)
-                .unwrap_or([0xEE; 32]),
+                .map_or([0xEE; 32], |txid| *txid.as_wire_bytes()),
             vout: i.source_output_index,
             script: 0..0,
             sequence: i.sequence,
@@ -264,16 +264,10 @@ impl AtomicNode for AtomicEntry {
 pub(super) fn atomic_table(txs: &[BeefTx]) -> HashMap<Hash32, AtomicEntry> {
     let mut table: HashMap<Hash32, AtomicEntry> = HashMap::new();
     for tx in txs {
-        let Some(txid) = wire_hash(&tx.txid()) else {
-            continue;
-        };
-        let entry = table.entry(txid).or_default();
+        let entry = table.entry(*tx.txid().as_wire_bytes()).or_default();
         if !tx.is_txid_only() && !entry.raw {
             entry.raw = true;
-            entry.prevs = spent_txids(tx)
-                .iter()
-                .filter_map(|t| wire_hash(t))
-                .collect();
+            entry.prevs = spent_txids(tx).iter().map(|t| *t.as_wire_bytes()).collect();
         }
     }
     table

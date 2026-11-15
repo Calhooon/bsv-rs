@@ -200,12 +200,12 @@ fn law_reach(tx: &Transaction, at: &str) -> usize {
 /// the run past its minute.)
 fn beef_entries_law(beef: &Beef, at: &str) -> usize {
     let mut judged = 0;
-    for (k, entry) in beef.txs.iter().enumerate() {
+    for (k, entry) in beef.txs().iter().enumerate() {
         if let Some(t) = entry.tx() {
             judged += law_reach(t, &format!("{at}, entry {k}"));
-            if let Some(linked) = beef.find_transaction_for_signing(&entry.txid()) {
+            if let Some(linked) = beef.find_transaction_for_signing(entry.txid()) {
                 assert_eq!(
-                    linked.id(),
+                    linked.txid(),
                     entry.txid(),
                     "{at}, entry {k}: the id for signing"
                 );
@@ -213,10 +213,10 @@ fn beef_entries_law(beef: &Beef, at: &str) -> usize {
             }
         }
     }
-    if let Some(subject) = beef.txs.last().filter(|e| e.tx().is_some()) {
-        if let Some(linked) = beef.find_atomic_transaction(&subject.txid()) {
+    if let Some(subject) = beef.txs().last().filter(|e| e.tx().is_some()) {
+        if let Some(linked) = beef.find_atomic_transaction(subject.txid()) {
             assert_eq!(
-                linked.id(),
+                linked.txid(),
                 subject.txid(),
                 "{at}: the last entry's id linked"
             );
@@ -240,7 +240,7 @@ fn beef_law(tx: &Transaction, at: &str) -> usize {
     // third fold).
     let id = tx.id();
     let atomic = beef
-        .find_atomic_transaction(&id)
+        .find_atomic_transaction(id.parse().unwrap())
         .expect("the transaction merged is held");
     assert_eq!(
         atomic.id(),
@@ -248,7 +248,9 @@ fn beef_law(tx: &Transaction, at: &str) -> usize {
         "{at}: find_atomic_transaction of the id merged"
     );
     same_sources(tx, &atomic, &format!("{at}: find_atomic_transaction"));
-    let signing = beef.find_transaction_for_signing(&id).expect("held");
+    let signing = beef
+        .find_transaction_for_signing(id.parse().unwrap())
+        .expect("held");
     assert_eq!(
         signing.id(),
         id,
@@ -1352,8 +1354,12 @@ fn into_parts_then_from_parts_keeps_the_merkle_path_and_the_metadata_869() {
         .add_output(TransactionOutput::new(2_000, p2pkh_lock()))
         .unwrap();
     let beef = bsv_rs::transaction::Beef::from_binary(&child.to_beef(false).unwrap()).unwrap();
-    assert_eq!(beef.bumps.len(), 1, "the proof travelled through the parts");
-    assert_eq!(beef.txs.len(), 2, "the walk stopped at the proven parent");
+    assert_eq!(
+        beef.bumps().len(),
+        1,
+        "the proof travelled through the parts"
+    );
+    assert_eq!(beef.txs().len(), 2, "the walk stopped at the proven parent");
     law(&child, "a child of the round-tripped transaction");
 }
 
@@ -1457,7 +1463,9 @@ fn a_beef_copy_of_a_parent_whose_txid_text_does_not_parse_keeps_the_law_869() {
         .id();
     let mut beef = Beef::new();
     beef.merge_transaction(child.clone());
-    let stored = beef.find_txid(&parent_id).expect("the parent held");
+    let stored = beef
+        .find_txid(parent_id.parse().unwrap())
+        .expect("the parent held");
     let stored = stored.tx().expect("held as a transaction");
     assert_eq!(
         stored.id(),

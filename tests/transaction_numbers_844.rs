@@ -342,7 +342,7 @@ fn the_raw_entry_doors_refuse_such_an_output_in_the_readers_words_stated_844() {
         beef.merge_raw_tx(raw.clone(), None).unwrap_err(),
         Error::BeefError(UNSAFE.into())
     );
-    assert!(beef.txs.is_empty(), "the BEEF untouched");
+    assert!(beef.txs().is_empty(), "the BEEF untouched");
     assert_eq!(
         BeefTx::from_raw_tx(raw.clone(), Some(0)).unwrap_err(),
         Error::BeefError(UNSAFE.into())
@@ -368,7 +368,7 @@ fn the_raw_entry_doors_refuse_such_an_output_in_the_readers_words_stated_844() {
         target.merge_beef(&source).unwrap_err(),
         Error::BeefError(UNSAFE_WRITE.into())
     );
-    assert!(target.txs.is_empty());
+    assert!(target.txs().is_empty());
     assert_eq!(
         source.to_binary().unwrap_err(),
         Error::BeefError(UNSAFE_WRITE.into()),
@@ -423,9 +423,12 @@ fn three_outputs_beef() -> (Beef, String) {
 /// (hex) or the entries held, else the error.
 fn writer_door_here(door: &str, position: usize, value: u64, txid: &str) -> Result<Value, Error> {
     let tx = three_outputs(position, value);
+    // The recorder's hand push of `BeefTx.fromTx(tx)`: an entry held as a
+    // transaction alone, which `merge_transaction` is the door for since
+    // #843b (a push onto the public `txs` until then).
     let pushed = |tx: Transaction| {
         let mut b = Beef::new();
-        b.txs.push(BeefTx::from_tx(tx, None));
+        b.merge_transaction(tx);
         b
     };
     let hex_of = |bytes: Vec<u8>| serde_json::json!({ "hex": bsv_rs::primitives::to_hex(&bytes) });
@@ -444,11 +447,13 @@ fn writer_door_here(door: &str, position: usize, value: u64, txid: &str) -> Resu
         "Beef.mergeTransaction" => {
             let mut b = Beef::new();
             b.merge_transaction(tx);
-            serde_json::json!({ "txs": b.txs.len() })
+            serde_json::json!({ "txs": b.txs().len() })
         }
         "Beef.toBinary (pushed)" => hex_of(pushed(tx).to_binary()?),
         "Beef.toHex (pushed)" => serde_json::json!({ "hex": pushed(tx).to_hex()? }),
-        "Beef.toBinaryAtomic (pushed)" => hex_of(pushed(tx).to_binary_atomic(txid)?),
+        "Beef.toBinaryAtomic (pushed)" => {
+            hex_of(pushed(tx).to_binary_atomic(txid.parse().unwrap())?)
+        }
         "BeefTx.toWriter (pushed)" => {
             let mut w = bsv_rs::primitives::Writer::new();
             BeefTx::from_tx(tx, None).to_writer(&mut w, BEEF_V2)?;
@@ -459,14 +464,16 @@ fn writer_door_here(door: &str, position: usize, value: u64, txid: &str) -> Resu
             let mut target = Beef::new();
             let answer = target.merge_beef(&source);
             if answer.is_err() {
-                assert!(target.txs.is_empty(), "the target untouched on Err");
+                assert!(target.txs().is_empty(), "the target untouched on Err");
             }
             answer?;
-            serde_json::json!({ "txs": target.txs.len() })
+            serde_json::json!({ "txs": target.txs().len() })
         }
         "Beef.toBinary (edited in place)" => {
             let (mut beef, held) = three_outputs_beef();
-            beef.edit_tx(&held, |t| t.outputs_mut()[position].satoshis = Some(value))?;
+            beef.edit_tx(held.parse().unwrap(), |t| {
+                t.outputs_mut()[position].satoshis = Some(value)
+            })?;
             hex_of(beef.to_binary()?)
         }
         other => panic!("a door this test does not know: {other}"),
@@ -531,22 +538,26 @@ fn the_writers_refuse_such_an_output_in_the_reference_writers_words_in_any_outpu
     assert!(differing.is_empty(), "{differing:#?}");
 }
 
+/// Replaces
+/// `a_hand_pushed_entry_with_such_an_output_is_refused_by_every_writer_and_merged_as_the_round_trip_844`,
+/// which pushed the entry onto the public `txs` of a BEEF read from bytes.
+/// No door pushes an entry since #843b: the entry is held through
+/// `merge_transaction`, as a transaction alone, which marks the source for
+/// a sort and no longer as read (the hand push left it as read).
 #[test]
-fn a_hand_pushed_entry_with_such_an_output_is_refused_by_every_writer_and_merged_as_the_round_trip_844(
+fn an_entry_held_as_a_transaction_with_such_an_output_is_refused_by_every_writer_and_merged_as_the_round_trip_843b(
 ) {
     // `fuzz_beef_parser`'s state, through public calls alone: a transaction
-    // built by hand with the amount in a later output, pushed into `txs`
-    // without being hashed. Every writer refuses it in the reference's
+    // built by hand with the amount in a later output, held as a
+    // transaction alone. Every writer refuses it in the reference's
     // writer's words, and `merge_beef` answers what writing the source and
     // reading it back answers (the reference's `mergeBeef`,
     // `fromBinaryStrict(beef.toBinary())`), the target untouched.
     for position in [0, 1, 2] {
-        // A BEEF read from bytes (so `merge_beef` takes its entries in the
-        // order read and hashes none), then the entry pushed by hand.
+        // A BEEF read from bytes, then the entry merged as a transaction.
         let source = || {
             let (mut b, _) = three_outputs_beef();
-            b.txs
-                .push(BeefTx::from_tx(three_outputs(position, 1 << 53), None));
+            b.merge_transaction(three_outputs(position, 1 << 53));
             b
         };
         let refused = Error::BeefError(UNSAFE_WRITE.into());
@@ -561,7 +572,7 @@ fn a_hand_pushed_entry_with_such_an_output_is_refused_by_every_writer_and_merged
             Err(e) => Err(e),
         };
         assert_eq!(merged, round_trip, "merge_beef {position}");
-        assert!(target.txs.is_empty(), "the target untouched");
+        assert!(target.txs().is_empty(), "the target untouched");
         assert!(round_trip.is_err());
         assert_eq!(
             source().to_binary().unwrap_err(),
@@ -577,21 +588,25 @@ fn a_hand_pushed_entry_with_such_an_output_is_refused_by_every_writer_and_merged
         );
         assert!(w.into_bytes().is_empty(), "the writer untouched");
         assert_eq!(
-            source().to_binary_atomic(&txid).unwrap_err(),
+            source()
+                .to_binary_atomic(txid.parse().unwrap())
+                .unwrap_err(),
             refused,
             "to_binary_atomic {position}"
         );
         // Before the subject is looked for, as the reference synchronizes
         // every entry before `#getBeefForAtomic`.
         assert_eq!(
-            source().to_binary_atomic(&"00".repeat(32)).unwrap_err(),
+            source()
+                .to_binary_atomic("00".repeat(32).parse().unwrap())
+                .unwrap_err(),
             refused,
             "to_binary_atomic of an absent txid {position}"
         );
         let mut w = bsv_rs::primitives::Writer::new();
         assert_eq!(
             source()
-                .txs
+                .txs()
                 .last()
                 .unwrap()
                 .to_writer(&mut w, BEEF_V1)

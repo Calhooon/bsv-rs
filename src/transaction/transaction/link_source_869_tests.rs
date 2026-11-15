@@ -87,7 +87,7 @@ fn the_outpoint_rule_is_the_serializer_s_869() {
     input.source_transaction = Some(Box::new(source.clone()));
     assert!(matches!(outpoint_txid(&input), OutpointTxid::Source(_)));
     assert_eq!(super::outpoint_txid_bytes(&input), source.hash());
-    assert_eq!(super::outpoint_txid_name(&input), Some(source.id()));
+    assert_eq!(super::outpoint_txid_name(&input), Some(source.txid()));
     input.source_txid = Some("AB".repeat(32).parse().unwrap());
     assert!(matches!(outpoint_txid(&input), OutpointTxid::Named(_)));
     // The bytes `get_source_txid_bytes` gives, and the name in lower case.
@@ -96,7 +96,10 @@ fn the_outpoint_rule_is_the_serializer_s_869() {
         input.get_source_txid_bytes().unwrap()
     );
     assert_eq!(super::outpoint_txid_bytes(&input), [0xab; 32]);
-    assert_eq!(super::outpoint_txid_name(&input), Some("ab".repeat(32)));
+    assert_eq!(
+        super::outpoint_txid_name(&input),
+        Some("ab".repeat(32).parse().unwrap())
+    );
 }
 
 /// The `Named` arm is exactly the texts `Txid::from_hex` reads (64 hex

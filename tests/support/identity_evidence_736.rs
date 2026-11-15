@@ -201,29 +201,47 @@ fn graph_script_bytes(subject_padding: usize, n: usize) -> (Vec<u8>, String) {
     )
 }
 
+/// A V2 BEEF frame of `bumps` and `entries` as given, each written by this
+/// crate's own writer (`MerklePath::to_writer`, `BeefTx::to_writer`), in
+/// the order given: the form that carries one txid twice, which no merge
+/// door holds (#843b: until then the entries were pushed by hand onto the
+/// public `txs` and written by `Beef::to_writer`).
+fn frame(writer: &mut Writer, bumps: &[MerklePath], entries: &[BeefTx]) {
+    const BEEF_V2: u32 = 0xEFBE_0002;
+    writer.write_u32_le(BEEF_V2);
+    writer.write_var_int(bumps.len() as u64);
+    for bump in bumps {
+        bump.to_writer(writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(entries.len() as u64);
+    for entry in entries {
+        entry
+            .to_writer(writer, BEEF_V2)
+            .expect("the entry is writable");
+    }
+}
+
 /// The proven grandparent, the parent raw and txid-only (`raw_before`
-/// naming the order), the subject: `txs` set by hand and written by
-/// `to_writer`, unsorted.
+/// naming the order), the subject: the entries written one by one in that
+/// order, unsorted.
 fn parent_twice(raw_before: bool) -> (Vec<u8>, String) {
     let g = grandparent();
     let parent = spending(g.id(), "", op_true());
     let subject = spending(parent.id(), "", token());
-    let mut beef = Beef::new();
-    let index = beef.merge_bump(lone_leaf(&g.id(), 900));
+    let bump = lone_leaf(&g.id(), 900);
     let raw = BeefTx::from_raw_tx(parent.to_binary(), None).expect("the bytes are one transaction");
-    let txid_only = BeefTx::from_txid(parent.id());
-    beef.txs.push(
-        BeefTx::from_raw_tx(g.to_binary(), Some(index)).expect("the bytes are one transaction"),
-    );
+    let txid_only = BeefTx::from_txid(parent.txid());
+    let mut entries =
+        vec![BeefTx::from_raw_tx(g.to_binary(), Some(0)).expect("the bytes are one transaction")];
     if raw_before {
-        beef.txs.extend([raw, txid_only]);
+        entries.extend([raw, txid_only]);
     } else {
-        beef.txs.extend([txid_only, raw]);
+        entries.extend([txid_only, raw]);
     }
-    beef.txs.push(
+    entries.push(
         BeefTx::from_raw_tx(subject.to_binary(), None).expect("the bytes are one transaction"),
     );
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    frame(&mut writer, &[bump], &entries);
     (writer.into_bytes(), subject.id())
 }

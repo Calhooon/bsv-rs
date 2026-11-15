@@ -8,10 +8,11 @@
 //! The BEEF format supports "known" transactions which are represented solely by their txid.
 //! This allows parties with shared history to exchange smaller proofs.
 
-use crate::primitives::{sha256d, to_hex, Reader};
+use crate::primitives::{sha256d, Reader};
 use crate::Result;
 
 use super::transaction::Transaction;
+use super::txid::Txid;
 
 // The writer and its check (#817), in the nightly's `beef*.rs` mutation selection.
 #[path = "beef_tx_writer.rs"]
@@ -62,20 +63,17 @@ pub struct BeefTx {
     tx: Option<Transaction>,
     /// Raw transaction bytes.
     raw_tx: Option<Vec<u8>>,
-    /// Transaction ID (cached or for txid-only entries).
-    txid: Option<String>,
-    /// TXIDs of inputs (populated when transaction data is available and no proof).
-    pub input_txids: Vec<String>,
-    /// Whether this transaction is valid (has proof or chains to proofs).
-    pub is_valid: Option<bool>,
-    /// Set by [`tx_mut`](Self::tx_mut): `input_txids` waits for
-    /// [`refresh`](Self::refresh) (bsv-rs#171).
-    mutated: bool,
-    /// Set by [`tx_mut`](Self::tx_mut) when it drops bytes the entry held:
-    /// the reference keeps such an entry's `_rawTx`, re-synced from the
-    /// mutated transaction (`BeefTx.ts:160-169`), so its atomic copy takes
-    /// the raw branch (`Beef.ts:465`; #798's second fold).
-    raw_dropped: bool,
+    /// Transaction ID (cached or for txid-only entries), a [`Txid`] since
+    /// #843b: a text that is no txid cannot be held.
+    txid: Option<Txid>,
+    /// TXIDs of inputs (populated when transaction data is available and no
+    /// proof); read through [`input_txids`](Self::input_txids), written by
+    /// this file alone (#843b: a hand write of it moved the sort).
+    input_txids: Vec<Txid>,
+    /// Whether this transaction is valid (has proof or chains to proofs);
+    /// read through [`is_valid`](Self::is_valid), set by the sort alone
+    /// (`Beef.ts:1461` at `ts-stack@edf6e03`).
+    is_valid: Option<bool>,
 }
 
 impl BeefTx {
@@ -88,8 +86,6 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
-            mutated: false,
-            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
@@ -126,8 +122,6 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
-            mutated: false,
-            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
@@ -143,24 +137,32 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
-            mutated: false,
-            raw_dropped: false,
         };
         btx.update_input_txids();
         btx
     }
 
-    /// The entry with its txid in hand: the display hex of the hash the
-    /// decoder computed as the bytes passed, so [`txid`](Self::txid) does not
-    /// serialize and hash the transaction again on each call (bsv-rs#86).
+    /// The entry with its txid in hand: the hash the decoder computed as
+    /// the bytes passed, so [`txid`](Self::txid) does not serialize and hash
+    /// the transaction again on each call (bsv-rs#86).
     #[must_use]
-    pub(crate) fn with_txid(mut self, txid: String) -> Self {
+    pub(crate) fn with_txid(mut self, txid: Txid) -> Self {
         self.txid = Some(txid);
         self
     }
 
-    /// Creates a BeefTx from just a transaction ID.
-    pub fn from_txid(txid: String) -> Self {
+    /// The entry with the sort's word on it (`Beef::edit_tx` keeps it over
+    /// an edit that moves nothing).
+    #[must_use]
+    pub(crate) fn with_valid(mut self, is_valid: Option<bool>) -> Self {
+        self.is_valid = is_valid;
+        self
+    }
+
+    /// Creates a BeefTx from just a transaction ID: a [`Txid`] since #843b
+    /// (`BeefTx::from_txid(text.parse()?)`), where a text nothing checked was
+    /// held until then and the writers refused it late.
+    pub fn from_txid(txid: Txid) -> Self {
         Self {
             bump_index: None,
             tx: None,
@@ -168,9 +170,26 @@ impl BeefTx {
             txid: Some(txid),
             input_txids: Vec::new(),
             is_valid: None,
-            mutated: false,
-            raw_dropped: false,
         }
+    }
+
+    /// The txids this entry's inputs name, each once, in input order; none
+    /// for an entry that names a BUMP or holds a txid alone. Read-only since
+    /// #843b: the sort reads it, and a hand write of it moved the sort.
+    pub fn input_txids(&self) -> &[Txid] {
+        &self.input_txids
+    }
+
+    /// Whether the last sort found this entry valid (it has a proof);
+    /// `None` before any sort. Read-only since #843b, set by
+    /// [`Beef::sort_txs`](super::beef::Beef::sort_txs) alone.
+    pub fn is_valid(&self) -> Option<bool> {
+        self.is_valid
+    }
+
+    /// The sort's word on this entry.
+    pub(crate) fn set_valid(&mut self, is_valid: Option<bool>) {
+        self.is_valid = is_valid;
     }
 
     /// Returns the bump index if this transaction has a proof.
@@ -194,98 +213,63 @@ impl BeefTx {
         self.txid.is_some() && self.raw_tx.is_none() && self.tx.is_none()
     }
 
-    /// Returns the transaction ID.
-    ///
-    /// Computes and caches the txid if not already known.
+    /// Returns the transaction ID as a value (#843b; a `String` until
+    /// then, which [`id`](Self::id) still gives): the one held, else the
+    /// hash of the entry's transaction.
     #[allow(clippy::panic)] // #134: every constructor sets a transaction, raw bytes or a txid; a Result here is a breaking change
-    pub fn txid(&self) -> String {
-        if let Some(ref txid) = self.txid {
-            return txid.clone();
+    pub fn txid(&self) -> Txid {
+        if let Some(txid) = self.txid {
+            return txid;
         }
 
         if let Some(ref tx) = self.tx {
-            // A transaction's id is always its fields' hash (#843): an edit
-            // through `tx_mut` clears its caches at the transaction's door.
-            return tx.id();
+            // A transaction's id is always its fields' hash (#843).
+            return tx.txid();
         }
 
         if let Some(ref raw_tx) = self.raw_tx {
-            // Compute txid from raw transaction bytes
-            let hash = sha256d(raw_tx);
-            let mut reversed = hash;
-            reversed.reverse();
-            return to_hex(&reversed);
+            // The double SHA-256 of the bytes is the txid in wire order.
+            return Txid::from_wire_bytes(sha256d(raw_tx));
         }
 
         panic!("BeefTx has no transaction data or txid");
     }
 
-    /// Returns a reference to the parsed transaction, parsing from raw bytes if needed.
+    /// Returns the transaction ID as its display text, 64 lower-case hex
+    /// digits: [`txid`](Self::txid)`.to_string()`, the pair
+    /// [`Transaction`] has (`txid()` beside `id()`).
+    pub fn id(&self) -> String {
+        self.txid().to_string()
+    }
+
+    /// The parse this entry holds, if any: an entry held raw with a BUMP
+    /// index is not parsed by the doors that build it, so this answers
+    /// `None` for it until a door parses it (`trim_known_proven`, or an
+    /// index set to none).
     pub fn tx(&self) -> Option<&Transaction> {
         self.tx.as_ref()
     }
 
-    /// Returns a mutable reference to the parsed transaction, parsing from
-    /// raw bytes if needed.
-    ///
-    /// From this call the transaction is the entry's only reading (bsv-rs#171,
-    /// as `@bsv/sdk` 3's `BeefTx.syncRawTxFromTransaction`): the bytes and the
-    /// txid it was read with are dropped, so [`txid`](Self::txid) is the
-    /// mutated transaction's hash and the writer emits its serialization; the
-    /// BUMP index stays as it was, so a proven entry whose hash moves is
-    /// refused `TxidNotInBump`. `input_txids` is refreshed by the BEEF's next
-    /// whole-BEEF reader (`sort_txs`, `verify_structure`, `verify_valid`,
-    /// `is_valid`, `to_binary`, `to_binary_atomic`, `trim_known_proven`,
-    /// `to_log_string`) or [`Beef::reindex`](super::beef::Beef::reindex),
-    /// which also re-key the BEEF's index by the new txid; until then a
-    /// lookup by the new txid misses and one by the old txid finds nothing,
-    /// so a per-entry merge of the new txid stores it a second time (the
-    /// #171 window, stated). [`Beef::edit_tx`](super::beef::Beef::edit_tx)
-    /// re-keys the entry at once (#817).
-    #[deprecated(note = "use Beef::edit_tx")]
-    pub fn tx_mut(&mut self) -> Option<&mut Transaction> {
-        self.parse_raw();
-        if self.tx.is_some() {
-            self.raw_dropped |= self.raw_tx.is_some();
-            self.raw_tx = None;
-            self.txid = None;
-            self.mutated = true;
-        }
-        self.tx.as_mut()
-    }
-
-    /// The parsed transaction, parsing from raw bytes if needed, for a
-    /// reader: unlike [`tx_mut`](Self::tx_mut) the entry keeps its bytes.
-    pub(crate) fn parsed(&mut self) -> Option<&Transaction> {
-        self.parse_raw();
-        self.tx.as_ref()
-    }
-
-    /// After [`tx_mut`](Self::tx_mut), reads `input_txids` from the mutated
-    /// transaction again; true when it did.
-    pub(crate) fn refresh(&mut self) -> bool {
-        if !std::mem::take(&mut self.mutated) {
-            return false;
-        }
-        self.update_input_txids();
-        true
+    /// Stores `tx` as this entry's parse, every other member kept: for
+    /// `Rows::swap_parse` alone, which has checked that `tx` is the
+    /// transaction the entry holds (#843b; until then `BeefTx::tx_mut` lent
+    /// the transaction and the entry waited for a refresh).
+    pub(in crate::transaction) fn set_parse(&mut self, tx: Transaction) {
+        self.tx = Some(tx);
     }
 
     /// The txid the entry holds, without hashing: the decoder's hash of the
     /// bytes it read (`collect.rs`), `merge_raw_tx`'s or `from_txid`'s.
     /// `None` for an entry built by the public `from_raw_tx` or `from_tx`
-    /// and for one mutated through `tx_mut` (#621's fold: `merge_beef` hashes
-    /// such an entry's bytes, never trusting `txid()`'s reading of its
-    /// fields, which a stale cache after `raw_tx_or_compute` could part from
-    /// until #843, whose doors empty the caches before every edit).
-    pub(crate) fn held_txid(&self) -> Option<&str> {
-        self.txid.as_deref()
+    /// (#621's fold: `merge_beef` hashes such an entry's bytes, never
+    /// trusting `txid()`'s reading of its fields).
+    pub(crate) fn held_txid(&self) -> Option<Txid> {
+        self.txid
     }
 
     /// The bytes [`to_writer`](Self::to_writer) writes for the entry's
     /// transaction, as [`Beef::to_binary`](super::beef::Beef::to_binary)
-    /// writes them (after its `refresh`, which drops a mutated transaction's
-    /// cached hash and bytes): the held bytes, else the transaction's
+    /// writes them: the held bytes, else the transaction's
     /// serialization; `None` for a txid-only entry. The snapshot form of an
     /// entry in `merge_beef` (#621's second fold).
     pub(crate) fn written_tx_bytes(&self) -> Option<std::borrow::Cow<'_, [u8]>> {
@@ -296,27 +280,18 @@ impl BeefTx {
         Some(std::borrow::Cow::Owned(tx.to_binary()))
     }
 
-    /// The input txids the BEEF's next `refresh` would give an entry mutated
-    /// through [`tx_mut`](Self::tx_mut), read without changing the entry;
-    /// `None` when it is not waiting on a refresh (its `input_txids` are
-    /// current). For `merge_beef`'s order of a source it does not sort
-    /// (#621's second fold).
-    pub(crate) fn refreshed_input_txids(&self) -> Option<Vec<String>> {
-        if !self.mutated {
-            return None;
+    /// A copy for the Atomic BEEF's closure naming `bump`: an entry held as
+    /// bytes keeps this entry's input list, as the reference's copy of a
+    /// `_rawTx` entry keeps `inputTxids` (`Beef.ts:464-465`); one held as a
+    /// transaction alone has it read again with the new index, as
+    /// `BeefTx.fromTx` reads it (`:466-467`; #798's fold).
+    pub(in crate::transaction) fn atomic_copy(&self, bump: Option<usize>) -> Self {
+        let mut copy = self.clone();
+        copy.set_bump_index(bump);
+        if self.held_raw() {
+            copy.input_txids = self.input_txids.clone();
         }
-        if self.has_proof() {
-            return Some(Vec::new());
-        }
-        Some(self.tx.as_ref().map(input_txids_of).unwrap_or_default())
-    }
-
-    /// True when the entry's txid is `txid`, without a copy when it is held.
-    pub(crate) fn has_txid(&self, txid: &str) -> bool {
-        match self.txid {
-            Some(ref held) => held == txid,
-            None => self.txid() == txid,
-        }
+        copy
     }
 
     /// Parses the raw bytes into the transaction, when only the bytes are
@@ -338,26 +313,19 @@ impl BeefTx {
         None
     }
 
-    /// True when the entry holds bytes or held them before
-    /// [`tx_mut`](Self::tx_mut) dropped them: the reference's
+    /// True when the entry holds bytes: the reference's
     /// `tx._rawTx != null`, the atomic copy's raw branch (`Beef.ts:464-465`).
     pub(crate) fn held_raw(&self) -> bool {
-        self.raw_tx.is_some() || self.raw_dropped
+        self.raw_tx.is_some()
     }
 
-    /// Returns raw transaction bytes, computing from parsed tx if needed.
-    pub fn raw_tx_or_compute(&mut self) -> Option<Vec<u8>> {
-        if let Some(ref raw_tx) = self.raw_tx {
-            return Some(raw_tx.clone());
-        }
-
-        if let Some(ref tx) = self.tx {
-            let bytes = tx.to_binary();
-            self.raw_tx = Some(bytes.clone());
-            return Some(bytes);
-        }
-
-        None
+    /// Returns the raw transaction bytes: the ones held, else the parsed
+    /// transaction's serialization; `None` for an entry holding a txid
+    /// alone. A read (`&self`) since #843b, keeping nothing: until then it
+    /// took `&mut self` and kept the bytes it computed, which no door of a
+    /// [`Beef`](super::beef::Beef) can lend an entry for any more.
+    pub fn raw_tx_or_compute(&self) -> Option<Vec<u8>> {
+        self.written_tx_bytes().map(std::borrow::Cow::into_owned)
     }
 
     /// True for a raw transaction whose input count is 0. A txid-only entry
@@ -432,12 +400,10 @@ impl BeefTx {
 
             match TxDataFormat::from_u8(format) {
                 Some(TxDataFormat::TxidOnly) => {
-                    // Read txid (reversed)
-                    let txid_slice = reader.read_bytes(32)?;
-                    let mut txid_bytes = txid_slice.to_vec();
-                    txid_bytes.reverse();
-                    let txid = to_hex(&txid_bytes);
-                    Ok(Self::from_txid(txid))
+                    // The 32 bytes on the wire are the txid in wire order.
+                    let mut wire = [0u8; 32];
+                    wire.copy_from_slice(reader.read_bytes(32)?);
+                    Ok(Self::from_txid(Txid::from_wire_bytes(wire)))
                 }
                 Some(TxDataFormat::RawTxAndBumpIndex) => {
                     let bump_index = reader.read_var_int_num()?;
@@ -464,14 +430,14 @@ impl BeefTx {
 }
 
 /// The txids `tx`'s inputs name, each once, in input order.
-fn input_txids_of(tx: &Transaction) -> Vec<String> {
+fn input_txids_of(tx: &Transaction) -> Vec<Txid> {
     let mut seen = std::collections::HashSet::new();
     let mut txids = Vec::new();
     for input in tx.inputs() {
-        // The txid the outpoint names: the source's id where the text does
-        // not parse (#869's third fold), as `get_source_txid` otherwise reads.
+        // The txid the outpoint names: the input's own, else its linked
+        // source's id (#869's third fold).
         if let Some(txid) = crate::transaction::transaction::outpoint_txid_name(input) {
-            if !txid.is_empty() && seen.insert(txid.clone()) {
+            if seen.insert(txid) {
                 txids.push(txid);
             }
         }
@@ -500,7 +466,7 @@ mod tests {
         let beef_tx = BeefTx::from_tx(tx, None);
         assert!(!beef_tx.is_txid_only());
         assert!(!beef_tx.has_proof());
-        assert_eq!(beef_tx.txid().len(), 64);
+        assert_eq!(beef_tx.id().len(), 64);
     }
 
     #[test]
@@ -515,7 +481,7 @@ mod tests {
     #[test]
     fn test_from_txid() {
         let txid = "abc123".repeat(11)[..64].to_string();
-        let beef_tx = BeefTx::from_txid(txid.clone());
+        let beef_tx = BeefTx::from_txid(txid.parse().unwrap());
         assert!(beef_tx.is_txid_only());
         assert!(!beef_tx.has_proof());
         assert_eq!(beef_tx.txid(), txid);
@@ -640,48 +606,55 @@ mod tests {
             assert!(!entry.has_no_inputs());
             assert!(!entry.has_no_outputs());
         }
-        let known = BeefTx::from_txid(TEST_TX_ID.to_string());
+        let known = BeefTx::from_txid(TEST_TX_ID.to_string().parse().unwrap());
         assert!(!known.has_no_inputs());
         assert!(!known.has_no_outputs());
     }
 
     /// `ts-stack@edf6e03` `BeefTx.ts:105-116`: an entry's txid is the held one
-    /// or the hash of its transaction; `has_txid` answers that comparison
-    /// whether the txid is held (a txid-only entry, a read entry) or not (an
-    /// entry built from a transaction or bytes).
+    /// or the hash of its transaction, whether the txid is held (a txid-only
+    /// entry, a read entry) or not (an entry built from a transaction or
+    /// bytes); `id()` is its display text (#843b: the comparison was
+    /// `has_txid`, on text, until then).
     #[test]
-    fn has_txid_is_the_entry_txid_beef_tx_ts_105_116() {
+    fn the_entry_txid_is_held_or_hashed_beef_tx_ts_105_116() {
         let tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
-        let other = "00".repeat(32);
+        let named: Txid = TEST_TX_ID.parse().unwrap();
+        let other: Txid = "00".repeat(32).parse().unwrap();
         let entries = [
             BeefTx::from_tx(tx, None),
             BeefTx::from_raw_tx(from_hex(TEST_TX_HEX).unwrap(), Some(0))
                 .expect("the bytes are one transaction"),
-            BeefTx::from_txid(TEST_TX_ID.to_string()),
+            BeefTx::from_txid(named),
         ];
         for entry in entries {
-            assert_eq!(entry.txid(), TEST_TX_ID);
-            assert!(entry.has_txid(TEST_TX_ID));
-            assert!(!entry.has_txid(&other));
+            assert_eq!(entry.txid(), named);
+            assert_eq!(entry.id(), TEST_TX_ID);
+            assert_eq!(entry.txid(), TEST_TX_ID.to_uppercase(), "either case");
+            assert!(entry.txid() != other);
         }
     }
 
     /// `ts-stack@edf6e03` `BeefTx.ts:144-151` (`getRawTxBytes`): the bytes
-    /// held, else the parsed transaction's serialization, kept; a txid-only
-    /// entry has none.
+    /// held, else the parsed transaction's serialization; a txid-only
+    /// entry has none. A read since #843b: the reference keeps the bytes it
+    /// computes, and this crate kept them until then (`&mut self`); nothing
+    /// is kept now, so an entry held as a transaction stays one (the atomic
+    /// copy's branch, the root `CLAUDE.md`'s #798 row).
     #[test]
     fn raw_tx_or_compute_is_the_held_bytes_or_the_serialization_beef_tx_ts_144_151() {
         let raw = from_hex(TEST_TX_HEX).unwrap();
-        let mut read =
+        let read =
             BeefTx::from_raw_tx(raw.clone(), Some(0)).expect("the bytes are one transaction");
         assert_eq!(read.raw_tx_or_compute(), Some(raw.clone()));
 
-        let mut built = BeefTx::from_tx(Transaction::from_hex(TEST_TX_HEX).unwrap(), None);
+        let built = BeefTx::from_tx(Transaction::from_hex(TEST_TX_HEX).unwrap(), None);
         assert_eq!(built.raw_tx(), None);
         assert_eq!(built.raw_tx_or_compute(), Some(raw.clone()));
-        assert_eq!(built.raw_tx(), Some(raw.as_slice()), "kept");
+        assert_eq!(built.raw_tx(), None, "nothing kept");
+        assert!(!built.held_raw());
 
-        let mut known = BeefTx::from_txid(TEST_TX_ID.to_string());
+        let known = BeefTx::from_txid(TEST_TX_ID.parse().unwrap());
         assert_eq!(known.raw_tx_or_compute(), None);
     }
 
@@ -712,37 +685,10 @@ mod tests {
         assert_eq!(BeefTx::from_tx(tx, None).input_txids, vec![parent]);
     }
 
-    /// `ts-stack@edf6e03` `BeefTx.ts:160-177` (`syncRawTxFromTransaction`):
-    /// a transaction mutated in place is the entry's reading, its txid the
-    /// mutated one's hash and its input list read again, the sync true when
-    /// they changed and false when nothing did (`:164`, `:176`). Here the
-    /// mutation goes through `tx_mut` and the sync is `refresh` (bsv-rs#171).
-    #[test]
-    #[allow(deprecated)] // the deprecated `tx_mut` and its `refresh` are what this pins
-    fn a_transaction_mutated_through_tx_mut_is_the_entry_reading_beef_tx_ts_160_177() {
-        let raw = from_hex(TEST_TX_HEX).unwrap();
-        let mut entry = BeefTx::from_raw_tx(raw, None).expect("the bytes are one transaction");
-        assert!(!entry.refresh(), "nothing mutated, nothing to sync");
-        let before = entry.input_txids.clone();
-        assert_eq!(before.len(), 1);
-
-        let parent = "e6".repeat(32);
-        let mutated = {
-            let tx = entry
-                .tx_mut()
-                .expect("a parsed entry yields its transaction");
-            tx.inputs_mut()[0].source_txid = Some(parent.parse().unwrap());
-            tx.clone()
-        };
-        assert_ne!(mutated.id(), TEST_TX_ID);
-        assert_eq!(entry.txid(), mutated.id(), "named by the mutated hash");
-        assert!(entry.has_txid(&mutated.id()));
-        assert!(!entry.has_txid(TEST_TX_ID));
-        assert_eq!(entry.raw_tx_or_compute(), Some(mutated.to_binary()));
-        assert_eq!(entry.input_txids, before, "until the sync");
-
-        assert!(entry.refresh(), "the identity and the inputs moved");
-        assert_eq!(entry.input_txids, vec![parent]);
-        assert!(!entry.refresh(), "synced once");
-    }
+    // #843b removed `a_transaction_mutated_through_tx_mut_is_the_entry_reading_
+    // beef_tx_ts_160_177`: `BeefTx::tx_mut` and its `refresh` are gone, so no
+    // entry is mutated in place. The reference's sync
+    // (`syncRawTxFromTransaction`, `BeefTx.ts:160-177`) is `Beef::edit_tx`'s
+    // eager repair, pinned by `tests/beef_edit_door_817.rs`; that `tx_mut`
+    // does not compile is `beef/rows.rs`' `compile_fail` doc test.
 }

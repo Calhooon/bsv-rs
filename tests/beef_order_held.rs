@@ -87,22 +87,34 @@ fn roots() -> Vec<(u64, Hash32)> {
     vec![(beef_chain::HEIGHT, beef_chain::funding_root())]
 }
 
-/// `raw` entries, in the order given, under the funding BUMP, written by
-/// this crate's writer without its sort (`to_writer`): an entry is proven
-/// when it is the funding transaction.
-fn written(version: u32, raws: &[Vec<u8>]) -> Vec<u8> {
-    let mut beef = Beef::with_version(version);
-    beef.bumps.push(funding_bump());
-    for raw in raws {
-        let proven = sha256d(raw) == beef_chain::funding_root();
-        beef.txs.push(
-            BeefTx::from_raw_tx(raw.clone(), proven.then_some(0))
-                .expect("the bytes are one transaction"),
-        );
-    }
+/// A BEEF frame of `bump` and the `raws` in the order given, each element
+/// written by this crate's own writer (`MerklePath::to_writer`,
+/// `BeefTx::to_writer`), no sort: an entry is proven, by the BUMP at 0,
+/// when its hash is `root`. Until #843b the rows were pushed by hand onto
+/// the public `bumps` and `txs` and written by `Beef::to_writer`; no door
+/// holds a child ahead of its parent without marking the BEEF for a sort.
+fn frame<R: AsRef<[u8]>>(version: u32, bump: &MerklePath, root: Hash32, raws: &[R]) -> Vec<u8> {
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(version);
+    writer.write_var_int(1);
+    bump.to_writer(&mut writer).expect("the BUMP is writable");
+    writer.write_var_int(raws.len() as u64);
+    for raw in raws {
+        let raw = raw.as_ref();
+        let proven = sha256d(raw) == root;
+        BeefTx::from_raw_tx(raw.to_vec(), proven.then_some(0))
+            .expect("the bytes are one transaction")
+            .to_writer(&mut writer, version)
+            .expect("the entry is writable");
+    }
     writer.into_bytes()
+}
+
+/// `raw` entries, in the order given, under the funding BUMP, written by
+/// this crate's writers without a sort: an entry is proven when it is the
+/// funding transaction.
+fn written(version: u32, raws: &[Vec<u8>]) -> Vec<u8> {
+    frame(version, &funding_bump(), beef_chain::funding_root(), raws)
 }
 
 /// The same entries merged children-first into a `Beef`, written by
@@ -653,22 +665,9 @@ fn signed_family(tamper: bool, version: i32) -> [Vec<u8>; 3] {
 fn family_beef(raws: &[&Vec<u8>]) -> (Vec<u8>, HashMap<u64, Hash32>) {
     let funding = raws.iter().find(|r| r.len() < 200).unwrap();
     let root = sha256d(funding);
-    let mut beef = Beef::with_version(BEEF_V2);
-    beef.bumps.push(MerklePath::from_coinbase_txid(
-        &display(&root),
-        beef_chain::HEIGHT as u32,
-    ));
-    for raw in raws {
-        let proven = sha256d(raw) == root;
-        beef.txs.push(
-            BeefTx::from_raw_tx((*raw).clone(), proven.then_some(0))
-                .expect("the bytes are one transaction"),
-        );
-    }
-    let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    let bump = MerklePath::from_coinbase_txid(&display(&root), beef_chain::HEIGHT as u32);
     (
-        writer.into_bytes(),
+        frame(BEEF_V2, &bump, root, raws),
         HashMap::from([(beef_chain::HEIGHT, root)]),
     )
 }
@@ -781,7 +780,8 @@ fn a_chronicle_bit_signature_in_a_version_1_family_is_refused_at_its_input_in_th
     let verify = |version: i32| {
         let [f, c, g] = signed_family(false, version);
         let (bytes, _) = family_beef(&[&f, &c, &g]);
-        let tx = Transaction::from_beef(&bytes, Some(&display(&sha256d(&c)))).unwrap();
+        let tx =
+            Transaction::from_beef(&bytes, Some(display(&sha256d(&c)).parse().unwrap())).unwrap();
         tokio::runtime::Builder::new_current_thread()
             .build()
             .unwrap()

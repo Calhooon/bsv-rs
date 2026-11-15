@@ -348,13 +348,25 @@ fn a_bump_above_a_u32_height_is_refused_not_cut_to_its_low_bits() {
 /// The BEEF's transactions written in reverse order, when the whole path
 /// reads it: an unproven transaction ahead of the parent it spends.
 fn reversed(bytes: &[u8]) -> Option<Vec<u8>> {
-    let mut beef = Beef::from_binary(bytes).ok()?;
-    if beef.txs.len() < 2 {
+    let beef = Beef::from_binary(bytes).ok()?;
+    if beef.txs().len() < 2 {
         return None;
     }
-    beef.txs.reverse();
+    // The frame written entry by entry, the entries last to earliest: no
+    // door reorders what a `Beef` holds (#843b; until then `txs` was
+    // reversed by hand and written by `Beef::to_writer`).
     let mut writer = Writer::new();
-    beef.to_writer(&mut writer).expect("the BEEF is writable");
+    writer.write_u32_le(beef.version);
+    writer.write_var_int(beef.bumps().len() as u64);
+    for bump in beef.bumps() {
+        bump.to_writer(&mut writer).expect("the BUMP is writable");
+    }
+    writer.write_var_int(beef.txs().len() as u64);
+    for entry in beef.txs().iter().rev() {
+        entry
+            .to_writer(&mut writer, beef.version)
+            .expect("the entry is writable");
+    }
     Some(writer.into_bytes())
 }
 
@@ -603,11 +615,12 @@ fn a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structur
     let txid = beef_chain::funding_root();
     let (bytes, _) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING)], vec![(1, 0, OTHER)]]);
     let mut beef = Beef::from_binary(&bytes).expect("the BEEF parses");
-    let leaf = beef.bumps[0].path[1][0].clone();
+    let leaf = beef.bumps()[0].path[1][0].clone();
     let mut changed = leaf.clone();
     changed.hash = Some(display(&SIBLING));
-    beef.bumps[0].path[1].push(changed);
+    beef.edit_bump(0, |bump| bump.path[1].push(changed))
+        .unwrap();
     assert_eq!(beef.verify_structure(), Err(Kind::DuplicateOffset));
-    beef.bumps[0].path[1][1] = leaf;
+    beef.edit_bump(0, |bump| bump.path[1][1] = leaf).unwrap();
     assert_eq!(beef.verify_structure(), Err(Kind::DuplicateOffset));
 }

@@ -185,7 +185,7 @@ fn transactions(n: usize) -> (Vec<u8>, String) {
     let subject = spending("11".repeat(32), "", token());
     let mut beef = Beef::new();
     for i in 1..=n {
-        beef.merge_txid_only(format!("{i:064x}"));
+        beef.merge_txid_only(format!("{i:064x}").parse().unwrap());
     }
     proven(&mut beef, &subject, 900);
     (atomic(&subject.id(), &mut beef), subject.id())

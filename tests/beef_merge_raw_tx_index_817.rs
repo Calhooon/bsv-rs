@@ -56,9 +56,9 @@ fn recorded(v: &Value, list: &Value) -> Vec<Entry> {
 }
 
 fn entries(beef: &Beef) -> Vec<Entry> {
-    beef.txs
+    beef.txs()
         .iter()
-        .map(|t| (t.txid(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
+        .map(|t| (t.id(), t.bump_index().map(|i| i as u64), t.is_txid_only()))
         .collect()
 }
 
@@ -78,7 +78,7 @@ fn built(v: &Value, steps: &Value) -> (Beef, (String, Option<u64>)) {
                 let entry = beef
                     .merge_raw_tx(raw(v, name), Some(index.parse().unwrap()))
                     .expect("the bytes are one transaction: the index is not judged");
-                returned = Some((entry.txid(), entry.bump_index().map(|i| i as u64)));
+                returned = Some((entry.id(), entry.bump_index().map(|i| i as u64)));
             }
             other => panic!("no step {other:?}"),
         }
@@ -118,7 +118,7 @@ fn assert_as_recorded(name: &str) {
         recorded(&v, &c["entries"]),
         "{name}: the entries held"
     );
-    assert_eq!(beef.bumps.len() as u64, c["bumps"].as_u64().unwrap());
+    assert_eq!(beef.bumps().len() as u64, c["bumps"].as_u64().unwrap());
 
     let bytes = beef
         .to_binary()

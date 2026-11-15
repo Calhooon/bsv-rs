@@ -4,12 +4,14 @@ use std::collections::HashMap;
 
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, BeefTx, Element, Headers,
-    Kind, MerklePathLeaf, Transaction, Verdict,
+    Kind, MerklePath, MerklePathLeaf, Transaction, Txid, Verdict, BEEF_V1, BEEF_V2,
 };
 use libfuzzer_sys::fuzz_target;
 
 #[path = "support/identity_law.rs"]
 mod identity_law;
+#[path = "support/rows_law.rs"]
+mod rows_law;
 
 /// Headers that carry every root, so a BUMP's root is never the refusal and
 /// the reader walks on to the doors after it (the Lean's `Reason`s).
@@ -129,67 +131,85 @@ fn the_pre_pass_is_the_round_trip(source: &Beef) {
     }
 }
 
-/// The states a source can be put in through its public fields, chosen by
-/// the input's bytes: a BUMP the reader refuses (no levels, an empty level 0,
-/// 65 levels, a second leaf at an offset, an offset outside the tree, a
-/// duplicate at an even offset, a leaf removed), a BUMP of a held height
-/// with another root ahead of a refused one, a bad version word, a txid-only
-/// entry of 62 digits, an entry edited through the deprecated door, a
-/// parsed entry whose cached bytes are a held transaction twice (#621's
-/// fold: the state `Transaction::from_binary` of such a buffer left until
-/// #840, built since through `Transaction::with_cached_bytes_for_test`,
-/// under `cfg(fuzzing)` alone; put in by `merge_transaction` and by a hand
-/// push), and an output of 2^53 satoshis or more in an entry edited through
-/// `edit_tx`, merged by `merge_transaction` and pushed by hand (#844).
+/// A copy of `beef` with its rows changed by hand, through the test door
+/// (`Beef::with_rows_for_test`, the `internal-test-doors` feature; #843b: a
+/// write of the public `txs` and `bumps` until then): a state no public
+/// door builds.
+fn with_rows(beef: &Beef, change: impl FnOnce(&mut Vec<BeefTx>, &mut Vec<MerklePath>)) -> Beef {
+    let (mut txs, mut bumps) = (beef.txs().to_vec(), beef.bumps().to_vec());
+    change(&mut txs, &mut bumps);
+    let mut state = Beef::with_rows_for_test(beef.version, txs, bumps);
+    state.atomic_txid = beef.atomic_txid;
+    state
+}
+
+/// The states a source can be put in, chosen by the input's bytes: a BUMP
+/// the reader refuses (no levels, an empty level 0, 65 levels, a second
+/// leaf at an offset, an offset outside the tree, a duplicate at an even
+/// offset, a leaf removed), each edited through `edit_bump`; a BUMP of a
+/// held height with another root ahead of a refused one (the test door); a
+/// bad version word; a txid-only entry of a txid from the input's bytes,
+/// under the BEEF's word and under the other one (until #843b a txid-only
+/// entry of a text of 62 digits, a state no door builds since the txid is a
+/// `Txid`: the writers' refusal of a txid-only entry outside V2 is the one
+/// this pair reaches); an entry edited through `edit_tx` (the deprecated
+/// `tx_mut` until #843b); a parsed entry whose cached bytes are a held
+/// transaction twice (#621's fold: the state `Transaction::from_binary` of
+/// such a buffer left until #840, built since through
+/// `Transaction::with_cached_bytes_for_test`; put in by `merge_transaction`
+/// and by the test door); and an output of 2^53 satoshis or more in an
+/// entry edited through `edit_tx`, merged by `merge_transaction` and put in
+/// through the test door, never hashed (#844).
 fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
     let pick = |i: usize| data.get(i).copied().unwrap_or(0) as usize;
     let mut states = Vec::new();
-    let n = beef.bumps.len();
+    let n = beef.bumps().len();
     if n > 0 {
         let at = pick(0) % n;
         for k in 0..7 {
             let mut b = beef.clone();
-            let path = &mut b.bumps[at].path;
-            match k {
-                0 => path.clear(),
-                1 => {
-                    if let Some(level) = path.first_mut() {
-                        level.clear();
+            let _ = b.edit_bump(at, |bump| {
+                let path = &mut bump.path;
+                match k {
+                    0 => path.clear(),
+                    1 => {
+                        if let Some(level) = path.first_mut() {
+                            level.clear();
+                        }
                     }
-                }
-                2 => path.resize_with(65, Vec::new),
-                3 => {
-                    let level = pick(1) % path.len().max(1);
-                    if let Some(leaves) = path.get_mut(level) {
-                        if let Some(leaf) = leaves.first().cloned() {
-                            leaves.push(leaf);
+                    2 => path.resize_with(65, Vec::new),
+                    3 => {
+                        let level = pick(1) % path.len().max(1);
+                        if let Some(leaves) = path.get_mut(level) {
+                            if let Some(leaf) = leaves.first().cloned() {
+                                leaves.push(leaf);
+                            }
+                        }
+                    }
+                    4 => {
+                        if let Some(leaf) = path.first_mut().and_then(|l| l.last_mut()) {
+                            leaf.offset = u64::MAX >> (pick(2) % 64);
+                        }
+                    }
+                    5 => {
+                        if let Some(level) = path.first_mut() {
+                            level.push(MerklePathLeaf::new_duplicate((pick(3) as u64) * 2));
+                        }
+                    }
+                    _ => {
+                        let height = pick(4) % path.len().max(1);
+                        if let Some(level) = path.get_mut(height) {
+                            if !level.is_empty() {
+                                let i = pick(5) % level.len();
+                                level.remove(i);
+                            }
                         }
                     }
                 }
-                4 => {
-                    if let Some(leaf) = path.first_mut().and_then(|l| l.last_mut()) {
-                        leaf.offset = u64::MAX >> (pick(2) % 64);
-                    }
-                }
-                5 => {
-                    if let Some(level) = path.first_mut() {
-                        level.push(MerklePathLeaf::new_duplicate((pick(3) as u64) * 2));
-                    }
-                }
-                _ => {
-                    let height = pick(4) % path.len().max(1);
-                    if let Some(level) = path.get_mut(height) {
-                        if !level.is_empty() {
-                            let i = pick(5) % level.len();
-                            level.remove(i);
-                        }
-                    }
-                }
-            }
+            });
             states.push(b);
         }
-        let mut b = beef.clone();
-        let mut other = b.bumps[at].clone();
+        let mut other = beef.bumps()[at].clone();
         if let Some(leaf) = other
             .path
             .first_mut()
@@ -197,62 +217,84 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
         {
             leaf.hash = Some("11".repeat(32));
         }
-        let mut broken = b.bumps[at].clone();
+        let mut broken = beef.bumps()[at].clone();
         broken.path.clear();
-        b.bumps.push(other);
-        b.bumps.push(broken);
-        states.push(b);
+        states.push(with_rows(beef, |_, bumps| {
+            bumps.push(other);
+            bumps.push(broken);
+        }));
     }
     let mut b = beef.clone();
     b.version = 0xEFBE_0003;
     states.push(b);
-    let mut b = beef.clone();
-    b.merge_txid_only("ab".repeat(31));
-    states.push(b);
-    let mut b = beef.clone();
-    if let Some(entry) = b.txs.iter_mut().find(|t| !t.is_txid_only()) {
-        if let Some(tx) = entry.tx_mut() {
-            tx.set_lock_time(tx.lock_time() ^ 1);
-        }
-        states.push(b);
+    // A txid-only entry of a txid from the input's bytes (wire order), under
+    // the BEEF's word and under the other of V1 and V2.
+    let mut wire = [0u8; 32];
+    for (i, byte) in wire.iter_mut().enumerate() {
+        *byte = pick(8 + i) as u8;
     }
-    if let Some(raw) = beef.txs.iter().find_map(|t| t.raw_tx().map(<[u8]>::to_vec)) {
+    let mut b = beef.clone();
+    b.merge_txid_only(Txid::from_wire_bytes(wire));
+    let mut other_word = b.clone();
+    other_word.version = if b.version == BEEF_V2 {
+        BEEF_V1
+    } else {
+        BEEF_V2
+    };
+    states.push(b);
+    states.push(other_word);
+    let mut b = beef.clone();
+    let editable = b.txs().iter().find(|t| !t.is_txid_only()).map(BeefTx::txid);
+    if let Some(txid) = editable {
+        if b.edit_tx(txid, |tx| tx.set_lock_time(tx.lock_time() ^ 1))
+            .is_ok()
+        {
+            states.push(b);
+        }
+    }
+    if let Some(raw) = beef
+        .txs()
+        .iter()
+        .find_map(|t| t.raw_tx().map(<[u8]>::to_vec))
+    {
         // A parsed entry caching a transaction and more (#621's fold): the
         // state `Transaction::from_binary` left on a doubled buffer until
-        // #840, built through the fuzzing-only cache door since no public
+        // #840, built through the test door of the cache since no public
         // door reaches it.
         let doubled = [raw.as_slice(), raw.as_slice()].concat();
         for door in 0..2 {
             let tx = Transaction::from_binary(&raw)
                 .expect("a raw entry the reader collected is one transaction")
                 .with_cached_bytes_for_test(doubled.clone());
-            let mut b = beef.clone();
             if door == 0 {
+                let mut b = beef.clone();
                 b.merge_transaction(tx);
+                states.push(b);
             } else {
-                b.txs.push(BeefTx::from_tx(tx, None));
+                states.push(with_rows(beef, |txs, _| {
+                    txs.push(BeefTx::from_tx(tx, None))
+                }));
             }
-            states.push(b);
         }
     }
     // An output of 2^53 satoshis or more (#844), its amount from the input's
     // bytes: a read entry edited through `edit_tx`, and a transaction built
-    // by hand merged as a parsed entry and pushed by hand.
+    // by hand merged as a parsed entry and put in by the test door.
     let amount = (1u64 << 53) + (pick(6) as u64) * (pick(7) as u64 + 1);
     let mut b = beef.clone();
     let edited = b
-        .txs
+        .txs()
         .iter()
         .find(|t| t.tx().is_some_and(|tx| !tx.outputs().is_empty()))
         .map(BeefTx::txid);
     if let Some(txid) = edited {
-        if b.edit_tx(&txid, |tx| tx.outputs_mut()[0].satoshis = Some(amount))
+        if b.edit_tx(txid, |tx| tx.outputs_mut()[0].satoshis = Some(amount))
             .is_ok()
         {
             states.push(b);
         }
     }
-    if let Some(tx) = beef.txs.iter().find_map(|t| t.tx()) {
+    if let Some(tx) = beef.txs().iter().find_map(|t| t.tx()) {
         let mut outputs = tx.outputs().to_vec();
         outputs.push(bsv_rs::transaction::TransactionOutput::new(
             amount,
@@ -263,9 +305,9 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
         let mut b = beef.clone();
         b.merge_transaction(by_hand.clone());
         states.push(b);
-        let mut b = beef.clone();
-        b.txs.push(BeefTx::from_tx(by_hand, None));
-        states.push(b);
+        states.push(with_rows(beef, |txs, _| {
+            txs.push(BeefTx::from_tx(by_hand, None))
+        }));
     }
     states
 }
@@ -298,7 +340,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     let hinted = hinted.expect("the hinted parse refused what the parse accepted");
-    assert_eq!(hinted.txs.len(), beef.txs.len());
+    assert_eq!(hinted.txs().len(), beef.txs().len());
 
     // #817: every BEEF the parse returns writes `Ok`, an `Ok` write reads
     // back to the same entries and BUMPs and is a fixed point, and so the
@@ -307,8 +349,12 @@ fuzz_target!(|data: &[u8]| {
         .to_binary()
         .expect("a BEEF the parse returned is refused by the writer (#817)");
     let mut back = Beef::from_binary(&written).expect("an Ok write does not read back (#817)");
-    assert_eq!(back.txs.len(), beef.txs.len(), "the entries read back");
-    assert_eq!(back.bumps.len(), beef.bumps.len(), "the BUMPs read back");
+    assert_eq!(back.txs().len(), beef.txs().len(), "the entries read back");
+    assert_eq!(
+        back.bumps().len(),
+        beef.bumps().len(),
+        "the BUMPs read back"
+    );
     assert_eq!(
         back.to_binary().expect("the read-back BEEF writes"),
         written,
@@ -326,10 +372,15 @@ fuzz_target!(|data: &[u8]| {
     // second fold).
     identity_law::beef_copies_keep_the_law(&beef);
 
+    // #843b's law under edits through the public doors, chosen by the
+    // input's bytes: the index and every entry's BUMP position are the
+    // rows' after each.
+    rows_law::edits_keep_the_rows_law(&beef, data);
+
     // Link every subject (the iterative walk), serialize, clone and drop it
-    let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+    let txids: Vec<Txid> = beef.txs().iter().map(|t| t.txid()).collect();
     for txid in &txids {
-        if let Some(tx) = beef.find_atomic_transaction(txid) {
+        if let Some(tx) = beef.find_atomic_transaction(*txid) {
             let _ = tx.to_beef(true);
             let _ = tx.to_atomic_beef(true);
             let copy = tx.clone();
@@ -366,7 +417,7 @@ fuzz_target!(|data: &[u8]| {
                 "the atomic door's BEEF ends with the transaction"
             );
             assert_eq!(
-                Beef::from_binary(&bytes).map(|b| b.txs.last().map(|t| t.txid())),
+                Beef::from_binary(&bytes).map(|b| b.txs().last().map(|t| t.id())),
                 Ok(Some(id)),
                 "the atomic door's closure ends with the transaction"
             );

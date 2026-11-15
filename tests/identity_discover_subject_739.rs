@@ -87,7 +87,7 @@ fn over_bound(byte: &str, n: usize) -> Vec<u8> {
         .unwrap();
     let mut beef = Beef::new();
     for i in 1..=n {
-        beef.merge_txid_only(format!("{i:064x}"));
+        beef.merge_txid_only(format!("{i:064x}").parse().unwrap());
     }
     let path = MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, subject.id())]]).unwrap();
     let index = beef.merge_bump(path);

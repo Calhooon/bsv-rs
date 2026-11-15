@@ -243,11 +243,12 @@ fn source_output<'a>(
     if !output.spendable || output.satoshis > 2_100_000_000_000_000 {
         return Err(refused("Wallet returned invalid KVStore output metadata"));
     }
-    let txid = crate::primitives::to_hex(&output.outpoint.txid);
+    // The wallet's `TxId` is display order (`wallet/types.rs`).
+    let txid = crate::transaction::Txid::from_display_bytes(output.outpoint.txid);
     let tx = beef
-        .find_txid(&txid)
+        .find_txid(txid)
         .and_then(|entry| entry.tx())
-        .filter(|tx| tx.id() == txid)
+        .filter(|tx| tx.txid() == txid)
         .ok_or_else(|| refused("KVStore BEEF does not contain the exact listed transaction"))?;
     tx.outputs()
         .get(output.outpoint.vout as usize)

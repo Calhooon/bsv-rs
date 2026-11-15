@@ -56,8 +56,8 @@ fn hints(max_txs: usize, max_bumps: usize) -> BeefLimits {
 fn a_beef_at_its_hints_is_read() {
     let (bytes, _) = chain_bytes(10);
     let beef = Beef::from_binary_with_limits(&bytes, &hints(10, 1)).expect("reads");
-    assert_eq!(beef.txs.len(), 10);
-    assert_eq!(beef.bumps.len(), 1);
+    assert_eq!(beef.txs().len(), 10);
+    assert_eq!(beef.bumps().len(), 1);
 }
 
 /// What 0.3.35 refused as `over max_txs 9` and `over max_bumps 0`.
@@ -67,8 +67,8 @@ fn a_beef_over_every_hint_is_read_all_the_same() {
     for limits in [hints(9, 1), hints(usize::MAX, 0), hints(0, 0)] {
         let mut beef = Beef::from_binary_with_limits(&bytes, &limits)
             .expect("a valid BEEF is not refused for its counts");
-        assert_eq!(beef.txs.len(), 10);
-        assert_eq!(beef.bumps.len(), 1);
+        assert_eq!(beef.txs().len(), 10);
+        assert_eq!(beef.bumps().len(), 1);
         assert_eq!(beef.to_binary().expect("the BEEF is writable"), bytes);
     }
 }
@@ -80,7 +80,7 @@ fn a_beef_over_every_hint_is_read_all_the_same() {
 fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
     let (bytes, _) = chain_bytes(2);
     let mut beef = Beef::from_binary(&bytes).expect("parses");
-    beef.txs.clear();
+    beef.retain_txs(|_| false);
     let mut writer = bsv_rs::primitives::Writer::new();
     beef.to_writer(&mut writer).expect("the BEEF is writable");
     let mut claimed = writer.into_bytes();
@@ -111,13 +111,15 @@ fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
 #[test]
 fn the_hints_change_nothing_that_is_read() {
     let (mut beef, subject) = chain_beef(5);
-    let atomic = beef.to_binary_atomic(&subject).expect("atomic");
+    let atomic = beef
+        .to_binary_atomic(subject.parse().unwrap())
+        .expect("atomic");
     let hinted = Beef::from_binary_with_limits(&atomic, &hints(4, 0)).expect("reads");
     let plain = Beef::from_binary(&atomic).expect("reads");
-    assert_eq!(hinted.txs.len(), 5);
+    assert_eq!(hinted.txs().len(), 5);
     assert_eq!(hinted.atomic_txid, plain.atomic_txid);
     assert_eq!(
-        hinted.txs.iter().map(|t| t.txid()).collect::<Vec<_>>(),
-        plain.txs.iter().map(|t| t.txid()).collect::<Vec<_>>()
+        hinted.txs().iter().map(|t| t.txid()).collect::<Vec<_>>(),
+        plain.txs().iter().map(|t| t.txid()).collect::<Vec<_>>()
     );
 }

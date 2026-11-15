@@ -226,7 +226,7 @@ fn an_upper_case_text_names_the_same_input_and_finds_its_held_parent_845() {
     let mut beef = Beef::new();
     beef.merge_transaction(parent.clone());
     beef.merge_transaction(upper.clone());
-    let signing = beef.find_transaction_for_signing(&upper.id()).unwrap();
+    let signing = beef.find_transaction_for_signing(upper.txid()).unwrap();
     assert_eq!(
         signing.inputs()[0]
             .source_transaction
@@ -235,7 +235,7 @@ fn an_upper_case_text_names_the_same_input_and_finds_its_held_parent_845() {
         Some(pid.clone()),
         "the held parent linked"
     );
-    assert_eq!(beef.find_txid(&upper.id()).unwrap().input_txids, vec![pid]);
+    assert_eq!(beef.find_txid(upper.txid()).unwrap().input_txids(), [pid]);
 }
 
 /// The JSON a transaction writes carries each input's txid as the 64

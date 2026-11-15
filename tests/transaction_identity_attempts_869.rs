@@ -194,7 +194,7 @@ fn a_beef_door_lending_a_transaction_keeps_its_law_869() {
     beef.merge_raw_tx(child.to_binary(), None).unwrap();
     let id = child.id();
     let seen = beef
-        .edit_tx(&id, |tx| {
+        .edit_tx(id.parse().unwrap(), |tx| {
             let _ = tx.id();
             tx.set_lock_time(31);
             law(tx, "inside edit_tx");
@@ -204,10 +204,17 @@ fn a_beef_door_lending_a_transaction_keeps_its_law_869() {
         })
         .unwrap();
     assert_ne!(seen, id);
-    let held = beef.find_txid(&seen).unwrap().tx().unwrap().clone();
+    let held = beef
+        .find_txid(seen.parse().unwrap())
+        .unwrap()
+        .tx()
+        .unwrap()
+        .clone();
     assert_eq!(held.id(), seen, "the entry holds the edited transaction");
     law(&held, "the edited entry's transaction");
-    let mut signing = beef.find_transaction_for_signing(&seen).unwrap();
+    let mut signing = beef
+        .find_transaction_for_signing(seen.parse().unwrap())
+        .unwrap();
     law(&signing, "find_transaction_for_signing's copy");
     signing.inputs_mut()[0]
         .source_transaction

@@ -308,7 +308,7 @@ macro_rules! counting {
                     let beef = args.input_beef.as_deref().unwrap();
                     let sources: Vec<_> = args.inputs.iter().flatten().map(|input| {
                         let txid = bsv_rs::primitives::to_hex(&input.outpoint.txid);
-                        (Transaction::from_beef(beef, Some(&txid)).unwrap(), input.outpoint.vout)
+                        (Transaction::from_beef(beef, Some(txid.parse().unwrap())).unwrap(), input.outpoint.vout)
                     }).collect();
                     signable = Some(spending_many(&sources, args.outputs.as_deref().unwrap_or(&[])));
                 }

@@ -37,24 +37,25 @@ impl Beef {
     /// stand alone (a root to prune or split from its ancestry) keeps that
     /// one-entry merge with `merge_raw_tx(tx.to_binary(), None)`.
     pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx {
-        let root = tx.id();
+        let root = tx.txid();
         let mut visited = HashSet::new();
         let mut stack = vec![&tx];
         while let Some(current) = stack.pop() {
-            let txid = current.id();
-            if !visited.insert(txid.clone()) {
+            let txid = current.txid();
+            if !visited.insert(txid) {
                 continue;
             }
             let bump = current.merkle_path.clone().map(|p| self.merge_bump(p));
             let idx = self.push_transaction(txid, current.clone_for_beef(), bump);
-            if self.txs[idx].bump_index().is_none() {
+            if self.txs()[idx].bump_index().is_none() {
                 let sources = current.inputs().iter().rev();
                 stack.extend(sources.filter_map(|i| i.source_transaction.as_deref()));
             }
         }
-        let idx = self.index_of(&root).unwrap_or(self.txs.len() - 1);
-        let bump = self.txs[idx].bump_index();
-        self.txs[idx] = BeefTx::from_tx(tx, bump).with_txid(root);
-        &self.txs[idx]
+        let idx = self.position(&root).unwrap_or(self.txs().len() - 1);
+        let bump = self.txs()[idx].bump_index();
+        // The same txid in the same place: no key moves.
+        self.replace_entry(idx, BeefTx::from_tx(tx, bump).with_txid(root));
+        &self.txs()[idx]
     }
 }

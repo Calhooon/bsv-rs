@@ -12,9 +12,10 @@
 //!
 //! The order is the reference's (`ts-stack@edf6e03` `Beef.ts:360-373`,
 //! `#getSerializedBytes`): its writer's own throws in the order it meets them
-//! (a txid-only entry with an empty txid ahead of everything,
-//! `#ensureSerializableState`; then a non-hex BUMP hash, the BUMPs before the
-//! transactions; then each entry's throw in written order), then the version
+//! (a non-hex BUMP hash, the BUMPs before the
+//! transactions; then each entry's throw in written order; its throw for a
+//! txid-only entry with an empty txid, `#ensureSerializableState`, has no
+//! state here since #843b, the txid a `Txid`), then the version
 //! word its reader refuses at byte 0 (`:1251-1254`, what `mergeBeef`'s
 //! snapshot throws), then, in written order, the states it writes that its
 //! reader cannot read back as written: the BUMPs' (`MerklePath`'s check and
@@ -40,7 +41,7 @@ impl Beef {
         let new_tx = BeefTx::from_raw_tx(raw_tx, bump_index)?;
         let txid = new_tx.txid();
         let idx = self.store_raw_entry(new_tx, txid);
-        Ok(&self.txs[idx])
+        Ok(&self.txs()[idx])
     }
 
     /// Merges another BEEF into this one, as the reference's `mergeBeef`
@@ -80,9 +81,11 @@ impl Beef {
     pub fn merge_beef(&mut self, other: &Beef) -> Result<()> {
         let order = other.written_order();
         other.snapshot_verdict(&order)?;
-        self.refresh_mutated(); // The target re-keyed (`Beef.ts:976`, #621's fourth fold).
+        // The target is keyed by its rows in every state (#843b): the
+        // whole-target scan for entries edited through `tx_mut`
+        // (`Beef.ts:976`, #621's fourth fold) is gone with `tx_mut`.
         self.mark_mutated();
-        for bump in &other.bumps {
+        for bump in other.bumps() {
             // Each level by offset, as the snapshot reads it (`MerklePath.ts:148-149`, #621's third fold).
             let mut bump = bump.clone();
             for level in &mut bump.path {
@@ -92,7 +95,7 @@ impl Beef {
         }
 
         for i in order {
-            self.merge_beef_entry(&other.txs[i]);
+            self.merge_beef_entry(&other.txs()[i]);
         }
         Ok(())
     }
@@ -107,18 +110,15 @@ impl Beef {
     /// `Beef.ts:360-373`): an entry holding a transaction with an output of
     /// 2^53 or more is refused first, in the reference's writer's words, as
     /// its `synchronizeNestedTransactionMutations` serializes every held
-    /// transaction before anything else (#844's fold); a txid-only entry whose txid is empty is refused
-    /// before the sort, the entries left as held, as the reference's
-    /// `#ensureSerializableState` throws `Internal` ahead of
-    /// `#ensureSortedForSerialization`; every other refusal after it, the
+    /// transaction before anything else (#844's fold), before the sort, the
+    /// entries left as held; every other refusal after it, the
     /// entries sorted, as the reference's `toWriter` throws after its sort
     /// (and as it sorts before writing a state this crate refuses in its own
-    /// words). Until #817's fold the empty txid was refused after the sort.
+    /// words). A txid-only entry whose txid is the empty text, refused
+    /// before the sort from #817's fold, cannot be held since #843b.
     pub fn to_binary(&mut self) -> Result<Vec<u8>> {
-        self.refresh_mutated();
         self.refuse_unsafe_amount()?;
-        self.refuse_empty_txid()?;
-        if self.needs_sort {
+        if self.needs_sort() {
             self.sort_txs();
         }
 
@@ -155,30 +155,28 @@ impl Beef {
     ///   (unsafe)`, the reference's writer's (`BigNumber.ts:462`, its BEEF
     ///   writers serializing every held transaction first, `Beef.ts:360-362`;
     ///   #844's fold, recorded);
-    /// - a txid-only entry whose txid is empty (the
-    ///   reference's `Internal`, `BeefTx.ts:105-116`, at `Beef.ts:334-340`):
-    ///   `Invalid txid-only entry txid: expected 64 hex digits, got 0`;
     /// - a BUMP hash with a character that is not a hex digit:
     ///   `Invalid hex string`, the reference's (`MerklePath.ts:289`);
     /// - in held order, a txid-only entry under a word other than V2:
     ///   `a valid serialized Transaction is expected`, the reference's
-    ///   (`BeefTx.ts:253-258`); one under V2 whose txid has a character that
-    ///   is not a hex digit: `Invalid hex string`, the reference's;
+    ///   (`BeefTx.ts:253-258`);
     /// - a version word other than V1 or V2: `Serialized BEEF must start
     ///   with 4022206465 or 4022206466 but starts with N`, the reference
     ///   reader's (`Beef.ts:1251-1254`), whose writer writes the word;
     /// - a BUMP [`MerklePath::to_writer`](crate::transaction::MerklePath::to_writer) refuses, in its words;
-    /// - in held order, a txid-only entry's txid of other than 64 hex digits:
-    ///   `Invalid txid-only entry txid: expected 64 hex digits, got N`; an
+    /// - in held order, an
     ///   entry whose written bytes are not exactly one transaction (held
     ///   raw, or a parsed transaction caching a transaction and more, as
     ///   `Transaction::from_binary` of a longer buffer left it until #840;
     ///   #621's fold), in [`BeefTx::from_raw_tx`](crate::transaction::BeefTx::from_raw_tx)'s words.
     ///
-    /// The last two classes and the version word are written by the
+    /// The last class and the version word are written by the
     /// reference as bytes no reader reads back as written (stated rows, the
     /// root `CLAUDE.md`). Until #817 a txid-only entry outside V2 panicked
-    /// and the rest were written.
+    /// and the rest were written. A txid-only entry's txid is a `Txid` since
+    /// #843b: the three refusals of a txid text that is no txid (the empty
+    /// text ahead of everything, a non-hex character, another length) have
+    /// no state left to refuse and are gone.
     pub fn to_writer(&self, writer: &mut Writer) -> Result<()> {
         self.check_writable()?;
         self.write_checked(writer);
@@ -188,7 +186,7 @@ impl Beef {
     /// The writers' check over the entries in held order (the order
     /// [`to_writer`](Self::to_writer) writes them).
     pub(super) fn check_writable(&self) -> Result<()> {
-        self.check_writable_in(&(0..self.txs.len()).collect::<Vec<_>>())
+        self.check_writable_in(&(0..self.txs().len()).collect::<Vec<_>>())
     }
 
     /// An entry holding a transaction with an output of 2^53 or more, refused
@@ -199,31 +197,19 @@ impl Beef {
     /// so the order the entries are met in moves nothing.
     pub(super) fn refuse_unsafe_amount(&self) -> Result<()> {
         #[cfg(test)]
-        super::atomic::cost::amounts(self.txs.len());
-        self.txs.iter().try_for_each(BeefTx::amount_refusal)
-    }
-
-    /// A txid-only entry whose txid is empty, refused ahead of everything
-    /// save an unsafe amount, where the reference's `txid` getter throws
-    /// `Internal` (`BeefTx.ts:105-116`) from `#ensureSerializableState`,
-    /// before its sort (`Beef.ts:367-368`).
-    fn refuse_empty_txid(&self) -> Result<()> {
-        match self.txs.iter().find(|tx| tx.empty_txid()) {
-            Some(tx) => tx.own_refusal(),
-            None => Ok(()),
-        }
+        super::atomic::cost::amounts(self.txs().len());
+        self.txs().iter().try_for_each(BeefTx::amount_refusal)
     }
 
     /// The writers' check with the entries met in `order` (positions in
     /// `txs`), the order they would be written.
     pub(super) fn check_writable_in(&self, order: &[usize]) -> Result<()> {
         self.refuse_unsafe_amount()?;
-        self.refuse_empty_txid()?;
-        if let Some(bump) = self.bumps.iter().find(|bump| bump.writes_non_hex()) {
+        if let Some(bump) = self.bumps().iter().find(|bump| bump.writes_non_hex()) {
             return bump.check_writable(); // `Invalid hex string`, the refusal it checks ahead
         }
         for &i in order {
-            self.txs[i].reference_refusal(self.version)?;
+            self.txs()[i].reference_refusal(self.version)?;
         }
         if self.version != BEEF_V1 && self.version != BEEF_V2 {
             return Err(crate::Error::BeefError(format!(
@@ -231,11 +217,11 @@ impl Beef {
                 self.version
             )));
         }
-        for bump in &self.bumps {
+        for bump in self.bumps() {
             bump.check_writable()?;
         }
         for &i in order {
-            self.txs[i].own_refusal()?;
+            self.txs()[i].own_refusal()?;
         }
         Ok(())
     }
@@ -243,20 +229,20 @@ impl Beef {
     /// The bytes of a BEEF the check accepted, the entries in held order, as
     /// 0.9.0-beta wrote every BEEF.
     pub(super) fn write_checked(&self, writer: &mut Writer) {
-        self.write_entries(writer, &(0..self.txs.len()).collect::<Vec<_>>());
+        self.write_entries(writer, &(0..self.txs().len()).collect::<Vec<_>>());
     }
 
     /// The version, the BUMPs and the entries in `order`, each entry's
     /// transaction as its `written_tx_bytes` (what `merge_beef` merges).
     fn write_entries(&self, writer: &mut Writer, order: &[usize]) {
         writer.write_u32_le(self.version);
-        writer.write_var_int(self.bumps.len() as u64);
-        for bump in &self.bumps {
+        writer.write_var_int(self.bumps().len() as u64);
+        for bump in self.bumps() {
             bump.write_unchecked(writer);
         }
         writer.write_var_int(order.len() as u64);
         for &i in order {
-            self.txs[i].write_unchecked(writer, self.version);
+            self.txs()[i].write_unchecked(writer, self.version);
         }
     }
 

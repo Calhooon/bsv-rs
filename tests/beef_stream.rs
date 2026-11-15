@@ -873,14 +873,14 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
     assert_eq!(bump.block_height, 814_435);
     assert_eq!(
         display_hex(&bump.root),
-        beef.bumps[0].compute_root(None).unwrap()
+        beef.bumps()[0].compute_root(None).unwrap()
     );
     assert_eq!(
         bump.to_merkle_path()
             .unwrap()
             .to_binary()
             .expect("the path holds only states a BUMP writes (#817)"),
-        beef.bumps[0]
+        beef.bumps()[0]
             .to_binary()
             .expect("the path holds only states a BUMP writes (#817)")
     );
@@ -891,7 +891,7 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
             _ => None,
         })
         .collect();
-    let memory_txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+    let memory_txids: Vec<String> = beef.txs().iter().map(|t| t.id()).collect();
     assert_eq!(stream_txids, memory_txids);
     assert!(beef.verify_valid(false).valid);
 
@@ -1820,8 +1820,8 @@ fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
     let c = chain(3, true);
     assert!(whole(&c.bytes).is_ok());
     let mut beef = Beef::from_binary(&c.bytes).unwrap();
-    let subject = beef.atomic_txid.clone().unwrap();
-    let written = beef.to_binary_atomic(&subject).unwrap();
+    let subject = beef.atomic_txid.unwrap();
+    let written = beef.to_binary_atomic(subject).unwrap();
     assert!(whole(&written).is_ok());
 }
 

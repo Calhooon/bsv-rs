@@ -298,11 +298,11 @@ fn vector_transactions() -> Vec<Linked> {
             continue;
         };
         let held: HashMap<String, Transaction> = beef
-            .txs
+            .txs()
             .iter()
             .filter_map(|entry| entry.tx().map(|tx| (tx.id(), tx.clone())))
             .collect();
-        for entry in beef.txs.iter().filter(|e| e.bump_index().is_none()) {
+        for entry in beef.txs().iter().filter(|e| e.bump_index().is_none()) {
             if let Some(tx) = entry.tx() {
                 let name = format!("{} {}", file.display(), tx.id());
                 out.extend(link(name, tx, &held));

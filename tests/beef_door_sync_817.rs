@@ -17,22 +17,34 @@
 //! which doors ran (a combine into an earlier BUMP sets its txids to it
 //! until a BUMP synchronization finds the BUMPs moved).
 //!
-//! Fifteen of the 43 cells are stated, each test named `_stated_817` with
-//! the reference's recorded answer asserted beside this crate's: the seven
-//! BUMP cells where the reference's map still holds a combine's index, the
-//! two `makeTxidOnly` cells (the reference's stale index), the edit through
-//! the public `txs` by the deprecated `tx_mut` (the #171 window), the edit
-//! onto a txid another entry holds (refused here), and the four hand edits
-//! of `txs` (a drop, a push, a swap, a replacement keeping the count), where
-//! the reference's index is never rebuilt and this crate's notices the
-//! count or a mismatched hit. The first 33 cells were recorded for PR #832,
-//! seven by the edit door's lane, two by its fold of the rebuild (the sort
-//! marks after an edit) and the last by its second fold (a twin read from
-//! bytes, one edited), additions only; 28 recorded and 15 stated.
+//! Fourteen of the 43 cells are stated, each test named `_stated_817` or
+//! `_stated_843b` with the reference's recorded answer asserted beside this
+//! crate's: the seven BUMP cells where the reference's map still holds a
+//! combine's index, the two `makeTxidOnly` cells (the reference's stale
+//! index), the edit onto a txid another entry holds (refused here), and the
+//! four cells the recorder made by a hand edit of its `txs` (a drop, a
+//! push, a swap, a replacement keeping the count), where the reference's
+//! index is never rebuilt. The 33 cells recorded for PR #832 came earliest,
+//! then seven by the edit door's lane, two by its fold of the rebuild (the
+//! sort marks after an edit) and the last by its second fold (a twin read
+//! from bytes, one edited), additions only; 29 recorded and 14 stated.
+//!
+//! Since #843b a `Beef` owns its rows: no hand edit of `txs`, no
+//! `find_txid_mut`, no `tx_mut`, no `reindex` (each a compile error,
+//! `src/transaction/beef/rows.rs`' `compile_fail` doc tests). The recorder's
+//! hand steps are replayed through the door that makes the same rows
+//! (`drop:` by `retain_txs`, `push:` by `merge_raw_tx`, `swap:` by a frame
+//! read in the swapped order, `replace:` and `editpub:` by `edit_tx`), and
+//! `mut:` by the one lookup left, `find_txid`. The vector is unchanged. Two
+//! cells moved: the edit the recorder made through the public `txs` (stated
+//! until then as the #171 window of `tx_mut`) is the reference's recording
+//! now, and the replacement keeping the count (stated until then as a
+//! window on both sides: the new txid missed, stored twice) is found at
+//! once and held once here.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
-use bsv_rs::transaction::{Beef, BeefTx, MerklePath, Transaction};
+use bsv_rs::transaction::{Beef, MerklePath, Transaction};
 use serde_json::{json, Value};
 
 const VECTOR: &str = include_str!("vectors/beef_door_sync_817.json");
@@ -111,7 +123,8 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 None
             }
             "atomicbin" => {
-                beef.to_binary_atomic(&txid(v, arg)).unwrap();
+                beef.to_binary_atomic(txid(v, arg).parse().unwrap())
+                    .unwrap();
                 None
             }
             "wire" => {
@@ -124,25 +137,24 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             "noop" => {
                 // The lock time set to its own value, as the recorder's
                 // `e.tx.lockTime = e.tx.lockTime`.
-                beef.edit_tx(&txid(v, arg), |t| {
+                beef.edit_tx(txid(v, arg).parse().unwrap(), |t| {
                     t.set_lock_time(std::hint::black_box(t.lock_time()))
                 })
                 .unwrap();
                 None
             }
             "order" => Some(Some(json!(beef
-                .txs
+                .txs()
                 .iter()
-                .map(|t| name_of(v, &t.txid()))
+                .map(|t| name_of(v, &t.id()))
                 .collect::<Vec<_>>()))),
             "editpub" => {
-                // The edit through the public `txs`, no door before it: the
-                // deprecated `tx_mut`, its #171 window (the stated cell).
-                let u = txid(v, "u");
-                let at = beef.txs.iter().position(|t| t.txid() == u).unwrap();
-                #[allow(deprecated)] // the hand edit the cell states
-                let edited = beef.txs[at].tx_mut().unwrap();
-                edited.set_lock_time(1);
+                // The recorder's edit of the object reached through its
+                // public `txs`, no door before it. `edit_tx` is the one edit
+                // of a held transaction since #843b (until then this step
+                // was the deprecated `tx_mut`, its #171 window).
+                beef.edit_tx(txid(v, "u").parse().unwrap(), |t| t.set_lock_time(1))
+                    .unwrap();
                 None
             }
             "bump" => {
@@ -155,7 +167,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
                 None
             }
             "txid" => {
-                beef.merge_txid_only(txid(v, arg));
+                beef.merge_txid_only(txid(v, arg).parse().unwrap());
                 None
             }
             "tx" => {
@@ -171,7 +183,7 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             }
             "edit" if arg == "u_input_to_y" => {
                 let cc = "cc".repeat(32);
-                beef.edit_tx(&txid(v, "u"), |t| {
+                beef.edit_tx(txid(v, "u").parse().unwrap(), |t| {
                     t.inputs_mut()[0].source_txid = Some(cc.parse().unwrap())
                 })
                 .unwrap();
@@ -179,67 +191,105 @@ fn apply(v: &Value, beef: &mut Beef, steps: &Value, answers: &mut Vec<Value>) {
             }
             "edit" if arg == "y_input_to_u" => {
                 let u = txid(v, "u");
-                beef.edit_tx(&txid(v, "y"), |t| {
+                beef.edit_tx(txid(v, "y").parse().unwrap(), |t| {
                     t.inputs_mut()[0].source_txid = Some(u.parse().unwrap())
                 })
                 .unwrap();
                 None
             }
-            "edit" => match beef.edit_tx(&txid(v, "u"), |t| t.set_lock_time(1)) {
+            "edit" => match beef.edit_tx(txid(v, "u").parse().unwrap(), |t| t.set_lock_time(1)) {
                 Ok(()) => None,
                 // Refused (another entry holds V): this crate's answer.
                 Err(_) => Some(Some(json!("refused"))),
             },
+            // The recorder's four hand edits of its public `txs`, each made
+            // here through the door that leaves the same rows (#843b: the
+            // hand edit does not compile).
             "drop" => {
                 let id = txid(v, arg);
-                beef.txs.retain(|t| t.txid() != id);
+                beef.retain_txs(|t| t.txid() != id);
                 None
             }
             "push" => {
-                beef.txs.push(
-                    BeefTx::from_raw_tx(tx(v, arg).to_binary(), None).expect("one transaction"),
-                );
+                // An entry no entry's txid: the merge appends it, as the
+                // push did, and keys it.
+                let raw = tx(v, arg);
+                assert!(beef.find_txid(raw.txid()).is_none(), "{step}: not held");
+                beef.merge_raw_tx(raw.to_binary(), None)
+                    .expect("one transaction");
                 None
             }
             "swap" => {
-                beef.txs.swap(0, 1);
+                // No door reorders the entries: the BEEF is read again from
+                // a frame of its rows with the entries at 0 and 1 swapped
+                // (as read, each entry holding its bytes and its parse).
+                let mut order: Vec<usize> = (0..beef.txs().len()).collect();
+                order.swap(0, 1);
+                let mut frame = bsv_rs::primitives::Writer::new();
+                frame.write_u32_le(beef.version);
+                frame.write_var_int(beef.bumps().len() as u64);
+                for bump in beef.bumps() {
+                    bump.to_writer(&mut frame).expect("the BUMP writes");
+                }
+                frame.write_var_int(order.len() as u64);
+                for at in order {
+                    beef.txs()[at]
+                        .to_writer(&mut frame, beef.version)
+                        .expect("the entry writes");
+                }
+                *beef = Beef::from_binary(frame.as_bytes()).unwrap();
                 None
             }
             "replace" => {
+                // The entry holding `a` made to hold `b`, its place kept:
+                // `edit_tx` with the transaction assigned whole.
                 let (a, b) = arg.split_once('_').unwrap();
-                let a = txid(v, a);
-                let at = beef.txs.iter().position(|t| t.txid() == a).unwrap();
-                beef.txs[at] =
-                    BeefTx::from_raw_tx(tx(v, b).to_binary(), None).expect("one transaction");
+                let replacement = tx(v, b);
+                beef.edit_tx(txid(v, a).parse().unwrap(), |t| *t = replacement)
+                    .unwrap();
                 None
             }
+            // The recorder's `findTxid` before an in-place write; no door
+            // lends an entry mutably since #843b, so the lookup is the
+            // shared one.
             "mut" => Some(
-                beef.find_txid_mut(&txid(v, arg))
-                    .map(|e| name_of(v, &e.txid())),
+                beef.find_txid(txid(v, arg).parse().unwrap())
+                    .map(|e| name_of(v, &e.id())),
             ),
-            "inputs" => Some(beef.find_txid(&txid(v, arg)).map(|e| {
-                let names: Vec<Value> = e.input_txids.iter().map(|t| name_of(v, t)).collect();
+            "inputs" => Some(beef.find_txid(txid(v, arg).parse().unwrap()).map(|e| {
+                let names: Vec<Value> = e
+                    .input_txids()
+                    .iter()
+                    .map(|t| name_of(v, &t.to_string()))
+                    .collect();
                 json!(names)
             })),
             "atomicpath" => Some(
-                beef.find_atomic_transaction(&txid(v, arg))
+                beef.find_atomic_transaction(txid(v, arg).parse().unwrap())
                     .and_then(|t| t.merkle_path.as_ref().map(|mp| json!(mp.block_height))),
             ),
-            "find" => Some(beef.find_txid(&txid(v, arg)).map(|e| name_of(v, &e.txid()))),
-            "make" => Some(
-                beef.make_txid_only(&txid(v, arg))
-                    .map(|e| name_of(v, &e.txid())),
+            "find" => Some(
+                beef.find_txid(txid(v, arg).parse().unwrap())
+                    .map(|e| name_of(v, &e.id())),
             ),
-            "findbump" => Some(beef.find_bump(&txid(v, arg)).map(|mp| {
-                let at = beef.bumps.iter().position(|b| std::ptr::eq(b, mp)).unwrap();
+            "make" => Some(
+                beef.make_txid_only(txid(v, arg).parse().unwrap())
+                    .map(|e| name_of(v, &e.id())),
+            ),
+            "findbump" => Some(beef.find_bump(txid(v, arg).parse().unwrap()).map(|mp| {
+                let at = beef
+                    .bumps()
+                    .iter()
+                    .position(|b| std::ptr::eq(b, mp))
+                    .unwrap();
                 json!(at)
             })),
             "sign" => Some(
-                beef.find_transaction_for_signing(&txid(v, arg))
+                beef.find_transaction_for_signing(txid(v, arg).parse().unwrap())
                     .map(|t| name_of(v, &t.id())),
             ),
             "atomic" => Some(
-                beef.find_atomic_transaction(&txid(v, arg))
+                beef.find_atomic_transaction(txid(v, arg).parse().unwrap())
                     .map(|t| name_of(v, &t.id())),
             ),
             other => panic!("no step {other}"),
@@ -275,17 +325,17 @@ fn run(name: &str) -> (Value, Value) {
     // Written first, as the recorder reads the entries after its `toHex`.
     let hex = beef.to_hex().expect("the BEEF writes");
     let entries: Vec<Value> = beef
-        .txs
+        .txs()
         .iter()
         .map(|t| {
             let form = if t.is_txid_only() { "txid" } else { "raw" };
-            json!({ "name": name_of(&v, &t.txid()), "bump_index": t.bump_index(), "form": form })
+            json!({ "name": name_of(&v, &t.id()), "bump_index": t.bump_index(), "form": form })
         })
         .collect();
     let ours = json!({
         "answers": answers,
         "beef": hex,
-        "bumps": beef.bumps.len(),
+        "bumps": beef.bumps().len(),
         "entries": entries,
     });
     (ours, case)
@@ -321,11 +371,11 @@ fn assert_stated(name: &str, reference: Value, here: Value) {
     let v = vector();
     let back = Beef::from_hex(ours["beef"].as_str().unwrap()).unwrap();
     let read: Vec<Value> = back
-        .txs
+        .txs()
         .iter()
         .map(|t| {
             let form = if t.is_txid_only() { "txid" } else { "raw" };
-            json!({ "name": name_of(&v, &t.txid()), "bump_index": t.bump_index(), "form": form })
+            json!({ "name": name_of(&v, &t.id()), "bump_index": t.bump_index(), "form": form })
         })
         .collect();
     // A txid-only entry's index is not written (BRC-96's format 2 carries
@@ -402,8 +452,15 @@ fn an_edit_then_merge_bump_then_make_txid_only_of_the_new_txid_817() {
     assert_recorded("an_edit_then_merge_bump_then_make_txid_only_of_the_new_txid");
 }
 
+/// The recorded answers of the reference's lookup ahead of an in-place
+/// write, replayed through `find_txid`.
+///
+/// Replaces `an_edit_then_find_txid_mut_answers_the_edited_txid_817`:
+/// `find_txid_mut` does not compile since #843b
+/// (`src/transaction/beef/rows.rs`' `compile_fail` doc tests), and the
+/// entry it lent is reached through `edit_tx` and `set_bump_index`.
 #[test]
-fn an_edit_then_find_txid_mut_answers_the_edited_txid_817() {
+fn an_edit_then_the_lookup_answers_the_edited_txid_as_find_txid_mut_did_843b() {
     assert_recorded("an_edit_then_find_txid_mut_answers_the_edited_txid");
 }
 
@@ -464,45 +521,20 @@ fn an_edit_then_make_txid_only_of_the_new_txid_is_stated_817() {
     );
 }
 
-/// The edit through the public `txs` by the deprecated `tx_mut`, no door
-/// between: the reference's `findTxid(V)` synchronizes and finds V, and its
-/// `mergeRawTx(V)` replaces it; here the deprecated path keeps the #171
-/// window (the per-entry doors do not re-key), so V is not found and is
-/// stored a second time. `edit_tx` is the door that closes it
-/// (`tests/beef_edit_door_817.rs`), and `reindex` re-keys a hand edit.
+/// The recorder's edit of the object reached through its public `txs`, no
+/// door between: the reference's `findTxid(V)` synchronizes and finds V,
+/// and its `mergeRawTx(V)` replaces it; this crate's `edit_tx` re-keyed V
+/// at once, so V is found and held once, the reference's recording byte for
+/// byte and answer for answer.
+///
+/// Replaces `an_edit_through_txs_by_tx_mut_is_the_171_window_stated_817`,
+/// which stated the cell: the deprecated `tx_mut` kept the #171 window (the
+/// per-entry doors did not re-key), so V was not found and was stored a
+/// second time. `tx_mut` does not compile since #843b and the window is
+/// closed; the cell is no longer stated.
 #[test]
-fn an_edit_through_txs_by_tx_mut_is_the_171_window_stated_817() {
-    let v = vector();
-    let (_, case) = run("an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid");
-    let mut doubled = case["entries"].as_array().unwrap().clone();
-    doubled.push(entry("v", None, "raw"));
-    let (ours, _) = run("an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid");
-    let mut written = case["beef"].as_str().unwrap().to_string();
-    // The recorded bytes with a second V appended: the count, then V again.
-    let v_raw = tx(&v, "v").to_hex();
-    written = written.replacen("0200beef0002", "0200beef0003", 1) + "00" + &v_raw;
-    assert_eq!(ours["beef"].as_str().unwrap(), written);
-    assert_stated(
-        "an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid",
-        json!({
-            "answers": [
-                { "step": "find:u", "answer": "u" },
-                { "step": "find:v", "answer": "v" },
-                { "step": "find:u", "answer": null },
-            ],
-            "entries": case["entries"],
-            "beef": case["beef"],
-        }),
-        json!({
-            "answers": [
-                { "step": "find:u", "answer": "u" },
-                { "step": "find:v", "answer": null },
-                { "step": "find:u", "answer": null },
-            ],
-            "entries": doubled,
-            "beef": written,
-        }),
-    );
+fn an_edit_of_a_held_transaction_is_found_by_its_new_txid_and_held_once_843b() {
+    assert_recorded("an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid");
 }
 
 // X held by b0 (900000) and b1 (900001). This crate's rule: an entry names
@@ -652,17 +684,23 @@ fn an_edit_onto_a_txid_another_entry_holds_is_refused_stated_817() {
     );
 }
 
-// The hand edits of the public `txs`, no door between. The reference's
-// index maps a txid to its object and its position (`Beef.ts:507-529`), never
-// rebuilt by a hand edit, so a dropped entry is still found, a pushed one is
-// not, and `mergeRawTx` replaces at a stale position (a swap loses U) or
-// appends a second copy. This crate's index notices a moved count or a hit
-// naming another entry (a scan answers, the next `&mut` door rebuilds).
+// The recorder's hand edits of its public `txs`, no door between. The
+// reference's index maps a txid to its object and its position
+// (`Beef.ts:507-529`), never rebuilt by a hand edit, so a dropped entry is
+// still found, a pushed one is not, and `mergeRawTx` replaces at a stale
+// position (a swap loses U) or appends a second copy. Here each step goes
+// through a door (`apply`), after which a lookup answers the last entry
+// holding the txid and `None` for a txid no entry holds (#843b).
 
-/// The toolbox's `retain`: W and U found, the dropped X not, and W merged
-/// into its place (the reference: X found, W stored twice).
+/// The toolbox's `retain`, through `retain_txs`: W and U found, the dropped
+/// X not, and W merged into its place (the reference: X found, W stored
+/// twice).
+///
+/// Replaces `a_hand_drop_then_the_lookups_and_merge_raw_tx_stated_817`,
+/// whose drop was a hand `retain` of the public `txs`; the answers here are
+/// the ones it stated.
 #[test]
-fn a_hand_drop_then_the_lookups_and_merge_raw_tx_stated_817() {
+fn a_retain_then_the_lookups_and_merge_raw_tx_stated_843b() {
     let name = "a_hand_drop_then_the_lookups_and_merge_raw_tx";
     assert_stated(
         name,
@@ -675,6 +713,7 @@ fn a_hand_drop_then_the_lookups_and_merge_raw_tx_stated_817() {
             "entries": [entry("u", None, "raw"), entry("w", None, "raw"), entry("w", None, "raw")],
             "beef": run(name).1["beef"],
         }),
+        // Stated: the dropped X names nothing and W is held once (#843b).
         json!({
             "answers": [
                 { "step": "find:w", "answer": "w" },
@@ -687,10 +726,14 @@ fn a_hand_drop_then_the_lookups_and_merge_raw_tx_stated_817() {
     );
 }
 
-/// A hand push: W found and merged into its place (the reference: not
-/// found, stored twice).
+/// An entry appended by a merge, where the recorder pushed it by hand: W
+/// found and merged into its place (the reference: not found, stored
+/// twice).
+///
+/// Replaces `a_hand_push_then_find_txid_and_merge_raw_tx_stated_817`; the
+/// answers here are the ones it stated.
 #[test]
-fn a_hand_push_then_find_txid_and_merge_raw_tx_stated_817() {
+fn an_append_then_find_txid_and_merge_raw_tx_stated_843b() {
     let name = "a_hand_push_then_find_txid_and_merge_raw_tx";
     assert_stated(
         name,
@@ -699,6 +742,8 @@ fn a_hand_push_then_find_txid_and_merge_raw_tx_stated_817() {
             "entries": [entry("x", None, "raw"), entry("w", None, "raw"), entry("w", None, "raw")],
             "beef": run(name).1["beef"],
         }),
+        // Stated: an entry is keyed as it is appended, so W is found and
+        // held once (#843b).
         json!({
             "answers": [{ "step": "find:w", "answer": "w" }],
             "entries": [entry("x", None, "raw"), entry("w", None, "raw")],
@@ -707,10 +752,15 @@ fn a_hand_push_then_find_txid_and_merge_raw_tx_stated_817() {
     );
 }
 
-/// A hand swap: both found on both sides (the answers the recording's), X merged into its own new place (the
-/// reference's `mergeRawTx(X)` writes X over U at X's old position, U lost).
+/// The entries in the swapped order (read from a frame, where the recorder
+/// swapped them by hand): both found on both sides (the answers the
+/// recording's), X merged into its own new place (the reference's
+/// `mergeRawTx(X)` writes X over U at X's old position, U lost).
+///
+/// Replaces `a_hand_swap_then_find_each_and_merge_raw_tx_stated_817`; the
+/// answers here are the ones it stated.
 #[test]
-fn a_hand_swap_then_find_each_and_merge_raw_tx_stated_817() {
+fn a_swapped_order_then_find_each_and_merge_raw_tx_stated_843b() {
     let name = "a_hand_swap_then_find_each_and_merge_raw_tx";
     assert_stated(
         name,
@@ -718,6 +768,7 @@ fn a_hand_swap_then_find_each_and_merge_raw_tx_stated_817() {
             "entries": [entry("x", None, "raw"), entry("x", None, "raw")],
             "beef": run(name).1["beef"],
         }),
+        // Stated: X is merged where it is held, U kept (#843b).
         json!({
             "entries": [entry("u", None, "raw"), entry("x", None, "raw")],
             "beef": written(&["u", "x"]),
@@ -725,18 +776,33 @@ fn a_hand_swap_then_find_each_and_merge_raw_tx_stated_817() {
     );
 }
 
-/// The stated window, on both sides: a hand replacement that keeps the
-/// count makes a lookup of the new entry miss, so `merge_raw_tx(W)` stores
-/// W twice there and here (the bytes agree); the replaced X is not found
-/// here (its hit names W) where the reference still finds its object.
-/// `reindex` is this crate's door for it (`tests/beef_edit_door_817.rs`).
+/// A replacement keeping the count, through `edit_tx`: W is found at once,
+/// the replaced X names nothing, and `merge_raw_tx(W)` stores W in its
+/// place, held once. The reference misses W (its index was never given it),
+/// still finds X's object and stores W twice.
+///
+/// Replaces `a_hand_replace_keeping_the_count_is_the_window_stated_817`,
+/// which stated the window on both sides: after the hand replacement this
+/// crate's lookup of W missed too and W was stored twice, the bytes the
+/// reference's, with `reindex` its door. The window is closed (#843b), so
+/// the answers, the entries and the bytes all part from the recording.
 #[test]
-fn a_hand_replace_keeping_the_count_is_the_window_stated_817() {
+fn a_replacement_keeping_the_count_is_found_at_once_stated_843b() {
     let name = "a_hand_replace_keeping_the_count_then_find_and_merge_raw_tx";
     assert_stated(
         name,
-        json!({ "answers": [{ "step": "find:w", "answer": null }, { "step": "find:x", "answer": "x" }] }),
-        json!({ "answers": [{ "step": "find:w", "answer": null }, { "step": "find:x", "answer": null }] }),
+        json!({
+            "answers": [{ "step": "find:w", "answer": null }, { "step": "find:x", "answer": "x" }],
+            "entries": [entry("w", None, "raw"), entry("u", None, "raw"), entry("w", None, "raw")],
+            "beef": run(name).1["beef"],
+        }),
+        // Stated: W is found where it is held and held once; X, which no
+        // entry holds, names nothing (#843b).
+        json!({
+            "answers": [{ "step": "find:w", "answer": "w" }, { "step": "find:x", "answer": null }],
+            "entries": [entry("w", None, "raw"), entry("u", None, "raw")],
+            "beef": written(&["w", "u"]),
+        }),
     );
 }
 
@@ -850,11 +916,16 @@ fn a_combine_on_a_clone_of_an_unread_beef_names_the_last_bump_stated_817() {
     );
 }
 
-/// The fifteen stated cells of the forty-three, counted: a cell that moves
+/// The fourteen stated cells of the forty-three, counted: a cell that moves
 /// is a finding. (Named so that its own name does not end in the stated
-/// cells' suffix, which a count of the suffix would take for a sixteenth.)
+/// cells' suffix, which a count of the suffix would take for one more.)
+///
+/// Replaces `the_stated_cells_counted_are_fifteen_of_forty_three_817`: the
+/// fifteenth was `an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid`,
+/// the #171 window of `tx_mut`, which is the reference's recording since
+/// #843b.
 #[test]
-fn the_stated_cells_counted_are_fifteen_of_forty_three_817() {
+fn the_stated_cells_counted_are_fourteen_of_forty_three_843b() {
     let v = vector();
     let differing: Vec<String> = v["cases"]
         .as_array()
@@ -878,7 +949,6 @@ fn the_stated_cells_counted_are_fifteen_of_forty_three_817() {
             "a_combine_through_merge_bump_survives_merge_raw_tx",
             "a_combine_before_any_bump_sync_survives_the_first",
             "a_combine_before_any_bump_sync_survives_a_sort",
-            "an_edit_through_txs_after_a_lookup_is_found_by_its_new_txid",
             "an_unsynced_combine_is_the_atomic_paths_index",
             "a_combine_on_a_clone_of_an_unread_beef_survives_find_bump",
             "an_edit_onto_a_txid_another_entry_holds",

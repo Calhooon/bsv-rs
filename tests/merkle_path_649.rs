@@ -317,8 +317,16 @@ fn an_empty_path_does_not_panic_in_a_beef() {
         beef.merge_transaction(tx);
         let index = beef.merge_bump(one_leaf(&shape));
         assert_eq!(beef.merge_bump(held(&shape)), index + 1, "{}", shape.name);
-        assert!(beef.find_bump(&txid).is_none(), "{}", shape.name);
-        assert!(beef.find_txid(&txid).unwrap().bump_index().is_none());
+        assert!(
+            beef.find_bump(txid.parse().unwrap()).is_none(),
+            "{}",
+            shape.name
+        );
+        assert!(beef
+            .find_txid(txid.parse().unwrap())
+            .unwrap()
+            .bump_index()
+            .is_none());
         assert!(beef.verify_structure().is_err(), "{}", shape.name);
         assert!(!beef.verify_valid(false).valid, "{}", shape.name);
     }

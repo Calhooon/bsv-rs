@@ -31,7 +31,7 @@ use bsv_rs::primitives::{from_hex, sha256d, to_hex};
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::beef_stream::{verify_stream_structure, Hash32, HeadersFn, Kind};
 use bsv_rs::transaction::{
-    Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput,
+    Beef, MerklePath, MerklePathLeaf, Transaction, TransactionInput, TransactionOutput, Txid,
 };
 
 const HEIGHT: u32 = 964_422;
@@ -114,14 +114,18 @@ fn refusal(beef: &Beef) -> Option<String> {
     let mut held = beef.clone();
     let kind = held.verify_structure().err()?;
     let sorted = held.clone().sort_txs();
+    // The door prints each list as its txid texts. The sort's lists are
+    // `Txid`s since #843b, whose `Debug` is `Txid(<digits>)`, so they are
+    // taken to text here to keep the door's shape.
+    let texts = |list: &[Txid]| list.iter().map(Txid::to_string).collect::<Vec<_>>();
     Some(format!(
         "BEEF structure is invalid ({kind:?}): roots {:?}; missing inputs {:?}; \
          transactions with missing inputs {:?}; {} tx(s), {} bump(s), {} bytes",
-        sorted.valid,
-        sorted.missing_inputs,
-        sorted.with_missing_inputs,
-        held.txs.len(),
-        held.bumps.len(),
+        texts(&sorted.valid),
+        texts(&sorted.missing_inputs),
+        texts(&sorted.with_missing_inputs),
+        held.txs().len(),
+        held.bumps().len(),
         held.to_binary().expect("the BEEF is writable").len()
     ))
 }
@@ -136,7 +140,7 @@ fn assert_links(beef: &mut Beef, subject: &str, b: &str, root: &str) {
     let any = HeadersFn(|_: u64, _: &Hash32| true);
     let verdict = verify_stream_structure(bytes.as_slice(), &any, None).unwrap();
     assert!(verdict.is_valid(), "{verdict:?}");
-    let mut stack = vec![Transaction::from_beef(&bytes, Some(subject)).unwrap()];
+    let mut stack = vec![Transaction::from_beef(&bytes, Some(subject.parse().unwrap())).unwrap()];
     while let Some(t) = stack.pop() {
         if t.id() == b {
             let mp = t.merkle_path.as_ref().expect("B's BUMP attached");
@@ -177,8 +181,8 @@ fn a_sibling_mined_input_merged_without_an_index_links_to_the_bump_holding_it_76
         .expect("the bytes are one transaction");
 
     assert_eq!(refusal(&beef), None, "the p25 BEEF");
-    assert_eq!(beef.find_txid(&b.id()).unwrap().bump_index(), Some(0));
-    assert_eq!(beef.bumps[0].txids(), vec![blk.a.id(), b.id()]);
+    assert_eq!(beef.find_txid(b.txid()).unwrap().bump_index(), Some(0));
+    assert_eq!(beef.bumps()[0].txids(), vec![blk.a.id(), b.id()]);
     let hex = beef.to_hex().expect("the BEEF is writable");
     assert!(
         hex.contains(&leaf_bytes(&b.id(), "02")),
@@ -203,7 +207,7 @@ fn a_txid_no_bump_holds_stays_unproven_and_its_missing_parent_refused_765() {
         beef.merge_raw_tx(t.to_binary(), None)
             .expect("the bytes are one transaction");
     }
-    assert_eq!(beef.find_txid(&b.id()).unwrap().bump_index(), None);
+    assert_eq!(beef.find_txid(b.txid()).unwrap().bump_index(), None);
     let text = refusal(&beef).expect("refused");
     assert!(
         text.starts_with("BEEF structure is invalid (InputNamesNoElement)"),
@@ -279,7 +283,7 @@ fn the_seven_arrangements_of_a_txid_held_as_a_sibling_leaf_link_765() {
     beef.merge_bump(k.blk.d_bump.clone());
     beef.merge_bump(k.blk.a_bump.clone());
     merge_raw(&mut beef, &[a, s, u1, u2]);
-    assert_eq!(beef.bumps.len(), 1, "two BUMPs of one block combined");
+    assert_eq!(beef.bumps().len(), 1, "two BUMPs of one block combined");
     cases.push(("at another BUMP's height", beef));
 
     let mut beef = Beef::new();
@@ -289,12 +293,12 @@ fn the_seven_arrangements_of_a_txid_held_as_a_sibling_leaf_link_765() {
 
     for (name, mut beef) in cases {
         assert_eq!(
-            beef.find_txid(&s.id()).unwrap().bump_index(),
+            beef.find_txid(s.txid()).unwrap().bump_index(),
             Some(0),
             "{name}"
         );
         assert!(
-            beef.bumps[0].txids().contains(&s.id()),
+            beef.bumps()[0].txids().contains(&s.id()),
             "{name}: the leaf flagged"
         );
         assert_links(&mut beef, &u2.id(), &s.id(), &k.blk.root);
@@ -307,7 +311,7 @@ fn the_seven_arrangements_of_a_txid_held_as_a_sibling_leaf_link_765() {
     beef.merge_bump(MerklePath::from_coinbase_txid(&m0.id(), HEIGHT - 1));
     beef.merge_bump(k.blk.a_bump.clone());
     merge_raw(&mut beef, &[&m0, &k.blk.a, &k.s, &k.u1, &k.u2]);
-    assert_eq!(beef.find_txid(&k.s.id()).unwrap().bump_index(), Some(1));
+    assert_eq!(beef.find_txid(k.s.txid()).unwrap().bump_index(), Some(1));
     assert_links(&mut beef, &k.u2.id(), &k.s.id(), &k.blk.root);
 }
 
@@ -322,9 +326,9 @@ fn a_txid_only_sibling_and_two_roots_at_one_height_answer_for_their_own_reasons_
     let k = chain(&"29".repeat(32));
     let mut beef = Beef::new();
     beef.merge_bump(k.blk.a_bump.clone());
-    beef.merge_txid_only(k.s.id());
+    beef.merge_txid_only(k.s.txid());
     merge_raw(&mut beef, &[&k.blk.a, &k.u1, &k.u2]);
-    assert_eq!(beef.find_txid(&k.s.id()).unwrap().bump_index(), Some(0));
+    assert_eq!(beef.find_txid(k.s.txid()).unwrap().bump_index(), Some(0));
     assert!(beef.verify_valid(false).valid && beef.verify_valid(true).valid);
     let mut read = Beef::from_binary(&beef.to_binary().expect("the BEEF is writable")).unwrap();
     assert!(read.verify_valid(false).valid, "the txid-only S read back");
@@ -343,7 +347,7 @@ fn a_txid_only_sibling_and_two_roots_at_one_height_answer_for_their_own_reasons_
             beef.merge_bump(MerklePath::from_coinbase_txid(&k.blk.a.id(), HEIGHT));
             merge_raw(&mut beef, &[&k.blk.a]);
         }
-        assert_eq!(beef.bumps.len(), 2);
+        assert_eq!(beef.bumps().len(), 2);
         assert_eq!(beef.verify_structure().err(), Some(Kind::RootNotCarried));
     }
 }
