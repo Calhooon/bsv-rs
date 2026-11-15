@@ -49,6 +49,27 @@
 //! visible in the diff), and a value GitHub keeps outside the file (an organization or repository
 //! variable, which reaches a job only through a `${{ vars.NAME }}` the file would carry, and of
 //! which the repository and its organization held none on 2026-11-13).
+//!
+//! An advisory's record (#849; RELEASING.md steps 14 and 23 (f)): the ritual publishes an advisory
+//! of this crate on this repository's Security tab and files it nowhere else. A RustSec file, a
+//! pull request to that database or a CVE request written back as a standing duty of a sitting is
+//! refused by its words (`STALE_ADVISORY_DUTIES_849`), and the sentences that say what is done are
+//! held (`ADVISORY_RECORD_849`). Since the fold of 2026-11-15 those sentences say two things more.
+//! The direction rule's class of a security advisory is true of both kinds: an advisory of this
+//! crate is one drafted on this repository's Security tab, an advisory against a dependency an
+//! entry of the RustSec database; the wording that called both a RustSec entry is refused beside
+//! a security patch's sitting (`STALE_ADVISORY_CLASS_849`). And a CVE is requested from GitHub at
+//! an advisory's publication when the project's owner has said so for the release, as it was for
+//! each of the six advisories of 0.8.5 to 0.8.9; the sentence that no CVE is requested unless the
+//! security page names the advisory, a rule nobody made, is refused (`FORMER_CVE_RULES_849`). The
+//! security page's own sentences and its closed table are `tests/front_page.rs`'s.
+//! The bound of these pins, as the cold read of the fold found it (2026-11-15): each is a
+//! literal, case-sensitive text. A former rule or the class's older wording written back in
+//! another spelling or another case (`No CVE is requested`, `a CVE is not requested unless`, `a
+//! RustSec entry against the crate`), or a sentence added beside a held one that contradicts it,
+//! passes; so does any sentence of step 23 not in `ADVISORY_RECORD_849`, the clause of point (iv)
+//! that a sitting owes `SECURITY.md` no edit for its advisory among them. Such a change is
+//! visible in its diff and is a reviewer's matter.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 mod arch_support;
@@ -1622,6 +1643,258 @@ fn releasing_names_the_settings_that_silence_the_judge_and_the_syncs_cancelled_r
         );
     }
     assert!(releasing_refusals("", "", "").is_empty());
+}
+
+/// What `RELEASING.md` prescribed until #849 and may not prescribe again: a RustSec file, a pull
+/// request to that database, a CVE request, each of them a standing duty of a release sitting.
+const STALE_ADVISORY_DUTIES_849: &[&str] = &[
+    "CVE requested",
+    "RustSec entry filed",
+    "the RustSec file needs no second pull request",
+    "a second pull request there",
+    "in the RustSec file's `patched`",
+    "(iv) the RustSec files",
+    "rustsec-admin lint",
+];
+
+/// What the ritual said of a CVE from #849's lane until its fold of 2026-11-15 and may not say
+/// again: that no CVE is requested unless the security page names the advisory, and that a
+/// sitting edits that page to name one. Nobody made that rule. A CVE was requested from GitHub
+/// for each of the six advisories of 0.8.5 to 0.8.9 at its publication, and the decision of
+/// 2026-11-13 that the lane cited is about the RustSec advisory database alone.
+const FORMER_CVE_RULES_849: &[&str] = &[
+    "no CVE is requested",
+    "to name an advisory for which a CVE is requested",
+];
+
+/// The direction rule's class of a security advisory as it read until the fold of 2026-11-15, "a
+/// security advisory (a RustSec entry against this crate or a dependency)". No advisory of this
+/// crate published after 2026-11-13 is a RustSec entry, so by that letter the class admitted no
+/// later security patch of this crate. Refused wherever the ritual describes a security patch's
+/// sitting (its step 23 drafts the advisory on the Security tab); `main`'s older ritual carries
+/// the sentence beside no such step and is not judged for it.
+const STALE_ADVISORY_CLASS_849: &str = "a RustSec entry against this crate";
+
+/// What the ritual says of an advisory's record since #849, each with why, wherever the ritual
+/// describes a security patch's sitting at all (it names a draft security advisory; `main`'s
+/// older ritual names none and is judged for the stale duties alone). The last two are the
+/// direction rule's class, true of both kinds since the fold of 2026-11-15; the third, the sixth
+/// and the seventh are what the fold says of a CVE.
+const ADVISORY_RECORD_849: &[(&str, &str)] = &[
+    (
+        "the advisory on this repository's Security tab is the record, and the one place where the sitting publishes it",
+        "step 23 (f) says where an advisory is published",
+    ),
+    (
+        "no file and no pull request is sent to the RustSec advisory database",
+        "step 23 (f) sends the RustSec database nothing",
+    ),
+    (
+        "a CVE is requested from GitHub at the publication when the project's owner has said so for the release",
+        "step 23 (f) requests a CVE on the owner's word for the release",
+    ),
+    (
+        "(iv) no RustSec file (a decision of the project's owner, 2026-11-13)",
+        "step 23 (f)(iv) is the decision, where it was the filing's lessons",
+    ),
+    (
+        "`cargo audit` and `cargo deny` therefore report no later advisory of this crate",
+        "step 23 (f)(iv) says what the two tools no longer report",
+    ),
+    (
+        "that decision is about the RustSec advisory database alone",
+        "step 23 (f)(iv) keeps the decision of 2026-11-13 to the RustSec database",
+    ),
+    (
+        "a CVE was requested for each of the six advisories of 0.8.5 to 0.8.9 at its publication",
+        "step 23 (f)(iv) records the CVE requests of the six advisories of 0.8.5 to 0.8.9",
+    ),
+    (
+        "is closed and gains no row",
+        "step 23 (f)(iv) says the security page's table is closed",
+    ),
+    (
+        "nothing is sent to the RustSec advisory database (step 23 (f)(iv)",
+        "step 14 owes the RustSec database nothing when a patched prerelease publishes",
+    ),
+    (
+        "- a security advisory: of this crate, one drafted on this repository's Security tab (step 23",
+        "the direction rule's class admits an advisory of this crate drafted on the Security tab",
+    ),
+    (
+        "against a dependency, an entry of the RustSec advisory database, which `cargo deny` reports",
+        "the direction rule's class admits a dependency's advisory read from the RustSec database",
+    ),
+];
+
+/// Every refusal of a release ritual's text on an advisory's record (#849).
+fn advisory_record_refusals(releasing: &str) -> Vec<String> {
+    let mut errors = Vec::new();
+    let line_of = |needle: &str| {
+        releasing
+            .lines()
+            .position(|l| l.contains(needle))
+            .map(|n| n + 1)
+    };
+    for duty in STALE_ADVISORY_DUTIES_849 {
+        if let Some(n) = line_of(duty) {
+            errors.push(format!(
+                "RELEASING.md:{n}: `{duty}` prescribes what is no standing duty of a sitting since 2026-11-13 (#849)"
+            ));
+        }
+    }
+    for rule in FORMER_CVE_RULES_849 {
+        if let Some(n) = line_of(rule) {
+            errors.push(format!(
+                "RELEASING.md:{n}: `{rule}` states a rule about CVE requests that nobody made (#849, the fold of 2026-11-15)"
+            ));
+        }
+    }
+    if releasing.contains("draft security advisory") {
+        if let Some(n) = line_of(STALE_ADVISORY_CLASS_849) {
+            errors.push(format!(
+                "RELEASING.md:{n}: `{STALE_ADVISORY_CLASS_849}` calls an advisory of this crate a RustSec entry, which none published after 2026-11-13 is (#849, the fold of 2026-11-15)"
+            ));
+        }
+        for (needle, why) in ADVISORY_RECORD_849 {
+            if !releasing.contains(needle) {
+                errors.push(format!(
+                    "RELEASING.md no longer says that {why}; it lacks `{needle}` (#849)"
+                ));
+            }
+        }
+    }
+    errors
+}
+
+/// #849: the release ritual publishes an advisory on this repository's Security tab and
+/// nowhere else. Until #849 step 23 (f) prescribed "a CVE requested and a RustSec entry filed
+/// from it", its point (iv) was the lessons of filing RustSec files, and step 14 owed that
+/// database a second pull request for a patched prerelease. The fold of 2026-11-15: the
+/// direction rule's class of a security advisory names both kinds (this crate's, drafted on the
+/// Security tab; a dependency's, an entry of the RustSec database), and a CVE is requested from
+/// GitHub at an advisory's publication when the project's owner has said so for the release, as
+/// it was for each of the six advisories of 0.8.5 to 0.8.9.
+#[test]
+fn releasing_publishes_an_advisory_on_the_security_tab_and_files_none_with_rustsec_849() {
+    let releasing = read("RELEASING.md");
+    assert!(
+        releasing.contains("draft security advisory"),
+        "this line's RELEASING.md describes a security patch's sitting"
+    );
+    let errors = advisory_record_refusals(&releasing);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    for (needle, why) in ADVISORY_RECORD_849 {
+        let planted = releasing.replace(needle, "");
+        assert_ne!(planted, releasing, "{needle}");
+        let errors = advisory_record_refusals(&planted);
+        assert!(
+            errors.iter().any(|e| e.contains(why)),
+            "{needle}: {errors:?}"
+        );
+    }
+    // Each duty of the ritual before #849 is refused where it returns, by its own words.
+    for (old, duty) in [
+        (
+            "(the patch, and the next beta prerelease that carries the fix when it is published, step 14), a CVE requested and a RustSec entry filed from it; nothing yanked",
+            "CVE requested",
+        ),
+        (
+            "a CVE requested and a RustSec entry filed from it",
+            "RustSec entry filed",
+        ),
+        (
+            "the RustSec file needs no second pull request if the form that names every version after the last affected prerelease under `patched` from the start is merged there",
+            "the RustSec file needs no second pull request",
+        ),
+        (
+            "if it is not, a second pull request there adds the patched prerelease",
+            "a second pull request there",
+        ),
+        (
+            "the minor's own sitting adds it: `\">= X.Y.0\"` in the RustSec file's `patched`",
+            "in the RustSec file's `patched`",
+        ),
+        (
+            "(iv) the RustSec files. What this project found by its own runs",
+            "(iv) the RustSec files",
+        ),
+        (
+            "Run their linter (`rustsec-admin lint`) on each file before the pull request",
+            "rustsec-admin lint",
+        ),
+    ] {
+        let planted = format!("{releasing}\n{old}\n");
+        let errors = advisory_record_refusals(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains(&format!("`{duty}` prescribes"))),
+            "{old}: {errors:?}"
+        );
+    }
+    // Each sentence on a CVE that the fold of 2026-11-15 removed is refused where it returns:
+    // step 23 (f)'s, point (iv)'s, and the edit of `SECURITY.md` that followed from them.
+    for (old, rule) in [
+        (
+            "no file and no pull request is sent to the RustSec advisory database, and no CVE is requested unless `SECURITY.md` names the advisory and says so (point (iv) below and `SECURITY.md`, \"Published advisories\")",
+            "no CVE is requested",
+        ),
+        (
+            "no CVE is requested unless `SECURITY.md` names the advisory and says so, and it names none",
+            "no CVE is requested",
+        ),
+        (
+            "so a sitting edits `SECURITY.md` only to name an advisory for which a CVE is requested, by a pull request on `beta` and its pick under the fifth class",
+            "to name an advisory for which a CVE is requested",
+        ),
+    ] {
+        let planted = format!("{releasing}\n{old}\n");
+        let errors = advisory_record_refusals(&planted);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains(&format!("`{rule}` states a rule about CVE requests"))),
+            "{old}: {errors:?}"
+        );
+    }
+    // The class's older sentence is refused beside a security patch's sitting: put back in the
+    // place of the one that names both kinds (the two held sentences go with it), and written
+    // back beside it.
+    let older = "- a security advisory (a RustSec entry against this crate or a dependency);";
+    let class = releasing
+        .lines()
+        .find(|l| l.starts_with("- a security advisory"))
+        .expect("the direction rule lists the class of a security advisory");
+    let calls = "calls an advisory of this crate a RustSec entry";
+    let put_back = advisory_record_refusals(&releasing.replace(class, older));
+    for expected in [
+        calls,
+        "admits an advisory of this crate drafted on the Security tab",
+        "admits a dependency's advisory read from the RustSec database",
+    ] {
+        assert!(
+            put_back.iter().any(|e| e.contains(expected)),
+            "{expected}: {put_back:?}"
+        );
+    }
+    assert_eq!(put_back.len(), 3, "{put_back:?}");
+    let beside = advisory_record_refusals(&format!("{releasing}\n{older}\n"));
+    assert_eq!(beside.len(), 1, "{beside:?}");
+    assert!(beside.iter().all(|e| e.contains(calls)), "{beside:?}");
+    // A ritual that describes no security sitting (`main`'s, until the cut) owes no sentence and
+    // is not judged for the class's older sentence, which it carries beside no step 23; it is
+    // still refused a stale duty and a rule about CVE requests that nobody made.
+    assert!(advisory_record_refusals(&format!("{older}\n")).is_empty());
+    assert_eq!(
+        advisory_record_refusals("a CVE requested and a RustSec entry filed from it\n").len(),
+        2
+    );
+    assert_eq!(
+        advisory_record_refusals("no CVE is requested unless `SECURITY.md` names the advisory\n")
+            .len(),
+        1
+    );
 }
 
 #[test]
