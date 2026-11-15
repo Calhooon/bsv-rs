@@ -761,7 +761,7 @@ fn test_kvstore_query_to_json() {
         .with_limit(10)
         .with_controller("02abc");
 
-    let json = query.to_json();
+    let json = serde_json::to_value(&query).unwrap();
     assert_eq!(json["key"], "test_key");
     assert_eq!(json["limit"], 10);
     assert_eq!(json["controller"], "02abc");

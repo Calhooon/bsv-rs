@@ -56,7 +56,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> AuthFetch<W, T> {
             auto_persist_last_session: false,
             originator: self.originator.clone(),
         });
-        peer.share_session_manager(Arc::clone(&self.session_manager));
+        peer.share_session_manager(self.session_manager.clone());
         let state = Arc::new(PeerState {
             peer: Arc::new(peer),
             identity: RwLock::new(None),

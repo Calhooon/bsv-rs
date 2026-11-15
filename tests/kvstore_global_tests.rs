@@ -1264,7 +1264,7 @@ fn test_kvstore_query_builder_complete() {
 #[test]
 fn test_kvstore_query_to_json() {
     let query = KVStoreQuery::new().with_key("my_key").with_limit(10);
-    let json = query.to_json();
+    let json = serde_json::to_value(&query).unwrap();
 
     assert_eq!(json["key"], "my_key");
     assert_eq!(json["limit"], 10);
@@ -1583,7 +1583,7 @@ fn test_query_tag_mode_all() {
 
     assert_eq!(query.tag_query_mode, Some("all".to_string()));
 
-    let json = query.to_json();
+    let json = serde_json::to_value(&query).unwrap();
     assert_eq!(json["tagQueryMode"], "all");
 }
 
@@ -1599,7 +1599,7 @@ fn test_query_tag_mode_any() {
 
     assert_eq!(query.tag_query_mode, Some("any".to_string()));
 
-    let json = query.to_json();
+    let json = serde_json::to_value(&query).unwrap();
     assert_eq!(json["tagQueryMode"], "any");
 }
 
@@ -1870,7 +1870,7 @@ fn test_interpreter_json_value() {
 #[test]
 fn test_query_with_protocol_id() {
     let query = KVStoreQuery::new().with_protocol_id("custom_protocol");
-    let json = query.to_json();
+    let json = serde_json::to_value(&query).unwrap();
     assert_eq!(json["protocolId"], "custom_protocol");
 }
 

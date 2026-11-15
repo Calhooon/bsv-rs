@@ -135,7 +135,7 @@ async fn read_the_three(
     assert_eq!(to_hex(&master.to_binary(true).unwrap()), binary_hex);
     assert_eq!(to_hex(&verifiable.to_binary(true).unwrap()), binary_hex);
     assert_eq!(
-        verifiable.to_json_value(),
+        serde_json::to_value(&verifiable).unwrap(),
         serde_json::from_str::<serde_json::Value>(&with_the_index(&json.verifiable)).unwrap()
     );
 

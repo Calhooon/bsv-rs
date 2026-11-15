@@ -4,9 +4,9 @@ use crate::auth::clients::{AuthFetchOptions, Response};
 use crate::{Error, Result};
 use indexmap::IndexMap;
 
-/// A caller-supplied native HTTP client, also accepted by `SimplifiedFetchTransport`.
-#[cfg(feature = "http")]
-pub type NativeFetchClient = reqwest::Client;
+/// The native HTTP client of the fallback: the crate's own name for it since
+/// #843dforeign (a public alias until then; a caller names `reqwest::Client`).
+pub(crate) type NativeFetchClient = reqwest::Client;
 
 pub(crate) fn default_client() -> NativeFetchClient {
     NativeFetchClient::builder()

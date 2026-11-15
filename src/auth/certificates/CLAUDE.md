@@ -166,7 +166,6 @@ reference's words, `Decryption failed!` and `Ciphertext too short`; #297):
 | `certifier()` | Get certifier's public key |
 | `cert_type()` | Get certificate type |
 | `serial_number()` | Get serial number |
-| `to_json_value()` | The type's serde as a `serde_json::Value`: the reference's JSON (#268) |
 
 ## Binary Format
 

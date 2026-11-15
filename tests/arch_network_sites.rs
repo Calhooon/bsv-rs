@@ -17,6 +17,16 @@ const OVERLAY_HOME: &str = "src/overlay/facilitators.rs";
 // These existing adapters predate the boundary. Each line has its own ceiling;
 // the exception does not permit another client in the same file (#87).
 const ALLOWED: &[(&str, &str, usize)] = &[
+    // #843dforeign: `AuthFetch::with_client`'s parameter names the caller's
+    // own client by its type, where the public alias `NativeFetchClient`
+    // named it until then; the client is handed to the transport home as
+    // given and held under the crate-private alias. One parameter, no client
+    // built or used here.
+    (
+        "src/auth/clients/auth_fetch.rs",
+        "client: reqwest::Client,",
+        1,
+    ),
     (
         "src/storage/downloader.rs",
         "let client = reqwest::Client::builder()",

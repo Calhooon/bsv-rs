@@ -58,6 +58,7 @@ pub mod host_reputation_tracker;
 pub mod lookup_limits;
 pub mod lookup_resolver;
 pub mod overlay_admin_token_template;
+mod rank_change_receiver;
 pub mod retry;
 pub mod topic_broadcaster;
 pub mod types;
@@ -80,6 +81,8 @@ pub use host_reputation_tracker::{
     get_overlay_host_reputation_tracker, HostReputationEntry, HostReputationTracker,
     RankChangeEvent, RankedHost, ReputationConfig, ReputationStorage,
 };
+
+pub use rank_change_receiver::RankChangeReceiver;
 
 // Re-exports from lookup_resolver
 pub use lookup_resolver::{LookupResolver, LookupResolverConfig};

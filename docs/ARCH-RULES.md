@@ -57,7 +57,7 @@ client crates, `web_sys`, `Fetch`, and TCP, UDP and WebSocket client types.
 An import using an alias is caught at its import. Comments and documentation
 about transports do not count.
 
-Existing exceptions at `efe12e6`: **6 sites in 3 files**. Each exact source line
+Existing exceptions at `efe12e6`: **6 sites in 3 files**, and one parameter type since #843dforeign. Each exact source line
 has a multiplicity ceiling, so another client in that file is refused.
 
 | File | Sites | Reason |
@@ -65,6 +65,7 @@ has a multiplicity ceiling, so another client in that file is refused.
 | `src/storage/downloader.rs` | 2 | Existing UHRP client construction and its parameter type |
 | `src/storage/uploader.rs` | 2 | Existing UHRP client field and construction |
 | `src/transaction/fee_models/live_policy.rs` | 2 | Existing policy endpoint client field and construction |
+| `src/auth/clients/auth_fetch.rs` | 1 | Since #843dforeign: `AuthFetch::with_client`'s parameter names the caller's own client by its type (the public alias `NativeFetchClient` named it until then); handed to the transport home as given, none built or used here |
 
 [#87](https://github.com/Calhooon/bsv-rs/issues/87) audits the substrate and
 client boundaries. These exceptions need relocation into a permitted adapter

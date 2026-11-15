@@ -19,6 +19,15 @@ use serde::{Deserialize, Serialize};
 ///
 /// The keyring contains encryption keys specific to this verifier,
 /// allowing decryption of only the fields that were revealed.
+///
+/// Its JSON is the type's serde (`serde_json::to_value(&cert)`); the
+/// restatement `to_json_value` left with #843dforeign:
+///
+/// ```compile_fail,E0599
+/// fn json(cert: &bsv_rs::auth::VerifiableCertificate) {
+///     let _ = cert.to_json_value();
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VerifiableCertificate {
@@ -278,13 +287,6 @@ impl VerifiableCertificate {
     pub fn serial_number(&self) -> &[u8; 32] {
         &self.certificate.serial_number
     }
-
-    /// Converts to a JSON-serializable format, the reference's shape: each
-    /// field value its held base64 text (#261), the signature hex and the
-    /// keyring's values their held base64 text (#268): the type's serde.
-    pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::to_value(self).unwrap_or_default()
-    }
 }
 
 impl std::ops::Deref for VerifiableCertificate {
@@ -376,7 +378,7 @@ mod tests {
         keyring.insert("email".to_string(), "BwgJ".to_string());
 
         let verifiable = VerifiableCertificate::new(cert, keyring);
-        let json = verifiable.to_json_value();
+        let json = serde_json::to_value(&verifiable).unwrap();
 
         assert!(json.get("type").is_some());
         assert!(json.get("serialNumber").is_some());
