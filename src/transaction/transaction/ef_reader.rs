@@ -29,6 +29,9 @@ impl Transaction {
     /// spent one at `n`; this door counts them over every input and refuses
     /// the bytes before it builds the source that would pass the figure.
     /// Under the figure, the answer is exactly [`from_ef`](Self::from_ef)'s.
+    /// Read bytes from a party you do not trust through this door, with a
+    /// figure your memory allows: each output is
+    /// `size_of::<TransactionOutput>()` bytes.
     ///
     /// # Errors
     ///

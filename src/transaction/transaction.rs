@@ -248,6 +248,9 @@ impl Transaction {
     /// An input spending output `n` is given a source transaction of `n + 1`
     /// outputs, the spent one at `n`; [`from_ef_bounded`](Self::from_ef_bounded)
     /// reads under a figure for those outputs over every input.
+    /// Bytes from a party you do not trust are read through that door, with a
+    /// figure your memory allows (each output is
+    /// `size_of::<TransactionOutput>()` bytes).
     pub fn from_ef(ef: &[u8]) -> Result<Self> {
         Self::read_ef(ef, None)
     }
