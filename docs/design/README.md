@@ -112,7 +112,7 @@ Each design's section 6 carries the options, the reference-shaped default with i
 
 - Q98.1 "Do the wallet substrates get a default deadline?" No for now; a default only with the stack's word on matrix row 35.
 - Q98.2 "Do the overlay facilitators (and storage) answer `Error::TransportFault` in place of `OverlayError` strings?" Yes for the facilitators in 0.9.x, storage after.
-- Q98.3 "`WhatsOnChainTracker`'s timeout: what shape?" An additive `with_timeout_ms` builder, default 30,000.
+- Q98.3 "`WhatsOnChainTracker`'s timeout: what shape?" An additive `with_timeout_ms` builder, default 30,000; the reference bounds the same (ts-stack's default HTTP client at 30 s, `HttpClientResponseUtils.ts:4`; the older ts-sdk and go-sdk set none). Landed (#98).
 - Q98.4 "Is the WebSocket transport's failure typed now?" Yes, once S2 records the witness.
 - Q98.5 "Does 'every PR' admit the docs-only exit, and does the scoreboard gain a chaos input?" Skip as `vectors` does; no collector change.
 

@@ -59,6 +59,23 @@ impl WocNetwork {
     }
 }
 
+/// Default per-request timeout, in milliseconds (30 s).
+///
+/// Every request this tracker makes is bounded by this, matching the sibling
+/// [`BlockHeadersServiceTracker`](super::BlockHeadersServiceTracker) (whose
+/// `timeout_ms` defaults to the same) and the TypeScript reference's default
+/// HTTP client, which its tracker takes when it is given none
+/// (`ts-stack@edf6e03` `transaction/chaintrackers/WhatsOnChain.ts:64`;
+/// `DEFAULT_HTTP_CLIENT_TIMEOUT_MS = 30_000`,
+/// `transaction/http/HttpClientResponseUtils.ts:4,15`, applied to each
+/// request at `FetchHttpClient.ts:49` and `NodejsHttpRequestUtils.ts:145-156`).
+/// Without a bound a response whose body never arrives would hold the call,
+/// and any `Transaction::verify` awaiting it, without end.
+///
+/// Public as `bsv_rs::transaction::DEFAULT_WOC_TIMEOUT_MS` and
+/// `bsv_rs::transaction::chain_trackers::DEFAULT_WOC_TIMEOUT_MS`.
+pub const DEFAULT_WOC_TIMEOUT_MS: u64 = 30_000;
+
 /// WhatsOnChain chain tracker.
 ///
 /// Verifies merkle roots and queries chain height using the WhatsOnChain API.
@@ -74,6 +91,8 @@ impl WocNetwork {
 pub struct WhatsOnChainTracker {
     network: WocNetwork,
     base_url_override: Option<String>,
+    /// Per-request timeout, in milliseconds (default [`DEFAULT_WOC_TIMEOUT_MS`]).
+    timeout_ms: u64,
     #[cfg(feature = "http")]
     client: reqwest::Client,
 }
@@ -94,6 +113,7 @@ impl WhatsOnChainTracker {
         Self {
             network,
             base_url_override: None,
+            timeout_ms: DEFAULT_WOC_TIMEOUT_MS,
             #[cfg(feature = "http")]
             client: reqwest::Client::new(),
         }
@@ -104,14 +124,39 @@ impl WhatsOnChainTracker {
         Self {
             network,
             base_url_override: Some(base_url.to_string()),
+            timeout_ms: DEFAULT_WOC_TIMEOUT_MS,
             #[cfg(feature = "http")]
             client: reqwest::Client::new(),
         }
     }
 
+    /// Set the per-request timeout, in milliseconds (default
+    /// [`DEFAULT_WOC_TIMEOUT_MS`], 30 s). Bounds every request this tracker
+    /// makes, as the sibling `BlockHeadersServiceTracker` and the reference do.
+    ///
+    /// The bound runs from the request's start until its body is read; a
+    /// request it ends is a transport fault
+    /// (`TransportFault::MayHaveBeenReceived`), never a verdict. A timeout of
+    /// `0` is no value of its own and does not turn the bound off: the bound
+    /// is then the timer's next tick (about a millisecond), so a request ends
+    /// as that fault unless its whole answer arrives inside the tick, which a
+    /// server on the same host can do. A very large one (up to `u64::MAX`) is
+    /// taken without a panic and is, in effect, no bound.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
+
     /// Get the configured network.
     pub fn network(&self) -> WocNetwork {
         self.network
+    }
+
+    /// Get the configured per-request timeout, in milliseconds.
+    #[must_use]
+    pub fn timeout_ms(&self) -> u64 {
+        self.timeout_ms
     }
 
     /// Get the effective base URL.
@@ -134,6 +179,7 @@ impl std::fmt::Debug for WhatsOnChainTracker {
         f.debug_struct("WhatsOnChainTracker")
             .field("network", &self.network)
             .field("base_url_override", &self.base_url_override)
+            .field("timeout_ms", &self.timeout_ms)
             .finish()
     }
 }
@@ -158,6 +204,7 @@ impl ChainTracker for WhatsOnChainTracker {
         let response = self
             .client
             .get(&url)
+            .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .send()
             .await
             .map_err(|e| fault::tracker_send_error(&e))?;
@@ -204,6 +251,7 @@ impl ChainTracker for WhatsOnChainTracker {
         let response = self
             .client
             .get(&url)
+            .timeout(std::time::Duration::from_millis(self.timeout_ms))
             .send()
             .await
             .map_err(|e| fault::tracker_send_error(&e))?;
@@ -270,6 +318,27 @@ mod tests {
     #[test]
     fn test_woc_tracker_default() {
         let tracker = WhatsOnChainTracker::default();
+        assert_eq!(tracker.network(), WocNetwork::Mainnet);
+    }
+
+    #[test]
+    fn the_woc_tracker_default_timeout_is_30s_98() {
+        // The bound matches the sibling BlockHeadersServiceTracker and the
+        // reference's default HTTP client (30 s), so no request is unbounded.
+        assert_eq!(DEFAULT_WOC_TIMEOUT_MS, 30_000);
+        assert_eq!(WhatsOnChainTracker::mainnet().timeout_ms(), 30_000);
+        assert_eq!(
+            WhatsOnChainTracker::with_base_url("http://localhost", WocNetwork::Testnet)
+                .timeout_ms(),
+            30_000
+        );
+    }
+
+    #[test]
+    fn the_woc_tracker_with_timeout_ms_overrides_98() {
+        let tracker = WhatsOnChainTracker::mainnet().with_timeout_ms(500);
+        assert_eq!(tracker.timeout_ms(), 500);
+        // The builder preserves the rest of the tracker's configuration.
         assert_eq!(tracker.network(), WocNetwork::Mainnet);
     }
 }

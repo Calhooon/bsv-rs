@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use bsv_rs::transaction::{
     BlockHeadersServiceConfig, BlockHeadersServiceTracker, ChainTracker, ChainTrackerError,
-    TransportFault, WhatsOnChainTracker, WocNetwork,
+    TransportFault, WhatsOnChainTracker, WocNetwork, DEFAULT_WOC_TIMEOUT_MS,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -128,7 +128,8 @@ async fn a_timeout_is_a_transport_fault_that_may_have_been_received() {
         ResponseTemplate::new(200).set_delay(Duration::from_secs(5)),
     )
     .await;
-    // WhatsOnChainTracker has no timeout of its own: only the headers service
+    // Both trackers now bound every request; the WhatsOnChain door's own bound
+    // is pinned by `the_whatsonchain_door_bounds_a_stalled_response_98` below.
     let tracker = BlockHeadersServiceTracker::with_config(BlockHeadersServiceConfig {
         base_url: server.uri(),
         auth_token: None,
@@ -143,6 +144,171 @@ async fn a_timeout_is_a_transport_fault_that_may_have_been_received() {
     ] {
         assert_fault("timeout", &err, TransportFault::MayHaveBeenReceived, None);
     }
+}
+
+/// The WhatsOnChain door bounds a stalled response. Before this change it alone
+/// of the two trackers set no request timeout (`whatsonchain.rs` built its
+/// client with `reqwest::Client::new()` and never called `.timeout()`), so a
+/// tracker that stalled its body held `is_valid_root_for_height` /
+/// `current_height`, and any `Transaction::verify` awaiting them, without
+/// bound. It now bounds each request like its sibling and the reference (30 s
+/// by default; 500 ms here so the test is quick). RED before the change: the
+/// stall runs past the ceiling and the outer bound trips.
+#[tokio::test]
+async fn the_whatsonchain_door_bounds_a_stalled_response_98() {
+    let server = MockServer::start().await;
+    // A response stalled far past the client's own bound stands in for a body
+    // that never ends (wiremock cannot truly hang). The margin, stall (30 s)
+    // >> ceiling (5 s) >> timeout (500 ms), is the chaos cell's: no wall-time
+    // flake under a loaded host.
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(30)))
+        .mount(&server)
+        .await;
+
+    let tracker =
+        WhatsOnChainTracker::with_base_url(&server.uri(), WocNetwork::Mainnet).with_timeout_ms(500);
+
+    const CEILING: Duration = Duration::from_secs(5);
+
+    let root = tokio::time::timeout(CEILING, tracker.is_valid_root_for_height(ROOT, 700_000))
+        .await
+        .expect("is_valid_root_for_height was not bounded: it did not return within the ceiling")
+        .expect_err("a stalled tracker is a fault, never a verdict");
+    assert_fault(
+        "WhatsOnChain root",
+        &root,
+        TransportFault::MayHaveBeenReceived,
+        None,
+    );
+
+    let height = tokio::time::timeout(CEILING, tracker.current_height())
+        .await
+        .expect("current_height was not bounded: it did not return within the ceiling")
+        .expect_err("a stalled tracker is a fault, never a verdict");
+    assert_fault(
+        "WhatsOnChain height",
+        &height,
+        TransportFault::MayHaveBeenReceived,
+        None,
+    );
+}
+
+/// The fold of #98: the default is reachable by both public paths (it was
+/// `pub` in a private module and re-exported nowhere, so no dependent could
+/// name it and the rustdoc link to it was refused), and it is the bound a
+/// tracker built without `with_timeout_ms` carries.
+#[test]
+fn the_whatsonchain_default_timeout_is_named_by_its_public_paths_98() {
+    assert_eq!(DEFAULT_WOC_TIMEOUT_MS, 30_000);
+    assert_eq!(
+        bsv_rs::transaction::chain_trackers::DEFAULT_WOC_TIMEOUT_MS,
+        bsv_rs::transaction::DEFAULT_WOC_TIMEOUT_MS
+    );
+    assert_eq!(
+        WhatsOnChainTracker::with_base_url("http://127.0.0.1:9", WocNetwork::Mainnet).timeout_ms(),
+        DEFAULT_WOC_TIMEOUT_MS
+    );
+}
+
+/// The fold of #98: the other stall, after the head. The stub answers `200`,
+/// twelve bytes of a longer body and nothing more; the WhatsOnChain door's
+/// own `with_timeout_ms` ends both questions as the fault the timeout cell
+/// answers, one request each (the cell the headers service holds in
+/// `a_body_that_never_ends_is_bounded_by_the_timeout_and_may_have_been_received_98`).
+#[tokio::test]
+async fn the_whatsonchain_door_bounds_a_body_that_never_ends_98() {
+    let stub = body_stub::BodyStub::stalled().await;
+    let tracker = || {
+        WhatsOnChainTracker::with_base_url(&stub.url, WocNetwork::Mainnet)
+            .with_timeout_ms(body_stub::DOOR_TIMEOUT.as_millis() as u64)
+    };
+    let root = stub
+        .stalled_once("WhatsOnChain root", || async {
+            tracker().is_valid_root_for_height(ROOT, 700_000).await
+        })
+        .await
+        .expect_err("a fault is never a verdict");
+    let height = stub
+        .stalled_once("WhatsOnChain height", || async {
+            tracker().current_height().await
+        })
+        .await
+        .expect_err("a fault is an error");
+    for err in [root, height] {
+        assert_fault(
+            "WhatsOnChain stalled body",
+            &err,
+            TransportFault::MayHaveBeenReceived,
+            None,
+        );
+    }
+    assert_eq!(stub.settled().await, 2, "one request a call");
+}
+
+/// The fold of #98: the two ends of `with_timeout_ms`, as its rustdoc says
+/// them. A timeout of 0 is no value of its own: the bound is the timer's next
+/// tick, so against an answer that is late both questions end at once as the
+/// fault, never a verdict, and against a server that answers inside the tick
+/// each question is the fault or the server's answer (which of the two is the
+/// host's clock's, so both are admitted; a wrong verdict is not). The largest
+/// value is taken without a panic and both questions are answered.
+#[tokio::test]
+async fn a_whatsonchain_timeout_of_zero_is_a_fault_and_the_largest_is_no_bound_98() {
+    let late = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(30)))
+        .mount(&late)
+        .await;
+    let prompt = MockServer::start().await;
+    for (question, body) in [
+        (QUESTIONS[0], format!("{{\"merkleroot\":\"{ROOT}\"}}")),
+        (QUESTIONS[1], "{\"blocks\":700000}".to_string()),
+    ] {
+        Mock::given(method("GET"))
+            .and(path(question))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(&prompt)
+            .await;
+    }
+    let door = |server: &MockServer, timeout_ms| {
+        WhatsOnChainTracker::with_base_url(&server.uri(), WocNetwork::Mainnet)
+            .with_timeout_ms(timeout_ms)
+    };
+    const CEILING: Duration = Duration::from_secs(5);
+    let is_the_fault = |name: &str, err: &ChainTrackerError| {
+        assert_fault(name, err, TransportFault::MayHaveBeenReceived, None);
+    };
+
+    let zero = door(&late, 0);
+    let root = tokio::time::timeout(CEILING, zero.is_valid_root_for_height(ROOT, 700_000))
+        .await
+        .expect("a timeout of 0 is a bound")
+        .expect_err("a timeout of 0 is a fault, never a verdict");
+    is_the_fault("timeout 0, late root", &root);
+    let height = tokio::time::timeout(CEILING, zero.current_height())
+        .await
+        .expect("a timeout of 0 is a bound")
+        .expect_err("a timeout of 0 is a fault");
+    is_the_fault("timeout 0, late height", &height);
+
+    let zero = door(&prompt, 0);
+    match zero.is_valid_root_for_height(ROOT, 700_000).await {
+        Ok(verdict) => assert!(verdict, "the server's answer is true"),
+        Err(err) => is_the_fault("timeout 0, prompt root", &err),
+    }
+    match zero.current_height().await {
+        Ok(height) => assert_eq!(height, 700_000),
+        Err(err) => is_the_fault("timeout 0, prompt height", &err),
+    }
+
+    let largest = door(&prompt, u64::MAX);
+    assert_eq!(largest.timeout_ms(), u64::MAX);
+    assert_eq!(
+        largest.is_valid_root_for_height(ROOT, 700_000).await,
+        Ok(true)
+    );
+    assert_eq!(largest.current_height().await, Ok(700_000));
 }
 
 #[tokio::test]

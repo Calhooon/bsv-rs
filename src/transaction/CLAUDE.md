@@ -391,7 +391,7 @@ pub struct AlwaysValidChainTracker { pub height: u32 }
 
 | Tracker | Networks | Config |
 |---------|----------|--------|
-| `WhatsOnChainTracker` | `mainnet()`, `testnet()` | `WocNetwork` enum |
+| `WhatsOnChainTracker` | `mainnet()`, `testnet()` | `WocNetwork` enum, `with_timeout_ms` (`DEFAULT_WOC_TIMEOUT_MS`, 30 s) |
 | `BlockHeadersServiceTracker` | Any (via URL) | `BlockHeadersServiceConfig`, `DEFAULT_HEADERS_URL` |
 
 ## MerklePath (BUMP - BRC-74)
