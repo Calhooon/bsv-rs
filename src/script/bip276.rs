@@ -98,6 +98,7 @@ pub fn encode_bip276(network: u8, script_type: u8, script: &[u8]) -> String {
 ///
 /// Returns an error if:
 /// - The string is too short or does not contain the expected prefix
+/// - The string is not ASCII where it must be cut
 /// - The hex data is invalid
 /// - The checksum does not match
 ///
@@ -123,6 +124,8 @@ pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)> {
         )));
     }
 
+    // Every cut below is taken with `get`: a cut that falls inside a
+    // character is a string that is not ASCII, and is refused
     let after_prefix = &encoded[prefix_with_colon.len()..];
 
     // We need at least 4 hex chars (network + script_type) + 8 hex chars (checksum) = 12 chars
@@ -131,35 +134,36 @@ pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)> {
     }
 
     // Parse network byte (first 2 hex chars after prefix)
-    let network_hex = &after_prefix[..2];
+    let network_hex = after_prefix.get(..2).ok_or_else(not_ascii)?;
     let network_bytes = from_hex(network_hex)
         .map_err(|_| Error::Bip276Error(format!("invalid network hex: '{}'", network_hex)))?;
     let network = network_bytes[0];
 
     // Parse script_type byte (next 2 hex chars)
-    let script_type_hex = &after_prefix[2..4];
+    let script_type_hex = after_prefix.get(2..4).ok_or_else(not_ascii)?;
     let script_type_bytes = from_hex(script_type_hex).map_err(|_| {
         Error::Bip276Error(format!("invalid script type hex: '{}'", script_type_hex))
     })?;
     let script_type = script_type_bytes[0];
 
     // The remaining data is script_hex + 8-char checksum
-    let data_and_checksum = &after_prefix[4..];
+    let data_and_checksum = after_prefix.get(4..).ok_or_else(not_ascii)?;
     if data_and_checksum.len() < 8 {
         return Err(Error::Bip276Error(
             "input too short for checksum".to_string(),
         ));
     }
 
-    let script_hex = &data_and_checksum[..data_and_checksum.len() - 8];
-    let provided_checksum = &data_and_checksum[data_and_checksum.len() - 8..];
+    let cut = data_and_checksum.len() - 8;
+    let script_hex = data_and_checksum.get(..cut).ok_or_else(not_ascii)?;
+    let provided_checksum = data_and_checksum.get(cut..).ok_or_else(not_ascii)?;
 
     // Decode script data
     let script_data = from_hex(script_hex)
         .map_err(|_| Error::Bip276Error(format!("invalid script hex: '{}'", script_hex)))?;
 
     // Compute expected checksum: SHA256d of the payload (everything before the checksum)
-    let payload = &encoded[..encoded.len() - 8];
+    let payload = encoded.get(..encoded.len() - 8).ok_or_else(not_ascii)?;
     let checksum = sha256d(payload.as_bytes());
     let expected_checksum = to_hex(&checksum[..4]);
 
@@ -168,6 +172,11 @@ pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)> {
     }
 
     Ok((network, script_type, script_data))
+}
+
+/// The refusal of a string whose cut falls inside a character.
+fn not_ascii() -> Error {
+    Error::Bip276Error("invalid encoding: not ASCII".to_string())
 }
 
 #[cfg(test)]

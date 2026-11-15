@@ -19,7 +19,7 @@ This module integrates with the `auth` module for certificate handling and the `
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root with re-exports (111 lines) |
-| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines) |
+| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (885 lines); `abbreviate_key`, the one abbreviation of `DisplayableIdentity::from_key` and `Contact::to_displayable_identity`, a cut inside a character moving out to its edge (`tests/text_doors_any_string.rs`) |
 | `client.rs` | IdentityClient for identity resolution, revelation, and management (2053 lines) |
 | `contacts.rs` | ContactsManager for encrypted contact storage with caching (1276 lines) |
 
