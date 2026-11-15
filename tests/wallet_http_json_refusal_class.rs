@@ -64,7 +64,7 @@ fn refusal(class: WalletRefusalClass, message: &str) -> Error {
 /// words, `code` where the class assigns one.
 #[tokio::test]
 async fn the_toolboxs_body_reads_as_its_class_by_name() {
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         let mut body = json!({
             "isError": true,
             "name": class.name(),

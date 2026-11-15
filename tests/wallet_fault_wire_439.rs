@@ -33,7 +33,7 @@ async fn an_accepted_abort_keeps_every_refusal_class_frame() {
         "Invalid transaction status: stored acceptance\0é\n\t",
     ];
     let mut mismatches = Vec::new();
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         for message in messages {
             let refusal = abort_frame(Error::WalletRefusal {
                 class,

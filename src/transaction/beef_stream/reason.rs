@@ -91,8 +91,9 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The twenty-six kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 26] = [
+    /// The twenty-six kinds, each once, in the Lean's order (`Kind.all`). A
+    /// slice, so a kind added later changes no public type (#843dall).
+    pub const ALL: &'static [Kind] = &[
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -351,7 +352,7 @@ mod all_is_every_variant_819_tests {
     fn all_holds_every_variant_once_in_the_definitions_order_819() {
         let names: Vec<String> = Kind::ALL.iter().map(|v| format!("{v:?}")).collect();
         assert_eq!(names, Kind::VARIANT_NAMES);
-        for (index, value) in Kind::ALL.into_iter().enumerate() {
+        for (index, value) in Kind::ALL.iter().copied().enumerate() {
             assert_eq!(position(value), index, "{value:?}");
         }
     }

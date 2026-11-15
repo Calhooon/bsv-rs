@@ -85,7 +85,10 @@ fn refusal_in_words(text: &str) -> Option<(u64, Kind)> {
         .chars()
         .take_while(char::is_ascii_alphanumeric)
         .collect();
-    let kind = Kind::ALL.into_iter().find(|k| format!("{k:?}") == name)?;
+    let kind = Kind::ALL
+        .iter()
+        .copied()
+        .find(|k| format!("{k:?}") == name)?;
     Some((offset.parse().ok()?, kind))
 }
 
