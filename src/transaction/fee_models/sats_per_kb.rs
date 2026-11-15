@@ -136,7 +136,14 @@ impl FeeModel for SatoshisPerKilobyte {
         // Node formula (go-sdk#267 class): FLOOR division with a 1-sat
         // minimum — ceiling overpaid by 1 sat on every fractional KB
         // (conformance fee-model-mismatch.0001: 1001 B @ 1 sat/kB = 1, not 2).
-        let fee = ((size as u64 * self.value) / 1000).max(1);
+        // A rate whose fee does not fit in a u64 is refused, never wrapped
+        let fee = (size as u64).checked_mul(self.value).ok_or_else(|| {
+            crate::Error::FeeModelError(format!(
+                "fee out of range: {} bytes at {} sat/kB",
+                size, self.value
+            ))
+        })? / 1000;
+        let fee = fee.max(1);
 
         Ok(fee)
     }
