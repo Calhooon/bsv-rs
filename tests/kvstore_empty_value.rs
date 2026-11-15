@@ -5,13 +5,16 @@
 //! reference's `decodeAndVerifyKVStoreToken` reads none (`ts-stack@edf6e03`
 //! `kvStoreTokenValidation.ts:85-119`: the signature is invalid); the token
 //! is built from the one `set` writes for one zero byte, its signature made
-//! again over an empty value.
+//! again over an empty value. `GlobalKVStore::set` refuses an empty value
+//! before it asks the wallet anything, as the reference's
+//! `validateKVStoreValue` does (`:49-56`) and as `LocalKVStore::set` does,
+//! with `Error::KvStoreInvalidValue`.
 #![cfg(feature = "kvstore")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
 
-use bsv_rs::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreInterpreter};
+use bsv_rs::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreInterpreter, KVStoreSetOptions};
 use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OverlayLookupFacilitator,
@@ -20,6 +23,7 @@ use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::{Counterparty, CreateSignatureArgs, ProtoWallet, Protocol, SecurityLevel};
+use bsv_rs::Error;
 use identity_reveal_wallet::Counting;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -73,6 +77,27 @@ async fn written(value: &str) -> LockingScript {
     LockingScript::from_binary(&outputs[0].locking_script).unwrap()
 }
 
+#[tokio::test]
+async fn an_empty_value_is_refused_before_the_wallet_is_asked() {
+    for options in [
+        None,
+        Some(KVStoreSetOptions {
+            tags: Some(vec!["a".into()]),
+            ..Default::default()
+        }),
+    ] {
+        let wallet = Counting::of_scalar(9);
+        let result = store(&wallet).set("alpha", "", options).await;
+        assert_eq!(result, Err(Error::KvStoreInvalidValue));
+        assert!(wallet.calls().is_empty(), "{:?}", wallet.calls());
+        assert!(wallet.created.lock().unwrap().is_none());
+    }
+    let wallet = Counting::of_scalar(9);
+    let result = store(&wallet).batch_set(&[("alpha", "")]).await;
+    assert_eq!(result, Err(Error::KvStoreInvalidValue));
+    assert!(wallet.calls().is_empty(), "{:?}", wallet.calls());
+}
+
 /// One zero byte: its token carries the value as `OP_0` too, which its token
 /// carries as `OP_0` and the interpreter reads back as written.
 #[tokio::test]
@@ -84,7 +109,7 @@ async fn a_value_of_one_zero_byte_is_written_and_read_back() {
 }
 
 /// A token whose value field is `OP_0` under a signature over an empty value
-/// (what `set` writes for an empty value) is no entry:
+/// (what `set` wrote for an empty value before it refused one) is no entry:
 /// its bytes differ from the zero-byte token's only in the signature.
 #[tokio::test]
 async fn a_token_signed_over_an_empty_value_is_no_entry() {

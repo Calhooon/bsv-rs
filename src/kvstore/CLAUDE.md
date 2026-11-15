@@ -17,7 +17,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
 | `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 538 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | 619 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`) before the wallet is asked | 630 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
 | `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #478: reference descriptions and unique-token result; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath (one current token per key plus one written during the first round); #479 and #483 both stated reference divergences | 197 |
@@ -144,6 +144,7 @@ Public key-value store using the overlay network.
 - **History building**: Uses `SyncHistorian` to traverse transaction ancestry for entry history
 - **Overlay broadcast**: Broadcasts tokens via `TopicBroadcaster`
 - **Batch operations**: `batch_get`, `batch_set`, `batch_remove` for multi-key operations
+- **Empty value refused**: `set` and `batch_set` answer `Error::KvStoreInvalidValue` for an empty value before the wallet is asked, as `LocalKVStore` and the reference do (an empty value's token is no entry; `tests/kvstore_empty_value.rs`)
 
 ### Methods
 

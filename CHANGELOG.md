@@ -671,6 +671,20 @@ The two refusals and their words are the reference's (`Transaction.ts:964-984`, 
 
 Neither reference exposes another package's number type through its big number (`ts-stack@edf6e03` `packages/sdk/src/primitives/BigNumber.ts` is its own class; go-sdk@2ca481c's `primitives/ec` takes the standard library's `*big.Int`, `ec.go:80-116`) or has this queue (`@bsv/authsocket-client` dispatches events to callbacks, `packages/messaging/authsocket-client/src/AuthSocketClient.ts:105-120,171-180`). No reference line decides this row: it is this crate's own surface. No wire byte, verdict or error text differs; no divergence row opens or closes (the root `CLAUDE.md` list names neither door).
 
+### Fixed: `GlobalKVStore::set` refuses an empty value, which it wrote as a token no reader returns
+
+- What was wrong. `set` refused an empty key and wrote any value. For an empty value it wrote a token whose value field is `OP_0`, which every reader reads back as one zero byte, under a signature over no bytes: no reader authenticates it (the interpreter reads no entry from it, as the reference's reader reads none), so the call spent the token amount on an entry `get` never returns. The reference refuses the value at write (`validateKVStoreValue`, `ts-stack@edf6e03` `kvStoreTokenValidation.ts:49-56`, "KVStore value has an invalid length", called by `GlobalKVStore.set`), as `LocalKVStore::set` does here.
+- The fix. `set` (and `batch_set`, through it) answers `Error::KvStoreInvalidValue` for an empty value, beside the empty key's refusal, before the wallet is asked anything. Every other value writes the same token as before.
+- The tests. `tests/kvstore_empty_value.rs` `an_empty_value_is_refused_before_the_wallet_is_asked`: `set` with and without tags and `batch_set`, each the refusal with no wallet call; RED on the base (the wallet was asked and the action built). The control beside it: a value of one zero byte is written and read back as written.
+- Migration. No signature moved. Where code set an empty value to clear a key, remove the key:
+
+  ```rust
+  match store.remove(key, None).await {
+      Ok(_) | Err(Error::KvStoreKeyNotFound(_)) => {}
+      Err(e) => return Err(e),
+  }
+  ```
+
 ### Documented: a `GlobalKVStore` token written for an empty value is no entry
 
 - What it is. `GlobalKVStore::set` signs the value's bytes, and PushDrop writes an empty field as `OP_0`, the push it writes for a field of one zero byte; every reader reads `OP_0` back as that byte. A token written for an empty value therefore carries its value as one zero byte under a signature over no bytes, which never verifies. Since `0.9.0-beta.4` the interpreter (`KVStoreInterpreter::interpret`, `interpret_script`) reads no entry from it, as the reference's reader (`decodeAndVerifyKVStoreToken`, `ts-stack@edf6e03` `kvStoreTokenValidation.ts:85-119`) reads none ("Signature is not valid", by a run at the pin and at `4d0ea63`). A value of one zero byte is written and read back as written.
