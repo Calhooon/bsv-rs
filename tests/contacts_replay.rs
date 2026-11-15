@@ -981,6 +981,21 @@ async fn a_cold_update_the_validator_refuses_asks_the_wallet_nothing_959() {
     );
     assert_eq!((update.unwrap_err(), calls), (words, vec![]));
     assert!(!manager.is_cache_initialized().await);
+
+    // The re-read's case: a valid name and ANOTHER field the validator refuses (an avatar address
+    // of an unsafe scheme). A check of the name alone in place of the validator lists the wallet
+    // first and answers `ContactNotFound`; the validator's words come with no wallet call.
+    let refused = Contact::new("Ada", &keys[0]).with_avatar_url("javascript:alert(1)");
+    let words = Error::IdentityError("Invalid contact: avatarURL uses an unsafe URL scheme".into());
+    let (save, calls) = calls_of!(wallet, vec![], manager.add_contact(refused.clone()).await);
+    assert_eq!((save.unwrap_err(), calls), (words.clone(), vec![]));
+    let (update, calls) = calls_of!(
+        wallet,
+        vec![],
+        manager.update_contact(&keys[0], refused).await
+    );
+    assert_eq!((update.unwrap_err(), calls), (words, vec![]));
+    assert!(!manager.is_cache_initialized().await);
 }
 
 /// A lookup facilitator counting the questions it is asked and answering
