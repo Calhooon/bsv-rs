@@ -188,7 +188,9 @@ A runner whose platform/CPU/cores key has no baseline entry exits 3, which
 the job reports as a warning to record one, not a failure.
 
 See [README.md](README.md) for the percentile definition, fixture scope,
-external output paths, corpus access, and the Linux recording procedure.
+external output paths, corpus access, the recording procedure (an entry is
+recorded whole, in one run, by the captain) and what the tests hold of the
+entries (no number of either, and nothing of the M1 Max entry).
 The `benchmarks` CI job replaces the old `critcmp` comparison.
 
 ## Output
