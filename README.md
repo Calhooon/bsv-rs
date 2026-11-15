@@ -18,7 +18,7 @@ A Rust SDK for BSV: keys and cryptography, Script and its interpreter, transacti
 ## Limits
 
 - `cargo add` takes the latest stable release; the next minor is developed on `beta` and published only as prereleases (`-beta.N`). <!-- F8 -->
-- The interpreter implements the post-Genesis rules: the default mode judges every spend by them, adding the node's pay-to-script-hash step for a coin locked by exactly `a9 14 <20 bytes> 87` (whose redeem script it judges by the same rules), and the chain-parameter verifier refuses a pre-Genesis input. <!-- F9 -->
+- The interpreter implements the post-Genesis rules: the default mode judges every spend by them, adding the node's pay-to-script-hash step for a coin locked by exactly `a9 14 <20 bytes> 87`; a door that proves a coin's height (the whole-transaction verifier, the streaming reader) judges a coin proven below the chain's Genesis height (its tip's, mainnet's without one) by the rules of a coin created before Genesis as well; the one-input door and `Spend`, given no height, judge every coin by the post-Genesis rules; and the chain-parameter verifier refuses a pre-Genesis input. <!-- F9 -->
 - Advisories, each naming the versions it affects (published prereleases included), are on the [Security tab](https://github.com/Calhooon/bsv-rs/security/advisories); those published so far were found by the project's own reads, and the crate has had no third-party audit ([SECURITY.md](SECURITY.md)). <!-- F10 -->
 - No performance claim is made yet: the timings in `benches/baseline.json` gate regressions on the machines that recorded them and are compared with nothing else. <!-- F11 -->
 
