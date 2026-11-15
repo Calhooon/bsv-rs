@@ -61,6 +61,7 @@
 //! ```
 
 pub mod client;
+mod definition_checks;
 mod token;
 pub mod types;
 mod unlock;
