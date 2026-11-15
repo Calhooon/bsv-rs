@@ -82,10 +82,11 @@ use sha2::{Digest, Sha256};
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::{to_hex, Reader, Writer};
+use crate::script::spend::PreGenesis;
 use crate::script::{p2sh_redeem::Redeem, LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
-use super::chain_tracker::{ChainTracker, ChainTrackerError, MockChainTracker};
+use super::chain_tracker::{ChainTracker, ChainTrackerError};
 use super::merkle_path::{MerklePath, MerklePathLeaf};
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
@@ -393,6 +394,8 @@ pub(crate) fn no_transaction(inputs: usize, outputs: usize) -> Option<Reason> {
 
 // [SRC] sibling@87f0461 TxRules.lean:25.
 const MAX_MONEY: u64 = 2_100_000_000_000_000;
+/// Mainnet's Genesis height, the era of a coin when no tip names a chain.
+const MAINNET_GENESIS: u64 = crate::script::ProtocolEra::MAINNET_GENESIS_HEIGHT as u64;
 
 // [SRC] sibling@87f0461 TxRules.lean:31-38,101-110; reading #68.
 fn is_coinbase(inputs: &[InputRef]) -> bool {
@@ -1691,69 +1694,8 @@ impl<R: Read> Iterator for BeefStream<R> {
 // The headers
 // ---------------------------------------------------------------------------
 
-/// Header context for checking mining in the next block (since 0.5.0).
-/// The activation heights belong to the caller's network. After CSV activation,
-/// finality uses median time past; before it the candidate block's time is needed.
-/// \[SRC\] bsv-script-lean@87f0461 docs/BLOCK-CONSENSUS.md:83-88.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChainTip {
-    /// Active chain tip's height.
-    pub height: u32,
-    /// Tip's median time past, in seconds.
-    pub median_time_past: u32,
-    /// This network's Genesis activation height.
-    pub genesis_height: u32,
-    /// This network's CSV activation height.
-    pub csv_height: u32,
-    /// Candidate block time, required only for time locks before CSV.
-    pub next_block_time: Option<u32>,
-}
-
-/// Active-chain roots and optional mining context. Missing roots fail closed;
-/// missing tip context declines checks that need it.
-pub trait Headers {
-    /// The header at `height` carries `root` (wire order).
-    fn carries(&self, height: u64, root: &Hash32) -> bool;
-    /// The caller's active tip and network; none means no contextual evidence.
-    fn mining_tip(&self) -> Option<ChainTip> {
-        None
-    }
-}
-
-impl<H: Headers + ?Sized> Headers for &H {
-    fn carries(&self, height: u64, root: &Hash32) -> bool {
-        (**self).carries(height, root)
-    }
-    fn mining_tip(&self) -> Option<ChainTip> {
-        (**self).mining_tip()
-    }
-}
-
-/// Roots by height, in wire order.
-impl Headers for HashMap<u64, Hash32> {
-    fn carries(&self, height: u64, root: &Hash32) -> bool {
-        self.get(&height) == Some(root)
-    }
-}
-
-/// The mock tracker's roots (display hex by height).
-impl Headers for MockChainTracker {
-    fn carries(&self, height: u64, root: &Hash32) -> bool {
-        u32::try_from(height)
-            .ok()
-            .and_then(|h| self.roots.get(&h))
-            .is_some_and(|carried| carried.eq_ignore_ascii_case(&display_hex(root)))
-    }
-}
-
-/// A function as the headers.
-pub struct HeadersFn<F>(pub F);
-
-impl<F: Fn(u64, &Hash32) -> bool> Headers for HeadersFn<F> {
-    fn carries(&self, height: u64, root: &Hash32) -> bool {
-        (self.0)(height, root)
-    }
-}
+mod headers;
+pub use headers::{ChainTip, Headers, HeadersFn};
 
 // ---------------------------------------------------------------------------
 // The index
@@ -2441,6 +2383,10 @@ impl BeefIndex {
             outputs,
             body.lock_time,
         ));
+        // GHSA-h4m7-c6p8-725m: a coin the BUMP of its parent proves below the
+        // tip's Genesis height (mainnet's without a tip) is judged again as one
+        // created before Genesis.
+        let genesis = tip.map_or(MAINNET_GENESIS, |t| u64::from(t.genesis_height));
         for (vin, (input, source)) in body
             .inputs
             .iter()
@@ -2468,8 +2414,14 @@ impl BeefIndex {
                 work_limit,
             };
             let step = Redeem::of(&source.script, raw, &params, true);
+            let bump = self
+                .proven
+                .get(&input.prev)
+                .and_then(|i| usize::try_from(*i).ok());
+            let height = bump.and_then(|i| self.bumps.get(i)).map(|b| b.0);
+            let again = PreGenesis::of(&source.script, raw, &params, height, genesis);
             let spend = Spend::with_transaction(params).map_err(parsed)?;
-            match Redeem::judge(step, spend, |_| {}).0 {
+            match PreGenesis::after(again, Redeem::judge(step, spend, |_| {})).0 {
                 Ok(true) => {}
                 Ok(false) => return Err(script_error("the script did not succeed".to_string())),
                 Err(e) => {
