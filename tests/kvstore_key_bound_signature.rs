@@ -267,3 +267,83 @@ async fn the_store_reads_the_key_bound_form_alone() {
     let ctx = KVStoreContext::new("k1", "kvstore");
     assert!(KVStoreInterpreter::interpret_script(&script(&honest), Some(&ctx)).is_some());
 }
+
+/// A key-bound token under the protocol `[1, name]` as `name` is written
+/// (its case and spaces kept): the lock derived under that protocol.
+fn token_named(controller: &PrivateKey, name: &str, key_text: &str, value: &str) -> PushDrop {
+    let wallet = ProtoWallet::new(Some(controller.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, name);
+    let mut fields = vec![
+        serde_json::to_vec(&(1u8, name)).unwrap(),
+        key_text.as_bytes().to_vec(),
+        value.as_bytes().to_vec(),
+        controller.public_key().to_compressed().to_vec(),
+    ];
+    let signature = wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            hash_to_directly_sign: None,
+            protocol_id: protocol.clone(),
+            key_id: key_text.to_owned(),
+            counterparty: Some(Counterparty::Anyone),
+        })
+        .unwrap()
+        .signature;
+    fields.push(signature);
+    let lock = wallet
+        .key_deriver()
+        .derive_public_key(&protocol, key_text, &Counterparty::Anyone, true)
+        .unwrap();
+    PushDrop::decode(&PushDrop::new(lock, fields).lock()).unwrap()
+}
+
+/// The asked protocol and the token's own compare as the derivation reads
+/// them on BOTH sides (trimmed, lowercase): a token whose protocol field
+/// names `KVStore` is the protocol a caller configured as `kvstore`, and one
+/// naming another protocol is not.
+#[test]
+fn the_tokens_protocol_name_is_compared_as_the_derivation_reads_it() {
+    let controller = key("controller", 4);
+    let written = token_named(&controller, "KVStore", "k1", "v");
+    let fields = KVStoreInterpreter::extract_fields(&script(&written)).unwrap();
+    for asked in ["kvstore", "KVSTORE", " kvstore "] {
+        assert!(
+            KVStoreInterpreter::verify_signature(&fields, asked),
+            "{asked}"
+        );
+    }
+    let other = token_named(&controller, "Another Store", "k1", "v");
+    let fields = KVStoreInterpreter::extract_fields(&script(&other)).unwrap();
+    assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    assert!(KVStoreInterpreter::verify_signature(
+        &fields,
+        "another store"
+    ));
+}
+
+/// The store's read refuses a key-bound token divided into fields otherwise
+/// and a key-bound token of another protocol, each signed by its controller.
+#[tokio::test]
+async fn the_store_refuses_a_divided_key_bound_token_and_one_of_another_protocol() {
+    let controller = key("controller", 5);
+    let honest = token(&controller, false, "k12", "vv", true);
+    assert_eq!(
+        read_by_the_store(&honest, "k12", "kv-bound-4mcm-s3-honest")
+            .await
+            .as_deref(),
+        Some("vv")
+    );
+    for (at, shift, key_text) in [(1, 1, "k1"), (1, -1, "k12v")] {
+        let moved = divided(&honest, at, shift).unwrap();
+        assert_eq!(
+            read_by_the_store(&moved, key_text, &format!("kv-bound-4mcm-s3-{shift}")).await,
+            None,
+            "{at} {shift}"
+        );
+    }
+    let other = token_named(&controller, "another store", "k12", "v");
+    assert_eq!(
+        read_by_the_store(&other, "k12", "kv-bound-4mcm-s3-other").await,
+        None
+    );
+}
