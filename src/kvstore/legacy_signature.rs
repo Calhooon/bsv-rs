@@ -4,18 +4,17 @@
 //! controller field is `controller`'s compressed key and whose last field is
 //! `controller`'s signature over the others (a field read as `OP_0`'s single
 //! zero byte signed as that byte or as an empty field). The signature is
-//! judged under the derivation the token's protocol field names, one of the
-//! two this crate's writers have used: the `[level, name]` namespace with the
-//! key as the key ID and the locking key derived from the controller, or a
-//! plain protocol name with the key ID `kvstore-token`. The tags' bounds are
+//! judged under the one derivation every door judges a token under
+//! (`token_derivation`): the `[level, name]` namespace with the key as the
+//! key ID and the locking key derived from the controller; a token in this
+//! crate's earlier form (a plain protocol name, the key ID `kvstore-token`)
+//! answers `false`. The tags' bounds are
 //! the readers' rule and are not judged here, so a token its controller
 //! signed answers `true` whatever its tags.
 
 use crate::primitives::PublicKey;
 use crate::script::templates::PushDrop;
-use crate::wallet::{
-    Counterparty, KeyDeriverApi, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs,
-};
+use crate::wallet::{Counterparty, ProtoWallet, Protocol, VerifySignatureArgs};
 
 /// Whether `pushdrop` carries a token whose controller field is `controller`
 /// and whose last field is `controller`'s signature over the others.
@@ -30,7 +29,7 @@ pub(super) fn signed_by(pushdrop: &PushDrop, controller: &PublicKey, wallet: &Pr
     if signature.is_empty() || signed[3].as_slice() != controller.to_compressed().as_slice() {
         return false;
     }
-    let Some((protocol_id, key_id)) = derivation(pushdrop, controller, wallet) else {
+    let Some((protocol_id, key_id)) = derivation(pushdrop, controller) else {
         return false;
     };
     // `OP_0` is the push of an empty field and of a single zero byte alike,
@@ -63,33 +62,14 @@ pub(super) fn signed_by(pushdrop: &PushDrop, controller: &PublicKey, wallet: &Pr
     })
 }
 
-/// The protocol and key ID the token was signed under, `None` for a protocol
-/// field neither writer produces or a namespace token whose locking key is
-/// not the one derived from its controller.
-fn derivation(
-    pushdrop: &PushDrop,
-    controller: &PublicKey,
-    wallet: &ProtoWallet,
-) -> Option<(Protocol, String)> {
-    let text = std::str::from_utf8(&pushdrop.fields[0]).ok()?;
-    let Ok((level, name)) = serde_json::from_str::<(u8, String)>(text) else {
-        return Some((
-            Protocol::new(SecurityLevel::App, text),
-            "kvstore-token".to_owned(),
-        ));
-    };
-    if serde_json::to_string(&(level, &name)).ok()? != text {
-        return None;
-    }
-    let protocol = Protocol::from_tuple((level, &name))?;
-    let key_id = String::from_utf8(pushdrop.fields[1].clone()).ok()?;
-    let linked = wallet.key_deriver().derive_public_key(
-        &protocol,
-        &key_id,
-        &Counterparty::Other(controller.clone()),
-        false,
-    );
-    linked
-        .is_ok_and(|key| key == pushdrop.locking_public_key)
-        .then_some((protocol, key_id))
+/// The protocol and key ID the token was signed under (the one derivation
+/// every door judges a token under), `None` for any other token.
+fn derivation(pushdrop: &PushDrop, controller: &PublicKey) -> Option<(Protocol, String)> {
+    super::token_derivation::derivation(
+        &pushdrop.fields[0],
+        &pushdrop.fields[1],
+        controller,
+        &pushdrop.locking_public_key,
+        None,
+    )
 }

@@ -8,9 +8,7 @@ use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
-use crate::wallet::{
-    Counterparty, KeyDeriverApi, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs,
-};
+use crate::wallet::{Counterparty, ProtoWallet, SecurityLevel, VerifySignatureArgs};
 use std::sync::OnceLock;
 
 use super::types::{KVStoreEntry, KvProtocolFields};
@@ -183,35 +181,17 @@ impl KVStoreInterpreter {
             data.extend_from_slice(tags);
         }
 
-        // The reference signs with the token's wallet protocol and key, and
-        // binds its locking key to the same derivation (validation.ts:106-117).
-        // Keep reading this crate's earlier raw-protocol tokens as well.
-        let (protocol, key_id) = match serde_json::from_slice::<(u8, String)>(&fields.protocol_id) {
-            Ok((level, name)) => {
-                let Some(protocol) = Protocol::from_tuple((level, &name)) else {
-                    return false;
-                };
-                if serde_json::to_vec(&(level, &name)).ok().as_ref() != Some(&fields.protocol_id) {
-                    return false;
-                }
-                let Some(key_id) = fields.key_string() else {
-                    return false;
-                };
-                let expected_key = get_anyone_wallet().key_deriver().derive_public_key(
-                    &protocol,
-                    &key_id,
-                    &Counterparty::Other(controller_pubkey.clone()),
-                    false,
-                );
-                if !expected_key.is_ok_and(|key| key == fields.locking_public_key) {
-                    return false;
-                }
-                (protocol, key_id)
-            }
-            Err(_) => (
-                Protocol::new(SecurityLevel::App, protocol_id),
-                "kvstore-token".to_owned(),
-            ),
+        // The reference's derivation alone (BRC-35; `validation.ts:106-117`),
+        // and the protocol field naming the protocol asked: a token in this
+        // crate's earlier form (a constant key ID) authenticates nowhere.
+        let Some((protocol, key_id)) = super::token_derivation::derivation(
+            &fields.protocol_id,
+            &fields.key,
+            &controller_pubkey,
+            &fields.locking_public_key,
+            Some(protocol_id),
+        ) else {
+            return false;
         };
         let args = VerifySignatureArgs {
             data: Some(data),
@@ -235,7 +215,7 @@ impl KVStoreInterpreter {
     /// fields whose controller field is `controller` and whose signature
     /// field is `controller`'s signature over the other fields; `false` for
     /// anything else.
-    #[deprecated(note = "Use verify_signature with KVStoreFields instead")]
+    #[deprecated(note = "A signature verdict alone, for a token in the key-bound form only")]
     pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool {
         super::legacy_signature::signed_by(pushdrop, controller, get_anyone_wallet())
     }
@@ -370,7 +350,7 @@ mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::script::templates::PushDrop;
-    use crate::wallet::KeyDeriver;
+    use crate::wallet::{KeyDeriver, Protocol};
 
     #[test]
     fn malformed_reference_token_tags_use_the_reference_words_and_order() {
