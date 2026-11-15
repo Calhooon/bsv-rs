@@ -136,8 +136,10 @@ An explicit baseline update is:
 cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- --record
 ```
 
-This replaces only the measured machine's entry in `benches/baseline.json`,
-keyed by platform, CPU model and core count.
+This replaces the measured machine's entry in `benches/baseline.json`,
+keyed by platform, CPU model and core count, and writes the file again (the
+other entries are read and printed again: the paragraph on recording Linux
+below says what that moves).
 Use it only in a run that requests a baseline update (the dispatch input below). The table
 and retained run show exactly what changed. Ordinary comparisons never write
 the baseline. A run on a CPU model or core count with no entry exits 3 and names
@@ -165,17 +167,57 @@ runner's platform/CPU/cores key has no entry (exit 3) the job warns
 `no baseline entry for <key>: record one with gh workflow run bench.yml -f bench_baseline_record=true` and
 does not fail.
 
-The lane can record the local machine only. To record Linux, the captain
+A machine's entry is recorded whole, in one run of `--record`, and the record
+is the captain's act (the dispatch below for Linux, one `--record` in a quiet
+window on any other machine), never row by row, one bench at a time or by
+hand, which is the form pull request #993 used for the M1 Max entry (its nine
+bench binaries measured one at a time with the tool's own cargo line, the
+entry put together by a script and checked by `--from-run`; #911). An entry
+carries one `source_commit`, one `rustc` and one time, so its rows are one
+run's. `--record` measures the machine it runs on. To record Linux, the captain
 dispatches the bench workflow on the baseline PR's branch with the record input:
 `gh workflow run bench.yml --ref <branch> -f bench_baseline_record=true` (`ci.yml`
 carried the input until 2026-10-27; until
 2026-10-26 a `[bench-baseline-record]` marker in the PR's description did this;
 no pull request runs the job now). That run proposes `linux-baseline.json` as an artifact; it does not commit or
 publish it. Review the machine line and measurements, commit the Linux entry,
-and dispatch the run again to exercise the comparison path. Record that
+and dispatch the run again to exercise the comparison path. Commit the
+entry's own lines from the artifact, never the artifact's file whole:
+`--record` reads every other entry and prints it again, the keys sorted, and
+its reader is not the round-trip one, so some of their numbers come back one
+unit in the last place off (38 of the M1 Max entry's 636 in the record of
+2026-11-15; `docs/lanes/bench-245-linux-entry.md` gives the script). Record that
 run's URL in the landing report. If three Linux repeats demonstrate noise
 above 5%, report their numbers before proposing a wider threshold. The tool
 has no option to silently widen it.
+
+## What the tests hold of the entries
+
+`tools/bench-compare` has ten tests. Eight (`src/tests.rs`) judge a fixture
+built in the test and never open `benches/baseline.json`. Two
+(`tests/from_run.rs`) read the file as JSON and take the entry whose key sorts
+ahead of every other, today the Linux one (`linux-x86_64 ...` sorts ahead of
+`macos-aarch64 ...`), as a saved run: the
+binary must answer exit 3 with that run's key against an empty baseline and
+exit 0 against a baseline holding that entry alone. So the tests hold two
+things of the file: it is JSON, and the entry that leads its sorted keys is a run
+`validate_run` accepts (a break of the JSON anywhere, or a required row
+deleted from the Linux entry, fails both of the two). They do not hold what
+follows; every line but the last was run on a scratch copy with a hand edit
+(#911; the runs are in `docs/lanes/bench-245-linux-entry.md`):
+
+- Any number of either entry. With a p99 of the Linux entry doubled, all ten
+  pass, and the gate passes a run that much slower.
+- Anything of an entry that does not lead the sorted keys. With a p99 of the M1 Max
+  entry multiplied by ten, with one of its required rows deleted, with a p99
+  put under its p50, and with the entry deleted whole, all ten pass: no test
+  in the tree reads the M1 Max entry.
+- That the tool can read the file. With an unknown member added to the M1 Max
+  entry all ten pass, and the tool then refuses the whole file (`unknown
+  field`, exit 2) for a run on any machine, the Linux runner's included.
+- That an entry is the measurement of a run. Nothing compares an entry with
+  its run's evidence; the review of a record's pull request does (the
+  artifact's entry against the committed one, byte for byte).
 
 ## Stack alignment
 
