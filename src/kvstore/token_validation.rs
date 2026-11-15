@@ -91,6 +91,21 @@ fn protocol(text: &str) -> Result<Protocol> {
         .ok_or_else(|| refused("KVStore protocol ID is invalid"))
 }
 
+/// What `GlobalKVStore::set` may write: a key, value and tags this reader
+/// reads back, refused in its words otherwise, before any wallet call.
+pub(crate) fn writable(key: &str, value: &str, tags: Option<&[String]>) -> Result<()> {
+    if !(1..=800).contains(&key.len()) {
+        return Err(refused("KVStore key has an invalid length"));
+    }
+    if !(1..=MAX_VALUE_BYTES).contains(&value.len()) {
+        return Err(refused("KVStore value has an invalid length"));
+    }
+    match tags.filter(|tags| !tags.is_empty()) {
+        Some(tags) => validate_tags(&serde_json::json!(tags)).map(drop),
+        None => Ok(()),
+    }
+}
+
 /// `decodeAndVerifyKVStoreToken` (`kvStoreTokenValidation.ts:85-119`).
 pub(crate) fn decode_and_verify(script: &LockingScript) -> Result<AuthenticatedToken> {
     let token = canonical(script)?;

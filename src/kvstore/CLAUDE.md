@@ -17,16 +17,17 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `mod.rs` | Module root with re-exports and documentation | 123 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
 | `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 538 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`) before the wallet is asked | 630 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`), and a key, value or tags its reader would refuse (`token_validation::writable`), before the wallet is asked | 634 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |
 | `global_actions.rs` | #343: exact authenticated namespace, merged token BEEF, reference writer; #340: one replacement script and fresh selection on each shared-rule retry | 239 |
 | `local_actions.rs` | #343: replace/remove every listed token; #340: one attempt per removal batch; #478: reference descriptions and unique-token result; #479: refuse an empty page under a positive total; #483: cap at two rounds (at most three listings and two spends for any wallet), with the shrinking guard beneath (one current token per key plus one written during the first round); #479 and #483 both stated reference divergences | 197 |
 | `token_spends.rs` | #343: unique outpoint inputs and BEEF merge; source-specific wallet PushDrop signatures after binding | 141 |
 | `action_options.rs` | Private broadcast configuration, set by additive store builders; the reference's per-store createAction options (#342) | 20 |
 | `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | 730 |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; since #544 `interpret`/`interpret_script` read through `token_validation.rs` alone, the raw-protocol form no value there (`tests/kvstore_interpreter_envelope_544.rs`) | 656; since #537 its three readers (`extract_fields`, `extract_value`, `is_kvstore_token`) decode lock-before alone, as `kvStoreTokenValidation.ts:88` does, a lock-after token no value (`tests/kvstore_interpreter_lock_position_537.rs`) |
-| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged (`tests/kvstore_legacy_signature_verdict.rs`) | 95 |
-| `token_validation.rs` | #544: `decode_and_verify`, the reference's `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03` `kvStoreTokenValidation.ts:85-119`): the canonical five- or six-field envelope and bounds, the protocol canonical JSON `[level, name]`, key, value, a 33-byte controller, the tags, the controller-linked locking key, the controller's signature; crate-internal, read by `interpret_script`; its unit test replays the recorded words | 155 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; since #544 `interpret`/`interpret_script` read through `token_validation.rs` alone, the raw-protocol form no value there (`tests/kvstore_interpreter_envelope_544.rs`); `verify_signature` reads only the key-bound form through `token_derivation.rs`, the protocol field naming the protocol asked (GHSA-4mcm-g5xq-jv3r) | 636 |
+| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the one derivation every door judges a token under (`token_derivation.rs`: the `[level, name]` namespace, the key as key ID, a locking key derived from the controller); a token of the earlier plain-name form (key ID `kvstore-token`) `false` (GHSA-4mcm-g5xq-jv3r); a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds and the push encoding not judged (`tests/kvstore_legacy_signature_verdict.rs`) | 75 |
+| `token_derivation.rs` | The one derivation a token's signature is judged under at every door (`verify_signature`, `verify_signature_legacy`; the store's reads and history walk through them): the protocol field canonical JSON `[level, name]`, the key as key ID, the lock the controller's key linked to `anyone`; with a protocol asked, the field must name it (trimmed, lowercase; a plain name is level 1); any other form, the earlier plain-name one among them, authenticates nowhere (GHSA-4mcm-g5xq-jv3r) | 57 |
+| `token_validation.rs` | #544: `decode_and_verify`, the reference's `decodeAndVerifyKVStoreToken` (`ts-stack@edf6e03` `kvStoreTokenValidation.ts:85-119`): the canonical five- or six-field envelope and bounds, the protocol canonical JSON `[level, name]`, key, value, a 33-byte controller, the tags, the controller-linked locking key, the controller's signature; crate-internal, read by `interpret_script`; its unit test replays the recorded words; `writable`, what `set` may write: the reader's key and value bounds and tag rule, in its words | 175 |
 | `local_lookup.rs` | Local output checks and token authentication (#454); shared original-error extraction (#477); local parser catches (#489); the token decode lock-before alone, as the reference's (#499) | 308 |
 | `local_parser_words.rs` | Uses reference words only when the reference also refuses the input; accepted-reference keys keep native parser words (#489); the point and envelope words come from `script::templates::pushdrop_position` since #537, its point check `PublicKey::from_reference_der` (#498) | 58 |
 | `local_token.rs` | Signed local value envelopes, matching PushDrop.lock (#454); its `forSelf: false` request (#478); since #816 through `PushDrop::lock_with_wallet` (the same two requests, the key text judged before createSignature, as `PushDrop.ts:155-185` orders them; `tests/pushdrop_lock_key_order_816.rs`) | 29 |
@@ -795,10 +796,14 @@ limit present in the reference.
 
 `GlobalKVStore` verifies token signatures on retrieval. The verification:
 1. Concatenates fields 0-4 (protocol_id + key + value + controller + optional tags)
-2. For the reference writer's JSON protocol, uses that wallet protocol and
-   the token's key as key ID, checking the derived locking key first (#344).
-   The older raw protocol form written by this crate retains
-   `SecurityLevel::App` with key ID `"kvstore-token"`.
+2. Reads the protocol field as canonical JSON `[level, name]` and uses that
+   wallet protocol and the token's key as key ID, checking the derived
+   locking key first (#344), through `token_derivation.rs`, the one
+   derivation every judging door uses; `verify_signature`'s protocol argument
+   must be the protocol the field names (trimmed, lowercase; a plain name is
+   level 1). The older raw protocol form written by this crate (key ID
+   `"kvstore-token"`, the controller's own lock) authenticates nowhere since
+   GHSA-4mcm-g5xq-jv3r: its signature does not bind the key.
 3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`.
    All present fields preceding the signature are signed, including `[]`.
    PushDrop writes an empty field as `OP_0`, read back as one zero byte, so a

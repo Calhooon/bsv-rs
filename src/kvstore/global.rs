@@ -176,7 +176,10 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     /// asked anything: PushDrop writes an empty field as `OP_0`, which every
     /// reader reads back as one zero byte, so no reader could verify the
     /// token's signature (the reference refuses it at write too,
-    /// `validateKVStoreValue`).
+    /// `validateKVStoreValue`). `Error::KvStoreError`, also before the
+    /// wallet is asked, for a key, value or tags the store's reader would
+    /// refuse (its bounds; tags unique), so `set` writes no token it does not
+    /// read back.
     pub async fn set(
         &self,
         key: &str,
@@ -191,6 +194,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         }
 
         let options = options.unwrap_or_default();
+        super::token_validation::writable(key, value, options.tags.as_deref())?;
         let controller = self.get_identity_key().await?;
         let protocol_id = options
             .protocol_id
