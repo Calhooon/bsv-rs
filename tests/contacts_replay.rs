@@ -959,7 +959,7 @@ async fn a_metadata_of_notes_alone_or_tags_alone_reads_as_no_metadata_959() {
 /// #959's fold, the strength read's item: an update over a cold cache
 /// validates its record ahead of the load, as the reference's `saveContact`
 /// validates before it reads its cache or the wallet
-/// (`ContactsManager.ts:527`, then `:528-531`): a contact the validator
+/// (`ContactsManager.ts:528`, then `:529-531`): a contact the validator
 /// refuses (an empty name) is refused in the validator's words, the words a
 /// cold save gives, with no wallet call and the cache left cold. RED with
 /// `record::record_of(&updates)?;` deleted from `update_contact`
