@@ -87,7 +87,10 @@ fn a_certificate_signed_here_verifies_in_the_reference() {
         key(13).public_key(),
         certifier.public_key(),
     );
-    cert.revocation_outpoint = Some(Outpoint::new([5u8; 32], 1));
+    cert.revocation_outpoint = Some(Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([5u8; 32]),
+        1,
+    ));
     cert.set_field("name", to_base64(b"v-name"));
     cert.sign(&certifier).unwrap();
     assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);

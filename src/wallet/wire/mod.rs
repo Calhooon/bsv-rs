@@ -87,12 +87,14 @@ mod requests;
 mod result_validation;
 mod results;
 mod transceiver;
+mod txid_codec;
 mod validation;
 
 pub use calls::WalletCall;
 pub use encoding::{WireReader, WireWriter};
 pub use processor::WalletWireProcessor;
 pub use transceiver::WalletWireTransceiver;
+pub(crate) use txid_codec::{read_txid, write_txid};
 
 use crate::primitives::PublicKey;
 use crate::wallet::types::{Counterparty, Protocol};

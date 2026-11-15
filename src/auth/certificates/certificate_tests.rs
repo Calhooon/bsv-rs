@@ -52,7 +52,10 @@ fn test_binary_with_revocation_outpoint() {
     let subject = PrivateKey::random().public_key();
 
     let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-    cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], 5));
+    cert.revocation_outpoint = Some(Outpoint::new(
+        crate::transaction::Txid::from_display_bytes([3u8; 32]),
+        5,
+    ));
     cert.sign(&certifier).unwrap();
 
     let binary = cert.to_binary(true).unwrap();
@@ -60,7 +63,10 @@ fn test_binary_with_revocation_outpoint() {
 
     assert!(parsed.revocation_outpoint.is_some());
     let outpoint = parsed.revocation_outpoint.unwrap();
-    assert_eq!(outpoint.txid, [3u8; 32]);
+    assert_eq!(
+        outpoint.txid,
+        crate::transaction::Txid::from_display_bytes([3u8; 32])
+    );
     assert_eq!(outpoint.vout, 5);
 }
 
@@ -98,14 +104,20 @@ fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bou
     let certifier = PrivateKey::random();
     let subject = PrivateKey::random().public_key();
     let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-    cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], u32::MAX));
+    cert.revocation_outpoint = Some(Outpoint::new(
+        crate::transaction::Txid::from_display_bytes([3u8; 32]),
+        u32::MAX,
+    ));
     cert.sign(&certifier).unwrap();
     let binary = cert.to_binary(true).unwrap();
 
     let parsed = Certificate::from_binary(&binary).unwrap();
     assert_eq!(
         parsed.revocation_outpoint,
-        Some(Outpoint::new([3u8; 32], u32::MAX))
+        Some(Outpoint::new(
+            crate::transaction::Txid::from_display_bytes([3u8; 32]),
+            u32::MAX
+        ))
     );
     assert!(parsed.verify().unwrap());
 
@@ -141,6 +153,6 @@ fn a_dotless_outpoint_of_64_non_hex_characters_is_a_wallet_error() {
     );
     assert_eq!(
         revocation_outpoint_from_str(&"Ab".repeat(32)).unwrap(),
-        Outpoint::new([0xab; 32], 0)
+        Outpoint::new(crate::transaction::Txid::from_display_bytes([0xab; 32]), 0)
     );
 }

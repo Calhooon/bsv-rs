@@ -1,6 +1,6 @@
 //! A wallet's `WERR_REVIEW_ACTIONS` with the results it carries (#327).
 
-use super::{Outpoint, ReviewActionResult, SendWithResult, TxId};
+use super::{Outpoint, ReviewActionResult, SendWithResult, Txid};
 
 /// The reference's `WERR_REVIEW_ACTIONS` as an error with its evidence
 /// (`ts-stack@edf6e03` `packages/sdk/src/wallet/WERR_REVIEW_ACTIONS.ts`):
@@ -30,7 +30,7 @@ pub struct ReviewActionsRefusal {
     /// The batch's send results (`sendWithResults`, #339).
     pub send_with_results: Vec<SendWithResult>,
     /// The transaction the action made, when the wallet names it (`txid`, #339).
-    pub txid: Option<TxId>,
+    pub txid: Option<Txid>,
     /// Its atomic BEEF, when the wallet returns it (`tx`, #339).
     pub tx: Option<Vec<u8>>,
     /// A noSend createAction's change outpoints (`noSendChange`, #339).
@@ -54,7 +54,7 @@ impl ReviewActionsRefusal {
     pub fn with_members(
         review_action_results: Vec<ReviewActionResult>,
         send_with_results: Vec<SendWithResult>,
-        txid: Option<TxId>,
+        txid: Option<Txid>,
         tx: Option<Vec<u8>>,
         no_send_change: Option<Vec<Outpoint>>,
     ) -> Self {

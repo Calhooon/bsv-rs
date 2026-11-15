@@ -259,7 +259,7 @@ impl WalletInterface for TokenWallet {
         let partial = seen.partial.clone().unwrap();
         seen.signed.push((partial, unlock));
         Ok(SignActionResult {
-            txid: Some([0xab; 32]),
+            txid: Some(bsv_rs::transaction::Txid::from_display_bytes([0xab; 32])),
             tx: None,
             send_with_results: None,
         })

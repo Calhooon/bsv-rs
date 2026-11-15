@@ -88,7 +88,7 @@ impl WireResult for CreateActionResult {
             bytes.binary.push(("signableTransaction.tx", &tx.tx));
         }
         let metadata = Action {
-            txid: self.txid.map(hex::encode),
+            txid: self.txid.map(|txid| txid.to_string()),
             tx: self.tx.as_ref().map(|_| []),
             no_send_change: self.no_send_change.as_deref(),
             send_with_results: self.send_with_results.as_deref(),
@@ -114,7 +114,7 @@ impl WireResult for SignActionResult {
         action: Option<&crate::wallet::CreateActionArgs>,
     ) -> Result<()> {
         let metadata = Action {
-            txid: self.txid.map(hex::encode),
+            txid: self.txid.map(|txid| txid.to_string()),
             tx: self.tx.as_ref().map(|_| []),
             no_send_change: None,
             send_with_results: self.send_with_results.as_deref(),

@@ -1254,7 +1254,7 @@ mod wire_protocol_tests {
         let mut txid = [0u8; 32];
         txid[0] = 0xde;
         txid[31] = 0xad;
-        let outpoint = Outpoint::new(txid, 42);
+        let outpoint = Outpoint::new(bsv_rs::transaction::Txid::from_display_bytes(txid), 42);
 
         writer.write_outpoint(&outpoint);
 
@@ -1262,7 +1262,7 @@ mod wire_protocol_tests {
         let mut reader = WireReader::new(&bytes);
 
         let read = reader.read_outpoint().unwrap();
-        assert_eq!(read.txid, txid);
+        assert_eq!(read.txid.to_display_bytes(), txid);
         assert_eq!(read.vout, 42);
     }
 

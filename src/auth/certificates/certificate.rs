@@ -8,7 +8,9 @@ use super::bounds::{self, checked_field_names};
 use super::certificate_json::revocation_outpoint_from_str;
 use crate::primitives::{bounded_capacity, sha256, to_hex, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
-use crate::wallet::wire::{certificate_field_value_refusal, MAX_CERTIFICATE_FIELD_VALUE_BYTES};
+use crate::wallet::wire::{
+    certificate_field_value_refusal, read_txid, write_txid, MAX_CERTIFICATE_FIELD_VALUE_BYTES,
+};
 use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use crate::{Error, Result};
 use indexmap::IndexMap;
@@ -40,7 +42,7 @@ use indexmap::IndexMap;
 /// let subject = PrivateKey::random().public_key();
 /// let fields = IndexMap::from([("email".to_string(), "ZW1haWw=".to_string())]);
 /// let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key())
-///     .with_revocation_outpoint(Some(Outpoint::new([3u8; 32], 0)))
+///     .with_revocation_outpoint(Some(Outpoint::from_string(&format!("{}.0", "03".repeat(32))).unwrap()))
 ///     .with_fields(fields);
 /// cert.sign(&certifier).unwrap();
 /// assert_eq!(cert.verify(), Ok(true));
@@ -304,7 +306,7 @@ impl Certificate {
         // No marker byte - matches TypeScript SDK format
         // If no outpoint, use all-zeros TXID and index 0 as sentinel
         if let Some(ref outpoint) = self.revocation_outpoint {
-            buf.extend_from_slice(&outpoint.txid);
+            buf.extend_from_slice(&write_txid(&outpoint.txid));
             write_varint(&mut buf, outpoint.vout as u64);
         } else {
             // Sentinel value for "no outpoint": all zeros
@@ -588,12 +590,13 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
     // Revocation outpoint: TXID (32 bytes) + index (varint)
     // No marker byte - matches TypeScript SDK format
     // All-zeros TXID with index 0 is treated as "no outpoint"
-    let mut txid = [0u8; 32];
-    txid.copy_from_slice(reader.read_bytes(32)?);
+    let txid = read_txid(reader.read_bytes(32)?).ok_or_else(|| {
+        Error::CertificateValidationError(crate::wallet::wire::certificate_binary_read_refusal())
+    })?;
     let vout = reader.read_varint_index("revocation outpoint index")?;
 
     // Treat all-zeros TXID with index 0 as "no outpoint"
-    let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
+    let revocation_outpoint = if txid.is_null() && vout == 0 {
         None
     } else {
         Some(Outpoint::new(txid, vout))

@@ -84,11 +84,12 @@ fn listing(tokens: &Value) -> ListOutputsResult {
 pub fn review(case: &Value) -> Error {
     Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(vec![
         ReviewActionResult {
-            txid: [0x22; 32],
+            txid: bsv_rs::transaction::Txid::from_display_bytes([0x22; 32]),
             status: ReviewActionResultStatus::DoubleSpend,
-            competing_txs: Some(vec![from_hex(case["competing"]["txid"].as_str().unwrap())
+            competing_txs: Some(vec![case["competing"]["txid"]
+                .as_str()
                 .unwrap()
-                .try_into()
+                .parse()
                 .unwrap()]),
             competing_beef: Some(from_hex(case["competing"]["beef"].as_str().unwrap()).unwrap()),
         },

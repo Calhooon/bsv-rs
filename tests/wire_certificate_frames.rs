@@ -109,7 +109,7 @@ fn assert_codec_reads(bytes: &[u8], cert: &WalletCertificate) {
     assert_eq!(parsed.certifier.to_hex(), cert.certifier);
     let outpoint = parsed.revocation_outpoint.unwrap();
     assert_eq!(
-        format!("{}.{}", to_hex(&outpoint.txid), outpoint.vout),
+        format!("{}.{}", outpoint.txid, outpoint.vout),
         cert.revocation_outpoint
     );
     assert_eq!(parsed.fields, cert.fields);

@@ -6,6 +6,7 @@
 
 use crate::primitives::encoding::{Reader, Writer};
 use crate::primitives::{bounded_capacity, from_base64, from_hex, to_base64, to_hex, PublicKey};
+use crate::transaction::Txid;
 use crate::wallet::types::{
     ActionStatus, BasketInsertion, Counterparty, IdentityCertificate, IdentityCertifier,
     InternalizeOutput, Outpoint, OutputInclude, Protocol, QueryMode, SecurityLevel, SendWithResult,
@@ -131,9 +132,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an outpoint (32-byte txid + varint index).
     pub fn read_outpoint(&mut self) -> Result<Outpoint, Error> {
-        let txid_bytes = self.read_bytes(32)?;
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(txid_bytes);
+        let txid = self.read_txid()?;
         let vout = self.read_var_int_u32("outpoint index")?;
         Ok(Outpoint::new(txid, vout))
     }
@@ -230,8 +229,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a 32-byte txid as hex string.
     pub fn read_txid_hex(&mut self) -> Result<String, Error> {
-        let bytes = self.read_bytes(32)?;
-        Ok(to_hex(bytes))
+        Ok(self.read_txid()?.to_string())
     }
 
     /// Reads a 33-byte compressed public key as hex string.
@@ -350,9 +348,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a SendWithResult.
     pub fn read_send_with_result(&mut self) -> Result<SendWithResult, Error> {
-        let txid_bytes = self.read_bytes(32)?;
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(txid_bytes);
+        let txid = self.read_txid()?;
         let status = self.read_send_with_result_status()?;
         Ok(SendWithResult { txid, status })
     }
@@ -603,9 +599,7 @@ impl<'a> WireReader<'a> {
     ///           → description(string) → labels(string slice) → version(varint) → lockTime(varint)
     ///           → inputs(varint count or MaxUint64) → outputs(varint count or MaxUint64)
     pub fn read_wallet_action(&mut self) -> Result<WalletAction, Error> {
-        let txid_bytes = self.read_bytes(32)?;
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(txid_bytes);
+        let txid = self.read_txid()?;
         // The reference's signed net amount in its bound (bsv-rs#236)
         let satoshis = self.read_action_satoshis()?;
         let status = self
@@ -884,7 +878,7 @@ impl WireWriter {
 
     /// Writes an outpoint (32-byte txid + varint index).
     pub fn write_outpoint(&mut self, outpoint: &Outpoint) -> &mut Self {
-        self.write_bytes(&outpoint.txid);
+        self.write_txid(&outpoint.txid);
         self.write_var_int(outpoint.vout as u64)
     }
 
@@ -954,7 +948,9 @@ impl WireWriter {
                 bytes.len()
             )));
         }
-        Ok(self.write_bytes(&bytes))
+        // 32 decoded bytes are 64 hex digits: the text is a txid's.
+        let txid = Txid::from_hex(txid).map_err(|e| Error::WalletError(e.to_string()))?;
+        Ok(self.write_txid(&txid))
     }
 
     // =========================================================================
@@ -1022,7 +1018,7 @@ impl WireWriter {
 
     /// Writes a SendWithResult.
     pub fn write_send_with_result(&mut self, result: &SendWithResult) -> &mut Self {
-        self.write_bytes(&result.txid);
+        self.write_txid(&result.txid);
         self.write_send_with_result_status(result.status)
     }
 
@@ -1225,7 +1221,7 @@ impl WireWriter {
     ///           → description(string) → labels(string slice) → version(varint) → lockTime(varint)
     ///           → inputs(varint count or MaxUint64) → outputs(varint count or MaxUint64)
     pub fn write_wallet_action(&mut self, action: &WalletAction) -> &mut Self {
-        self.write_bytes(&action.txid);
+        self.write_txid(&action.txid);
         // Go uses unsigned VarInt for satoshis
         self.write_var_int(action.satoshis as u64);
         self.write_action_status(Some(action.status));
@@ -1458,7 +1454,7 @@ mod tests {
 
     #[test]
     fn test_outpoint_roundtrip() {
-        let txid = [0xab; 32];
+        let txid = Txid::from_display_bytes([0xab; 32]);
         let outpoint = Outpoint::new(txid, 42);
 
         let mut writer = WireWriter::new();
@@ -1730,7 +1726,7 @@ mod tests {
     #[test]
     fn test_send_with_result_roundtrip() {
         let result = SendWithResult {
-            txid: [0xaa; 32],
+            txid: Txid::from_display_bytes([0xaa; 32]),
             status: SendWithResultStatus::Sending,
         };
 
@@ -1748,11 +1744,11 @@ mod tests {
         // Some array
         let results = vec![
             SendWithResult {
-                txid: [0x11; 32],
+                txid: Txid::from_display_bytes([0x11; 32]),
                 status: SendWithResultStatus::Unproven,
             },
             SendWithResult {
-                txid: [0x22; 32],
+                txid: Txid::from_display_bytes([0x22; 32]),
                 status: SendWithResultStatus::Failed,
             },
         ];
@@ -2050,7 +2046,7 @@ mod tests {
     fn test_wallet_action_input_roundtrip() {
         // Full input
         let input = WalletActionInput {
-            source_outpoint: Outpoint::new([0xab; 32], 0),
+            source_outpoint: Outpoint::new(Txid::from_display_bytes([0xab; 32]), 0),
             source_satoshis: 50_000,
             source_locking_script: Some(vec![0x76, 0xa9, 0x14]),
             unlocking_script: Some(vec![0x48, 0x30, 0x45]),
@@ -2072,7 +2068,7 @@ mod tests {
 
         // Minimal input (no optional scripts)
         let minimal = WalletActionInput {
-            source_outpoint: Outpoint::new([0x00; 32], 42),
+            source_outpoint: Outpoint::new(Txid::from_display_bytes([0x00; 32]), 42),
             source_satoshis: 0,
             source_locking_script: None,
             unlocking_script: None,
@@ -2143,7 +2139,7 @@ mod tests {
     fn test_wallet_action_roundtrip() {
         // Full action with inputs and outputs
         let action = WalletAction {
-            txid: [0xab; 32],
+            txid: Txid::from_display_bytes([0xab; 32]),
             satoshis: 50_000,
             status: ActionStatus::Completed,
             is_outgoing: true,
@@ -2152,7 +2148,7 @@ mod tests {
             version: 1,
             lock_time: 0,
             inputs: Some(vec![WalletActionInput {
-                source_outpoint: Outpoint::new([0xcc; 32], 0),
+                source_outpoint: Outpoint::new(Txid::from_display_bytes([0xcc; 32]), 0),
                 source_satoshis: 100_000,
                 source_locking_script: Some(vec![0x76, 0xa9]),
                 unlocking_script: Some(vec![0x48, 0x30]),
@@ -2190,7 +2186,7 @@ mod tests {
 
         // Negative satoshis (outgoing tx)
         let outgoing = WalletAction {
-            txid: [0x11; 32],
+            txid: Txid::from_display_bytes([0x11; 32]),
             satoshis: -25_000,
             status: ActionStatus::Sending,
             is_outgoing: true,
@@ -2222,7 +2218,7 @@ mod tests {
             spendable: true,
             custom_instructions: Some("custom".to_string()),
             tags: Some(vec!["utxo".to_string()]),
-            outpoint: Outpoint::new([0xdd; 32], 1),
+            outpoint: Outpoint::new(Txid::from_display_bytes([0xdd; 32]), 1),
             labels: Some(vec!["label1".to_string(), "label2".to_string()]),
         };
 
@@ -2246,7 +2242,7 @@ mod tests {
             spendable: false,
             custom_instructions: None,
             tags: None,
-            outpoint: Outpoint::new([0x00; 32], 0),
+            outpoint: Outpoint::new(Txid::from_display_bytes([0x00; 32]), 0),
             labels: None,
         };
 
@@ -2293,7 +2289,7 @@ mod tests {
         writer.write_string("hello");
         writer.write_optional_string(None);
         writer.write_optional_bool(Some(true));
-        writer.write_outpoint(&Outpoint::new([0xff; 32], 7));
+        writer.write_outpoint(&Outpoint::new(Txid::from_display_bytes([0xff; 32]), 7));
         writer.write_counterparty(Some(&Counterparty::Self_));
         writer.write_protocol_id(&Protocol::new(SecurityLevel::App, "test protocol"));
         writer.write_action_status(Some(ActionStatus::Completed));
@@ -2308,7 +2304,7 @@ mod tests {
         assert_eq!(reader.read_optional_string().unwrap(), None);
         assert_eq!(reader.read_optional_bool().unwrap(), Some(true));
         let op = reader.read_outpoint().unwrap();
-        assert_eq!(op.txid, [0xff; 32]);
+        assert_eq!(op.txid, Txid::from_display_bytes([0xff; 32]));
         assert_eq!(op.vout, 7);
         assert_eq!(
             reader.read_counterparty().unwrap(),
@@ -2414,7 +2410,7 @@ mod tests {
 
         for status in statuses {
             let action = WalletAction {
-                txid: [0x00; 32],
+                txid: Txid::from_display_bytes([0x00; 32]),
                 satoshis: 0,
                 status,
                 is_outgoing: false,

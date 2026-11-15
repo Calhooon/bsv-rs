@@ -15,7 +15,7 @@ use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OutputListItem, TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_hex, to_base64, to_hex};
+use crate::primitives::{from_hex, to_base64};
 use crate::registry::types::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateQuery, DefinitionData, DefinitionType,
@@ -24,7 +24,7 @@ use crate::registry::types::{
 };
 use crate::registry::{token, unlock, REGISTRANT_TOKEN_AMOUNT};
 use crate::script::LockingScript;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, Txid};
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::{
     CreateActionArgs, CreateActionInput, CreateActionOutput, GetPublicKeyArgs, ListOutputsArgs,
@@ -269,7 +269,7 @@ impl<W: WalletInterface> RegistryClient<W> {
                         let result = broadcaster.broadcast_tx(&tx).await;
                         if result.is_ok() {
                             broadcast_success = Some(BroadcastSuccess {
-                                txid: to_hex(&txid),
+                                txid: txid.to_string(),
                                 message: "success".to_string(),
                             });
                         } else {
@@ -292,7 +292,7 @@ impl<W: WalletInterface> RegistryClient<W> {
         // Default to success if we got a txid
         if broadcast_success.is_none() && broadcast_failure.is_none() {
             broadcast_success = Some(BroadcastSuccess {
-                txid: to_hex(&txid),
+                txid: txid.to_string(),
                 message: "created".to_string(),
             });
         }
@@ -513,7 +513,7 @@ impl<W: WalletInterface> RegistryClient<W> {
                     if let Ok(fields) = token::data_fields(definition_type, &script) {
                         // Create token data
                         let token = TokenData::with_beef(
-                            to_hex(&output.outpoint.txid),
+                            output.outpoint.txid.to_string(),
                             output.outpoint.vout,
                             output.satoshis,
                             script.to_hex(),
@@ -599,11 +599,11 @@ impl<W: WalletInterface> RegistryClient<W> {
         // Parse outpoint
         let txid_bytes = from_hex(record.txid())
             .map_err(|e| Error::RegistryError(format!("Invalid txid: {}", e)))?;
-        let mut txid_arr = [0u8; 32];
         if txid_bytes.len() != 32 {
             return Err(Error::RegistryError("Invalid txid length".to_string()));
         }
-        txid_arr.copy_from_slice(&txid_bytes);
+        let txid_arr = Txid::from_hex(record.txid())
+            .map_err(|_| Error::RegistryError("Invalid txid length".to_string()))?;
 
         // Create the revocation transaction (spend with no outputs)
         let create_result = self
@@ -808,11 +808,11 @@ impl<W: WalletInterface> RegistryClient<W> {
         // Parse outpoint
         let txid_bytes = from_hex(record.txid())
             .map_err(|e| Error::RegistryError(format!("Invalid txid: {}", e)))?;
-        let mut txid_arr = [0u8; 32];
         if txid_bytes.len() != 32 {
             return Err(Error::RegistryError("Invalid txid length".to_string()));
         }
-        txid_arr.copy_from_slice(&txid_bytes);
+        let txid_arr = Txid::from_hex(record.txid())
+            .map_err(|_| Error::RegistryError("Invalid txid length".to_string()))?;
 
         // Create the update transaction (spend old UTXO, create new one)
         let create_result = self

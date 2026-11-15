@@ -92,6 +92,11 @@ fn sample_txid() -> [u8; 32] {
     txid
 }
 
+/// The sample txid as the wallet types hold it (the bytes are its display order).
+fn sample_id() -> bsv_rs::transaction::Txid {
+    bsv_rs::transaction::Txid::from_display_bytes(sample_txid())
+}
+
 /// Helper to create a sample outpoint string.
 fn sample_outpoint_string() -> String {
     let txid = sample_txid();
@@ -1227,7 +1232,7 @@ mod action_tests {
             ))
             .unwrap();
         source.merkle_path = Some(MerklePath::from_coinbase_txid(&source.id(), 800_000));
-        let source_id: [u8; 32] = hex::decode(source.id()).unwrap().try_into().unwrap();
+        let source_id = source.txid();
         let transceiver = create_loopback();
         let result = transceiver
             .create_action(
@@ -1256,11 +1261,11 @@ mod action_tests {
                         sign_and_process: Some(true),
                         accept_delayed_broadcast: Some(false),
                         trust_self: Some(TrustSelf::Known),
-                        known_txids: Some(vec![sample_txid()]),
+                        known_txids: Some(vec![sample_id()]),
                         return_txid_only: Some(true),
                         no_send: Some(false),
-                        no_send_change: Some(vec![Outpoint::new(sample_txid(), 1)]),
-                        send_with: Some(vec![sample_txid()]),
+                        no_send_change: Some(vec![Outpoint::new(sample_id(), 1)]),
+                        send_with: Some(vec![sample_id()]),
                         randomize_outputs: Some(true),
                     }),
                 },
@@ -1328,7 +1333,7 @@ mod action_tests {
                         accept_delayed_broadcast: Some(true),
                         return_txid_only: Some(false),
                         no_send: Some(true),
-                        send_with: Some(vec![sample_txid()]),
+                        send_with: Some(vec![sample_id()]),
                     }),
                 },
                 Some("test"),
@@ -1557,7 +1562,7 @@ mod output_tests {
             .relinquish_output(
                 RelinquishOutputArgs {
                     basket: "tokens".to_string(),
-                    output: Outpoint::new(sample_txid(), 3),
+                    output: Outpoint::new(sample_id(), 3),
                 },
                 Some("test"),
             )
@@ -2022,7 +2027,7 @@ mod complex_type_roundtrips {
     #[test]
     fn test_wallet_action_input_roundtrip() {
         let input = WalletActionInput {
-            source_outpoint: Outpoint::new(sample_txid(), 2),
+            source_outpoint: Outpoint::new(sample_id(), 2),
             source_satoshis: 100000,
             source_locking_script: Some(vec![0x76, 0xa9, 0x14, 0xab]),
             unlocking_script: Some(vec![0x48, 0x30, 0x45, 0x02, 0x21]),
@@ -2049,7 +2054,10 @@ mod complex_type_roundtrips {
     #[test]
     fn test_wallet_action_input_minimal_roundtrip() {
         let input = WalletActionInput {
-            source_outpoint: Outpoint::new([0u8; 32], 0),
+            source_outpoint: Outpoint::new(
+                bsv_rs::transaction::Txid::from_display_bytes([0u8; 32]),
+                0,
+            ),
             source_satoshis: 0,
             source_locking_script: None,
             unlocking_script: None,
@@ -2102,7 +2110,7 @@ mod complex_type_roundtrips {
     #[test]
     fn test_wallet_action_full_roundtrip() {
         let action = WalletAction {
-            txid: sample_txid(),
+            txid: sample_id(),
             satoshis: -50000, // negative for outgoing
             status: ActionStatus::Completed,
             is_outgoing: true,
@@ -2111,7 +2119,7 @@ mod complex_type_roundtrips {
             version: 1,
             lock_time: 0,
             inputs: Some(vec![WalletActionInput {
-                source_outpoint: Outpoint::new(sample_txid(), 0),
+                source_outpoint: Outpoint::new(sample_id(), 0),
                 source_satoshis: 100000,
                 source_locking_script: Some(vec![0x76, 0xa9]),
                 unlocking_script: Some(vec![0x48, 0x30]),
@@ -2157,7 +2165,7 @@ mod complex_type_roundtrips {
     #[test]
     fn test_wallet_action_minimal_roundtrip() {
         let action = WalletAction {
-            txid: [0u8; 32],
+            txid: bsv_rs::transaction::Txid::from_display_bytes([0u8; 32]),
             satoshis: 0,
             status: ActionStatus::Unprocessed,
             is_outgoing: false,
@@ -2175,7 +2183,7 @@ mod complex_type_roundtrips {
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_wallet_action().unwrap();
 
-        assert_eq!(read.txid, [0u8; 32]);
+        assert!(read.txid.is_null());
         assert_eq!(read.satoshis, 0);
         assert_eq!(read.status, ActionStatus::Unprocessed);
         assert!(!read.is_outgoing);
@@ -2202,7 +2210,7 @@ mod complex_type_roundtrips {
 
         for status in statuses {
             let action = WalletAction {
-                txid: sample_txid(),
+                txid: sample_id(),
                 satoshis: 1000,
                 status,
                 is_outgoing: false,
@@ -2232,7 +2240,7 @@ mod complex_type_roundtrips {
             spendable: true,
             custom_instructions: Some("spend-with-r-puzzle".to_string()),
             tags: Some(vec!["p2pkh".to_string(), "received".to_string()]),
-            outpoint: Outpoint::new(sample_txid(), 5),
+            outpoint: Outpoint::new(sample_id(), 5),
             labels: Some(vec!["income".to_string()]),
         };
 
@@ -2261,7 +2269,7 @@ mod complex_type_roundtrips {
             spendable: false,
             custom_instructions: None,
             tags: None,
-            outpoint: Outpoint::new([0u8; 32], 0),
+            outpoint: Outpoint::new(bsv_rs::transaction::Txid::from_display_bytes([0u8; 32]), 0),
             labels: None,
         };
 
@@ -2285,15 +2293,15 @@ mod complex_type_roundtrips {
     fn test_send_with_result_roundtrip() {
         let results = vec![
             SendWithResult {
-                txid: sample_txid(),
+                txid: sample_id(),
                 status: SendWithResultStatus::Unproven,
             },
             SendWithResult {
-                txid: [0xFF; 32],
+                txid: bsv_rs::transaction::Txid::from_display_bytes([0xFF; 32]),
                 status: SendWithResultStatus::Sending,
             },
             SendWithResult {
-                txid: [0x00; 32],
+                txid: bsv_rs::transaction::Txid::from_display_bytes([0x00; 32]),
                 status: SendWithResultStatus::Failed,
             },
         ];
@@ -2306,7 +2314,7 @@ mod complex_type_roundtrips {
         assert!(read.is_some());
         let read = read.unwrap();
         assert_eq!(read.len(), 3);
-        assert_eq!(read[0].txid, sample_txid());
+        assert_eq!(read[0].txid, sample_id());
         assert_eq!(read[0].status, SendWithResultStatus::Unproven);
         assert_eq!(read[1].status, SendWithResultStatus::Sending);
         assert_eq!(read[2].status, SendWithResultStatus::Failed);
@@ -2569,7 +2577,7 @@ mod response_roundtrips {
 
         // no_send_change (1 outpoint)
         writer.write_signed_var_int("noSendChange", 1).unwrap();
-        writer.write_outpoint(&Outpoint::new(sample_txid(), 0));
+        writer.write_outpoint(&Outpoint::new(sample_id(), 0));
 
         // send_with_results (None)
         writer.write_send_with_result_array(None);
@@ -2634,11 +2642,11 @@ mod response_roundtrips {
         // send_with_results with 2 entries
         writer.write_send_with_result_array(Some(&[
             SendWithResult {
-                txid: sample_txid(),
+                txid: sample_id(),
                 status: SendWithResultStatus::Sending,
             },
             SendWithResult {
-                txid: [0xBB; 32],
+                txid: bsv_rs::transaction::Txid::from_display_bytes([0xBB; 32]),
                 status: SendWithResultStatus::Failed,
             },
         ]));
@@ -2669,7 +2677,7 @@ mod response_roundtrips {
 
         // Write 2 WalletActions
         let action1 = WalletAction {
-            txid: sample_txid(),
+            txid: sample_id(),
             satoshis: 5000,
             status: ActionStatus::Completed,
             is_outgoing: false,
@@ -2683,7 +2691,7 @@ mod response_roundtrips {
         writer.write_wallet_action(&action1);
 
         let action2 = WalletAction {
-            txid: [0xFF; 32],
+            txid: bsv_rs::transaction::Txid::from_display_bytes([0xFF; 32]),
             satoshis: -3000,
             status: ActionStatus::Sending,
             is_outgoing: true,
@@ -2732,7 +2740,7 @@ mod response_roundtrips {
             spendable: true,
             custom_instructions: None,
             tags: Some(vec!["utxo".to_string()]),
-            outpoint: Outpoint::new(sample_txid(), 0),
+            outpoint: Outpoint::new(sample_id(), 0),
             labels: None,
         };
         writer.write_wallet_output(&output);
@@ -3067,11 +3075,20 @@ mod index_bounds_tests {
     #[test]
     fn an_outpoint_index_above_u32_max_is_refused_not_truncated() {
         let mut writer = WireWriter::new();
-        writer.write_outpoint(&Outpoint::new([7u8; 32], u32::MAX));
+        writer.write_outpoint(&Outpoint::new(
+            bsv_rs::transaction::Txid::from_display_bytes([7u8; 32]),
+            u32::MAX,
+        ));
         let frame = writer.into_bytes();
 
         let outpoint = WireReader::new(&frame).read_outpoint().unwrap();
-        assert_eq!(outpoint, Outpoint::new([7u8; 32], u32::MAX));
+        assert_eq!(
+            outpoint,
+            Outpoint::new(
+                bsv_rs::transaction::Txid::from_display_bytes([7u8; 32]),
+                u32::MAX
+            )
+        );
 
         let over = widen_index_past_u32(&frame, 32);
         let err = WireReader::new(&over).read_outpoint().unwrap_err();

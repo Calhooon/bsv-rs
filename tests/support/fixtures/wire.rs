@@ -147,9 +147,10 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
     Some(w.into_bytes())
 }
 
-fn optional_tx(w: &mut WireWriter, txid: Option<TxId>, tx: Option<&[u8]>) {
+fn optional_tx(w: &mut WireWriter, txid: Option<Txid>, tx: Option<&[u8]>) {
     if let Some(txid) = txid {
-        w.write_i8(1).write_bytes(&txid);
+        // The wallet wire carries a txid in display order.
+        w.write_i8(1).write_bytes(&txid.to_display_bytes());
     } else {
         w.write_i8(0);
     }

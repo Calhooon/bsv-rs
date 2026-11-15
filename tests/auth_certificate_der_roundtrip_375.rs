@@ -28,7 +28,10 @@ fn inputs() -> Value {
         deterministic_test_key(69).public_key(),
         certifier.public_key(),
     );
-    cert.set_revocation_outpoint(Some(Outpoint::new([0; 32], 0)));
+    cert.set_revocation_outpoint(Some(Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([0; 32]),
+        0,
+    )));
     cert.set_field("name", to_base64(b"certificate DER round-trip #375"));
     cert.sign(&certifier).unwrap();
     let canonical = cert.signature.clone().unwrap();

@@ -10,11 +10,10 @@
 //! error envelope is decoded, including transaction evidence and request binding.
 
 use super::byte_fields::byte_array;
-use crate::primitives::{from_hex, to_hex};
 use crate::transaction::Beef;
 use crate::wallet::{
     CreateActionArgs, Outpoint, ReviewActionResult, ReviewActionResultStatus, ReviewActionsRefusal,
-    SendWithResult, SendWithResultStatus, SignActionArgs, TxId,
+    SendWithResult, SendWithResultStatus, SignActionArgs, Txid,
 };
 use crate::Error;
 use serde_json::{Map, Value};
@@ -29,7 +28,7 @@ const MAX_ERROR_STRING_BYTES: usize = 4096;
 /// validation uses the complete request captured by the common result path.
 pub(super) struct ReviewRequest {
     call: &'static str,
-    send_with: Vec<TxId>,
+    send_with: Vec<Txid>,
 }
 
 impl ReviewRequest {
@@ -120,8 +119,8 @@ fn read_members(
     }
     super::result_values::review(data, call, binding)?;
     let action = action_result(data, request)?;
-    let mut allowed: HashSet<String> = request.send_with.iter().map(|t| to_hex(t)).collect();
-    allowed.extend(action.txid.map(|t| to_hex(&t)));
+    let mut allowed: HashSet<String> = request.send_with.iter().map(Txid::to_string).collect();
+    allowed.extend(action.txid.map(|t| t.to_string()));
     let results = review_action_results(data.get("reviewActionResults"), &allowed)?;
     Ok(ReviewActionsRefusal::with_members(
         results,
@@ -141,14 +140,14 @@ fn safe_integer(value: Option<&Value>) -> bool {
 }
 
 struct ActionMembers {
-    txid: Option<TxId>,
+    txid: Option<Txid>,
     tx: Option<Vec<u8>>,
     no_send_change: Option<Vec<Outpoint>>,
     send_with_results: Vec<SendWithResult>,
 }
 
 /// `string(value, call, field)` then `hex(.., 32)` (`WalletResultValidation.ts:908-925`).
-fn hex32(value: &Value, call: &str, field: &str) -> Result<TxId, Error> {
+fn hex32(value: &Value, call: &str, field: &str) -> Result<Txid, Error> {
     let text = value
         .as_str()
         .ok_or_else(|| invalid(call, field, "a string"))?;
@@ -161,8 +160,8 @@ fn hex32(value: &Value, call: &str, field: &str) -> Result<TxId, Error> {
     txid_of(text).ok_or_else(|| invalid(call, field, "32 hexadecimal bytes"))
 }
 
-fn txid_of(text: &str) -> Option<TxId> {
-    from_hex(text).ok()?.try_into().ok()
+fn txid_of(text: &str) -> Option<Txid> {
+    Txid::from_hex(text).ok()
 }
 
 /// `optionalArray` (`WalletResultValidation.ts:971-976`).

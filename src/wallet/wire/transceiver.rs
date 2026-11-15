@@ -549,7 +549,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             if let Some(txids) = &options.known_txids {
                 writer.write_var_int(txids.len() as u64);
                 for txid in txids {
-                    writer.write_bytes(txid);
+                    writer.write_txid(txid);
                 }
             } else {
                 writer.write_var_int(u64::MAX);
@@ -572,7 +572,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             if let Some(txids) = &options.send_with {
                 writer.write_var_int(txids.len() as u64);
                 for txid in txids {
-                    writer.write_bytes(txid);
+                    writer.write_txid(txid);
                 }
             } else {
                 writer.write_var_int(u64::MAX);
@@ -592,10 +592,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse txid
         let txid_flag = reader.read_i8()?;
         let txid = if txid_flag == 1 {
-            let bytes = reader.read_bytes(32)?;
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(bytes);
-            Some(arr)
+            Some(reader.read_txid()?)
         } else {
             None
         };
@@ -685,7 +682,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             if let Some(txids) = &options.send_with {
                 writer.write_var_int(txids.len() as u64);
                 for txid in txids {
-                    writer.write_bytes(txid);
+                    writer.write_txid(txid);
                 }
             } else {
                 writer.write_var_int(u64::MAX);
@@ -703,10 +700,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse txid
         let txid_flag = reader.read_i8()?;
         let txid = if txid_flag == 1 {
-            let bytes = reader.read_bytes(32)?;
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(bytes);
-            Some(arr)
+            Some(reader.read_txid()?)
         } else {
             None
         };

@@ -85,13 +85,13 @@ fn wallet_certificate(cert: &Certificate) -> WalletCertificate {
     let (txid, index) = cert
         .revocation_outpoint
         .as_ref()
-        .map_or(([0u8; 32], 0), |o| (o.txid, o.vout));
+        .map_or(("00".repeat(32), 0), |o| (o.txid.to_string(), o.vout));
     WalletCertificate {
         certificate_type: to_base64(&cert.cert_type),
         subject: cert.subject.to_hex(),
         serial_number: to_base64(&cert.serial_number),
         certifier: cert.certifier.to_hex(),
-        revocation_outpoint: format!("{}.{index}", to_hex(&txid)),
+        revocation_outpoint: format!("{txid}.{index}"),
         signature: to_hex(cert.signature.as_ref().unwrap()),
         fields: cert.fields.clone().into_iter().collect(),
     }
@@ -139,7 +139,10 @@ fn a_certificate_signed_here_is_written_to_the_wire_in_the_signed_order() {
         [9u8; 32],
         27,
         25,
-        Some(Outpoint::new([10u8; 32], 1)),
+        Some(Outpoint::new(
+            bsv_rs::transaction::Txid::from_display_bytes([10u8; 32]),
+            1,
+        )),
     );
     assert_wire_frame_is_the_signed_bytes(&cert, &witness("rust_signed_mixed_names"));
 }

@@ -3,7 +3,7 @@
 
 use super::{bytes, invalid, Result};
 use crate::primitives::{sha256d, Reader};
-use crate::transaction::{MerklePath, MerklePathLeaf};
+use crate::transaction::{MerklePath, MerklePathLeaf, Txid};
 use serde_json::value::RawValue;
 use std::collections::{HashMap, HashSet};
 
@@ -57,9 +57,12 @@ fn count(reader: &mut Reader<'_>) -> Result<usize> {
 }
 
 fn reversed(reader: &mut Reader<'_>) -> Result<String> {
-    let mut bytes = reader.read_bytes(32)?.to_vec();
-    bytes.reverse();
-    Ok(hex::encode(bytes))
+    // 32 bytes of a serialized transaction or BUMP (an outpoint's txid, a
+    // txid-only entry, a BUMP hash): wire order, shown as the text the
+    // wallet's results are keyed by. This file reads serialized transactions,
+    // not the wallet wire, so the order is the transaction's own.
+    let wire: [u8; 32] = reader.read_bytes(32)?.try_into().map_err(|_| malformed())?;
+    Ok(Txid::from_wire_bytes(wire).to_string())
 }
 
 fn script(reader: &mut Reader<'_>) -> Result<Vec<u8>> {
@@ -96,10 +99,9 @@ fn raw_transaction(reader: &mut Reader<'_>) -> Result<Transaction> {
         });
     }
     let lock_time = reader.read_u32_le()?;
-    let mut hash = sha256d(reader.consumed_since(start));
-    hash.reverse();
+    let hash = sha256d(reader.consumed_since(start));
     Ok(Transaction {
-        txid: hex::encode(hash),
+        txid: Txid::from_wire_bytes(hash).to_string(),
         version,
         inputs,
         outputs,

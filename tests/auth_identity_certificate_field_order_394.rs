@@ -75,7 +75,10 @@ fn signed_certificate() -> (Certificate, PrivateKey) {
     let certifier = PrivateKey::from_bytes(&[41u8; 32]).unwrap();
     let subject = PrivateKey::from_bytes(&[43u8; 32]).unwrap().public_key();
     let mut cert = Certificate::new([4; 32], [5; 32], subject, certifier.public_key());
-    cert.revocation_outpoint = Some(Outpoint::new([9; 32], 1));
+    cert.revocation_outpoint = Some(Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([9; 32]),
+        1,
+    ));
     for name in NAMES {
         cert.set_field(name, "QQ==");
     }

@@ -48,9 +48,7 @@ fn parse_outpoint(s: &str) -> Outpoint {
     let txid_hex = parts[0];
     let vout: u32 = parts[1].parse().expect("Invalid vout");
 
-    let mut txid = [0u8; 32];
-    let txid_bytes = from_hex(txid_hex).expect("Invalid txid hex");
-    txid.copy_from_slice(&txid_bytes);
+    let txid: bsv_rs::transaction::Txid = txid_hex.parse().expect("Invalid txid hex");
 
     Outpoint { txid, vout }
 }
@@ -496,7 +494,7 @@ fn test_certificate_outpoint_parsing() {
 
     let expected_txid =
         from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
-    assert_eq!(outpoint.txid.to_vec(), expected_txid);
+    assert_eq!(outpoint.txid.to_display_bytes().to_vec(), expected_txid);
 
     // Test with vout 0
     let outpoint0 =
@@ -578,10 +576,8 @@ fn test_certificate_binary_format_structure() {
     // Create outpoint with known txid
     let txid =
         from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
-    let mut txid_arr = [0u8; 32];
-    txid_arr.copy_from_slice(&txid);
     let outpoint = Outpoint {
-        txid: txid_arr,
+        txid: bsv_rs::transaction::Txid::from_display_bytes(txid.clone().try_into().unwrap()),
         vout: 1,
     };
 
@@ -620,7 +616,7 @@ fn test_certificate_binary_format_structure() {
     );
 
     // Offset 130-161: TXID (32 bytes) - TypeScript format: no marker byte!
-    assert_eq!(&binary[130..162], &txid_arr, "TXID mismatch");
+    assert_eq!(&binary[130..162], &txid[..], "TXID mismatch");
 
     // Offset 162: vout as varint (value 1 = single byte 0x01)
     assert_eq!(binary[162], 0x01, "Vout varint mismatch");

@@ -5,7 +5,7 @@ use crate::kvstore::{
     KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
 use crate::overlay::{with_wallet_double_spend_retry, LookupQuestion};
-use crate::primitives::{from_hex, to_hex};
+use crate::primitives::from_hex;
 use crate::script::templates::pushdrop_key_bytes::wallet_key_lock;
 use crate::script::LockingScript;
 use crate::wallet::{
@@ -199,7 +199,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         }
         result
             .txid
-            .map(|id| to_hex(&id))
+            .map(|id| id.to_string())
             .ok_or_else(|| Error::KvStoreError("No txid in result".into()))
     }
 }

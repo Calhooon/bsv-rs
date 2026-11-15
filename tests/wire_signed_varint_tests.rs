@@ -94,7 +94,10 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
     let err = match field {
         CreateActionSequenceNumber | CreateActionLockTime | CreateActionVersion => {
             let input = CreateActionInput {
-                outpoint: Outpoint::new([7u8; 32], 1),
+                outpoint: Outpoint::new(
+                    bsv_rs::transaction::Txid::from_display_bytes([7u8; 32]),
+                    1,
+                ),
                 input_description: "in".to_string(),
                 unlocking_script: Some(vec![0x51]),
                 unlocking_script_length: None,

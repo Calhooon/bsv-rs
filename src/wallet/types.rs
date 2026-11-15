@@ -14,6 +14,7 @@
 //! - **Auth/Chain Types**: Authentication, GetHeader, GetHeight, GetNetwork, GetVersion
 
 use crate::primitives::PublicKey;
+use crate::transaction::Txid;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -74,51 +75,56 @@ pub mod hex_bytes_option {
     }
 }
 
-/// Serde helper module for serializing [u8; 32] TxId as hex strings.
-/// Use with `#[serde(with = "hex_txid")]` on TxId fields.
+/// Serde helper module for a [`Txid`] as its hex text.
+/// Use with `#[serde(with = "hex_txid")]` on `Txid` fields.
 pub mod hex_txid {
+    use crate::transaction::Txid;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    /// Serializes the 32 bytes as one hex string.
-    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&hex::encode(bytes))
-    }
-
-    /// Deserializes one hex string of 32 bytes into the array.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
+    /// The id of a text the helpers' checks have passed: the same decode and
+    /// the same length check, in the same words, as before the type (#843).
+    pub(super) fn checked<E: serde::de::Error>(text: &str) -> Result<Txid, E> {
+        let bytes = hex::decode(text).map_err(E::custom)?;
         if bytes.len() != 32 {
-            return Err(serde::de::Error::custom(format!(
+            return Err(E::custom(format!(
                 "expected 32 bytes for txid, got {}",
                 bytes.len()
             )));
         }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        Ok(arr)
+        Txid::from_hex(text).map_err(E::custom)
+    }
+
+    /// Serializes the id as one hex string.
+    pub fn serialize<S>(txid: &Txid, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&txid.to_string())
+    }
+
+    /// Deserializes one hex string of 32 bytes into the id.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Txid, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        checked(&String::deserialize(deserializer)?)
     }
 }
 
-/// Serde helper module for serializing Option<Vec<[u8; 32]>> as optional array of hex strings.
+/// Serde helper module for serializing `Option<Vec<Txid>>` as optional array of hex strings.
 /// Use with `#[serde(with = "hex_txid_vec_option", skip_serializing_if = "Option::is_none", default)]`
 pub mod hex_txid_vec_option {
+    use crate::transaction::Txid;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    /// Serializes each 32-byte id as a hex string, or none.
-    pub fn serialize<S>(txids: &Option<Vec<[u8; 32]>>, serializer: S) -> Result<S::Ok, S::Error>
+    /// Serializes each id as a hex string, or none.
+    pub fn serialize<S>(txids: &Option<Vec<Txid>>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match txids {
             Some(vec) => {
-                let hex_strings: Vec<String> = vec.iter().map(hex::encode).collect();
+                let hex_strings: Vec<String> = vec.iter().map(Txid::to_string).collect();
                 hex_strings.serialize(serializer)
             }
             None => serializer.serialize_none(),
@@ -126,39 +132,19 @@ pub mod hex_txid_vec_option {
     }
 
     /// Deserializes an array of hex strings of 32 bytes each, or none, into the ids.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<[u8; 32]>>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<Txid>>, D::Error>
     where
         D: Deserializer<'de>,
     {
         let opt: Option<Vec<String>> = Option::deserialize(deserializer)?;
-        match opt {
-            Some(vec) => {
-                let mut result = Vec::with_capacity(vec.len());
-                for s in vec {
-                    let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-                    if bytes.len() != 32 {
-                        return Err(serde::de::Error::custom(format!(
-                            "expected 32 bytes for txid, got {}",
-                            bytes.len()
-                        )));
-                    }
-                    let mut arr = [0u8; 32];
-                    arr.copy_from_slice(&bytes);
-                    result.push(arr);
-                }
-                Ok(Some(result))
-            }
-            None => Ok(None),
-        }
+        opt.map(|texts| texts.iter().map(|s| super::hex_txid::checked(s)).collect())
+            .transpose()
     }
 }
 
 // =============================================================================
 // Primitive Type Aliases
 // =============================================================================
-
-/// A transaction ID as a 32-byte array.
-pub type TxId = [u8; 32];
 
 /// A satoshi value (0 to 21 trillion).
 /// Maximum: 21,000,000 BTC * 100,000,000 satoshis = 2.1 * 10^15 satoshis.
@@ -348,10 +334,11 @@ impl Counterparty {
 ///
 /// Serializes to/from string format "txid.vout" (e.g., "abc123...def.0") for cross-SDK compatibility.
 /// Deserialization also accepts object format { "txid": "hex...", "vout": N } for flexibility.
+#[doc = include_str!("types/one_txid_843w1.md")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Outpoint {
     /// The transaction ID.
-    pub txid: TxId,
+    pub txid: Txid,
     /// The output index within the transaction.
     pub vout: u32,
 }
@@ -394,7 +381,7 @@ impl<'de> serde::Deserialize<'de> for Outpoint {
             where
                 M: MapAccess<'de>,
             {
-                let mut txid: Option<TxId> = None;
+                let mut txid: Option<Txid> = None;
                 let mut vout: Option<u32> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
@@ -406,9 +393,7 @@ impl<'de> serde::Deserialize<'de> for Outpoint {
                             if bytes.len() != 32 {
                                 return Err(de::Error::custom("txid must be 32 bytes"));
                             }
-                            let mut arr = [0u8; 32];
-                            arr.copy_from_slice(&bytes);
-                            txid = Some(arr);
+                            txid = Some(Txid::from_hex(&hex).map_err(de::Error::custom)?);
                         }
                         "vout" => {
                             vout = Some(map.next_value()?);
@@ -431,7 +416,7 @@ impl<'de> serde::Deserialize<'de> for Outpoint {
 
 impl Outpoint {
     /// Creates a new outpoint.
-    pub fn new(txid: TxId, vout: u32) -> Self {
+    pub fn new(txid: Txid, vout: u32) -> Self {
         Self { txid, vout }
     }
 
@@ -453,9 +438,8 @@ impl Outpoint {
             )));
         }
 
-        let txid_bytes = crate::primitives::from_hex(txid_hex)?;
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(&txid_bytes);
+        crate::primitives::from_hex(txid_hex)?;
+        let txid = Txid::from_hex(txid_hex)?;
 
         let vout: u32 = parts[1]
             .parse()
@@ -467,7 +451,7 @@ impl Outpoint {
 
 impl std::fmt::Display for Outpoint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}", crate::primitives::to_hex(&self.txid), self.vout)
+        write!(f, "{}.{}", self.txid, self.vout)
     }
 }
 
@@ -583,7 +567,7 @@ pub struct CreateActionOptions {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub known_txids: Option<Vec<TxId>>,
+    pub known_txids: Option<Vec<Txid>>,
     /// If true, only return TXID instead of full transaction; `returnTXIDOnly` in JSON (#105).
     #[serde(rename = "returnTXIDOnly", skip_serializing_if = "Option::is_none")]
     pub return_txid_only: Option<bool>,
@@ -599,7 +583,7 @@ pub struct CreateActionOptions {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub send_with: Option<Vec<TxId>>,
+    pub send_with: Option<Vec<Txid>>,
     /// If false, don't randomize output order.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub randomize_outputs: Option<bool>,
@@ -635,7 +619,7 @@ pub enum SendWithResultStatus {
 pub struct SendWithResult {
     /// The transaction ID (hex encoded in JSON).
     #[serde(with = "hex_txid")]
-    pub txid: TxId,
+    pub txid: Txid,
     /// The status of the send operation.
     pub status: SendWithResultStatus,
 }
@@ -660,7 +644,7 @@ pub enum ReviewActionResultStatus {
 pub struct ReviewActionResult {
     /// The transaction ID (hex encoded in JSON).
     #[serde(with = "hex_txid")]
-    pub txid: TxId,
+    pub txid: Txid,
     /// The status of the review.
     pub status: ReviewActionResultStatus,
     /// Competing transaction IDs (hex encoded in JSON).
@@ -669,7 +653,7 @@ pub struct ReviewActionResult {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub competing_txs: Option<Vec<TxId>>,
+    pub competing_txs: Option<Vec<Txid>>,
     /// Merged BEEF of competing transactions (hex encoded).
     #[serde(
         with = "hex_bytes_option",
@@ -700,7 +684,7 @@ pub struct CreateActionResult {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub txid: Option<TxId>,
+    pub txid: Option<Txid>,
     /// The transaction in atomic BEEF format (if available; an array of byte numbers in JSON, #105).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tx: Option<Vec<u8>>,
@@ -848,7 +832,7 @@ pub struct WalletActionOutput {
 pub struct WalletAction {
     /// The transaction ID (hex encoded in JSON).
     #[serde(with = "hex_txid")]
-    pub txid: TxId,
+    pub txid: Txid,
     /// The net satoshi value (negative for outgoing transactions).
     pub satoshis: i64,
     /// The action status.
@@ -1063,7 +1047,7 @@ pub struct SignActionOptions {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub send_with: Option<Vec<TxId>>,
+    pub send_with: Option<Vec<Txid>>,
 }
 
 /// Arguments for signing a previously created transaction.
@@ -1089,7 +1073,7 @@ pub struct SignActionResult {
         skip_serializing_if = "Option::is_none",
         default
     )]
-    pub txid: Option<TxId>,
+    pub txid: Option<Txid>,
     /// The transaction in atomic BEEF format (if available; an array of byte numbers in JSON, #105).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tx: Option<Vec<u8>>,
@@ -1728,7 +1712,7 @@ mod tests {
 
         let outpoint = Outpoint::from_string(&outpoint_str).unwrap();
         assert_eq!(outpoint.vout, 5);
-        assert_eq!(outpoint.txid[31], 1);
+        assert_eq!(outpoint.txid.to_display_bytes()[31], 1);
 
         assert_eq!(outpoint.to_string(), outpoint_str);
     }

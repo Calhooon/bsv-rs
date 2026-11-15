@@ -1615,7 +1615,10 @@ fn test_wallet_certificate_conversion_roundtrip() {
         .insert("name".to_string(), "encrypted_name".to_string());
     cert.fields
         .insert("email".to_string(), "encrypted_email".to_string());
-    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xCC; 32], 7));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([0xCC; 32]),
+        7,
+    ));
     cert.sign(&certifier_key).unwrap();
 
     // Convert to WalletCertificate
@@ -1653,7 +1656,7 @@ fn test_wallet_certificate_conversion_roundtrip() {
     // Verify revocation outpoint is preserved
     assert!(wallet_cert.revocation_outpoint.is_some());
     let outpoint = wallet_cert.revocation_outpoint.as_ref().unwrap();
-    assert_eq!(outpoint.txid, [0xCC; 32]);
+    assert_eq!(outpoint.txid.to_display_bytes(), [0xCC; 32]);
     assert_eq!(outpoint.vout, 7);
 
     // The fields are the held text in WalletCertificate, never re-encoded (#261)
@@ -1931,7 +1934,10 @@ fn test_tampered_revocation_outpoint_fails_verification() {
         subject_key,
         certifier_key.public_key(),
     );
-    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xAA; 32], 0));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([0xAA; 32]),
+        0,
+    ));
     cert.fields
         .insert("name".to_string(), "encrypted_name".to_string());
 
@@ -1942,7 +1948,10 @@ fn test_tampered_revocation_outpoint_fails_verification() {
     );
 
     // Tamper with the revocation outpoint
-    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xBB; 32], 5));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([0xBB; 32]),
+        5,
+    ));
 
     let result = cert.verify().unwrap();
     assert!(

@@ -12,11 +12,12 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// Serde helper for an optional transaction id as BRC-100's `TXIDHexString`.
 /// Use with `#[serde(with = "hex_txid_option", skip_serializing_if = "Option::is_none", default)]`.
 pub mod hex_txid_option {
-    use super::super::{hex_txid, TxId};
+    use super::super::hex_txid;
+    use crate::transaction::Txid;
     use serde::{Deserialize, Deserializer, Serializer};
 
-    /// Serializes the 32 bytes as one hex string, or none.
-    pub fn serialize<S>(txid: &Option<TxId>, serializer: S) -> Result<S::Ok, S::Error>
+    /// Serializes the id as one hex string, or none.
+    pub fn serialize<S>(txid: &Option<Txid>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -26,13 +27,13 @@ pub mod hex_txid_option {
         }
     }
 
-    /// Deserializes one hex string of 32 bytes, or none, into the array.
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<TxId>, D::Error>
+    /// Deserializes one hex string of 32 bytes, or none, into the id.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Txid>, D::Error>
     where
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        struct Hex(#[serde(with = "hex_txid")] TxId);
+        struct Hex(#[serde(with = "hex_txid")] Txid);
         Ok(Option::<Hex>::deserialize(deserializer)?.map(|Hex(txid)| txid))
     }
 }

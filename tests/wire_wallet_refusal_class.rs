@@ -290,9 +290,11 @@ async fn a_review_with_its_results_is_framed_with_code_5_and_read_back_as_the_cl
     use bsv_rs::wallet::{ReviewActionResult, ReviewActionResultStatus, ReviewActionsRefusal};
     let review = Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(vec![
         ReviewActionResult {
-            txid: [0x22; 32],
+            txid: bsv_rs::transaction::Txid::from_display_bytes([0x22; 32]),
             status: ReviewActionResultStatus::DoubleSpend,
-            competing_txs: Some(vec![[0x33; 32]]),
+            competing_txs: Some(vec![bsv_rs::transaction::Txid::from_display_bytes(
+                [0x33; 32],
+            )]),
             competing_beef: Some(vec![1, 2, 3]),
         },
     ])));

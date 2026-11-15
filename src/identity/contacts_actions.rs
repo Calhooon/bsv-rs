@@ -117,7 +117,7 @@ impl<W: WalletInterface> ContactsManager<W> {
             .as_deref()
             .ok_or_else(|| refused("Contact output is missing source BEEF"))?;
         let beef = spend::bounded_beef(beef, "contact source BEEF")?;
-        let txid = crate::primitives::to_hex(&output.outpoint.txid);
+        let txid = output.outpoint.txid.to_string();
         let tx = Transaction::from_beef(beef, Some(&txid))?;
         if tx.id() != txid {
             return Err(refused("Contact source transaction ID mismatch"));

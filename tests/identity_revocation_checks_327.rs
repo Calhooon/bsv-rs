@@ -210,9 +210,9 @@ fn signed(r: &Run) -> bsv_rs::Result<SignActionResult> {
 fn review(competing: Option<&Competing>) -> Error {
     Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(vec![
         ReviewActionResult {
-            txid: [0x22; 32],
+            txid: bsv_rs::transaction::Txid::from_display_bytes([0x22; 32]),
             status: ReviewActionResultStatus::DoubleSpend,
-            competing_txs: competing.map(|c| vec![from_hex(&c.txid).unwrap().try_into().unwrap()]),
+            competing_txs: competing.map(|c| vec![c.txid.parse().unwrap()]),
             competing_beef: competing.map(|c| c.beef.clone()),
         },
     ])))

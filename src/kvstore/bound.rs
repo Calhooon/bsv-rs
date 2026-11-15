@@ -37,14 +37,21 @@ mod tests {
         let create = CreateActionOptions {
             accept_delayed_broadcast: Some(true),
             no_send: Some(false),
-            send_with: Some(vec![[7u8; 32]]),
+            send_with: Some(vec![crate::transaction::Txid::from_display_bytes(
+                [7u8; 32],
+            )]),
             return_txid_only: Some(true),
             ..Default::default()
         };
         let carried = bound_sign_options(Some(&create));
         assert_eq!(carried.accept_delayed_broadcast, Some(true));
         assert_eq!(carried.no_send, Some(false));
-        assert_eq!(carried.send_with, Some(vec![[7u8; 32]]));
+        assert_eq!(
+            carried.send_with,
+            Some(vec![crate::transaction::Txid::from_display_bytes(
+                [7u8; 32]
+            )])
+        );
         assert_eq!(carried.return_txid_only, Some(false));
     }
 }

@@ -270,7 +270,7 @@ pub fn validate_certificate_encoding(cert: &crate::auth::certificates::Certifica
     // Validate revocation outpoint if present.
     if let Some(ref outpoint) = cert.revocation_outpoint {
         // Outpoint txid should be 32 bytes (always is by type) and vout should be reasonable
-        if outpoint.txid == [0u8; 32] && outpoint.vout == 0 {
+        if outpoint.txid.is_null() && outpoint.vout == 0 {
             return Err(Error::CertificateValidationError(
                 "Revocation outpoint is the null sentinel (all-zero txid, vout 0)".into(),
             ));
@@ -600,7 +600,10 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([3u8; 32], 5));
+        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new(
+            crate::transaction::Txid::from_display_bytes([3u8; 32]),
+            5,
+        ));
         cert.sign(&certifier).unwrap();
 
         validate_certificate_encoding(&cert).unwrap();
@@ -613,7 +616,10 @@ mod tests {
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         // Set the null sentinel outpoint explicitly
-        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([0u8; 32], 0));
+        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new(
+            crate::transaction::Txid::from_display_bytes([0u8; 32]),
+            0,
+        ));
 
         let result = validate_certificate_encoding(&cert);
         assert!(matches!(result, Err(Error::CertificateValidationError(_))));

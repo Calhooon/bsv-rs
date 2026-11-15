@@ -151,13 +151,16 @@ mod revocation_outpoint_json {
         }
     }
 
+    /// The binary form's sentinel as text: the null txid at index 0.
+    const NO_OUTPOINT: &str = "0000000000000000000000000000000000000000000000000000000000000000.0";
+
     pub fn serialize<S>(outpoint: &Option<Outpoint>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         match outpoint {
             Some(outpoint) => outpoint.serialize(serializer),
-            None => Outpoint::new([0u8; 32], 0).serialize(serializer),
+            None => serializer.serialize_str(NO_OUTPOINT),
         }
     }
 
@@ -166,7 +169,7 @@ mod revocation_outpoint_json {
         D: Deserializer<'de>,
     {
         let outpoint = deserializer.deserialize_any(Read)?;
-        Ok(outpoint.filter(|o| o.txid != [0u8; 32] || o.vout != 0))
+        Ok(outpoint.filter(|o| !o.txid.is_null() || o.vout != 0))
     }
 }
 

@@ -6,7 +6,6 @@ use crate::kvstore::token_spends::{
 };
 use crate::kvstore::types::encode_value_with_ttl;
 use crate::kvstore::{KVStoreRemoveOptions, KVStoreSetOptions};
-use crate::primitives::to_hex;
 use crate::script::LockingScript;
 use crate::wallet::{Counterparty, CreateActionArgs, CreateActionOutput, WalletInterface};
 use crate::{Error, Result};
@@ -137,7 +136,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     .await
                     .map_err(|error| unlock_error(listed.total_outputs, key, error))?;
                 if let Some(txid) = result.txid {
-                    txids.push(to_hex(&txid));
+                    txids.push(txid.to_string());
                 }
                 rounds_completed += 1;
             }

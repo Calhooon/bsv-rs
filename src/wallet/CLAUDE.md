@@ -12,9 +12,10 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `../error/wallet_fault.rs` | `WalletFaultFamily`, `WalletFault`, `AbortAcceptance` (#439), `AbortKind` (#604): port extensions beyond the reference, re-exported from `error` and the crate root; unchanged strings, original abort refusal class, typed abort-guard refusal and optional context; `AbortAccepted` boxes the record to keep `Error` compact and frames as the corresponding refusal; no existing emissions changed; each type's `#[non_exhaustive]` pinned so that an addition cannot make the pin stale (#819's fold): the two enums defined in `non_exhaustive_enum!` (`src/util/non_exhaustive.rs`), which writes the every-variant `compile_fail` match and its twin from the definition, the two structs by a `compile_fail` functional update naming no field; the enums' `Hash` and value derives and the structs' `Error + Clone + Eq + Debug` by `tests/wallet_fault_shapes_819.rs`; the class by `tests/arch_non_exhaustive_pins_819.rs` | ~199 |
 | `mod.rs` | Module root with feature-gated exports and re-exports | ~253 |
 | `url_debug.rs` | `AcquireCertificateArgs`' hand-written `Debug`, `certifier_url` through `crate::util::debug_redact::OptionUrl` (the secret Debug lane's second fold; beside `types.rs` at its ratchet line) | 29 |
-| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers); `InternalizeOutput` re-exported from its JSON reader module (#393) | 1899 |
+| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers); `InternalizeOutput` re-exported from its JSON reader module (#393); every transaction id a `Txid` since #843's W1 (the `TxId` alias removed) | 1883 |
 | `types/internalize_output.rs` | `InternalizeOutput` and its JSON reader (#393): missing and null remittances distinguished during intake, null refused in the reference's protocol/presence/object-check order; public fields and serialized shape unchanged | 75 |
-| `types/json_forms.rs` | The JSON forms of #105 that are neither serde's default nor the hex helpers: `hex_txid_option`, `base64_bytes` (the signable reference) and `KeyringRevealer`'s serde (`"certifier"` or the key's hex) | ~95 |
+| `types/json_forms.rs` | The JSON forms of #105 that are neither serde's default nor the hex helpers: `hex_txid_option` (over `Option<Txid>` since #843's W1), `base64_bytes` (the signable reference) and `KeyringRevealer`'s serde (`"certifier"` or the key's hex) | ~95 |
+| `types/one_txid_843w1.md` | `Outpoint`'s rustdoc section (#843, W1), included by `#[doc = include_str!(..)]` to keep `types.rs` under its ratchet line: four `compile_fail` doc tests (`Outpoint::new(tx.hash(), 0)`, a literal with `as_wire_bytes()`, `SendWithResult { txid: tx.hash(), .. }`, `known_txids: Some(vec![tx.hash()])`), each beside the same lines with `tx.txid()`, which compile | 78 |
 | `types/linkage.rs` | The two key-linkage results and `KeyLinkageResult`, re-exported from `types`; their JSON flat with byte arrays, `protocolID` through the private `protocol_tuple` helper, `keyID` (#105) | ~83 |
 | `interface.rs` | WalletInterface async trait (28 methods, `originator: Option<&str>`, #329) + marker traits | ~319 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
@@ -49,7 +50,8 @@ Transport layer implementations for wallet communication (requires `http` featur
 ### wire/
 Wire protocol implementation for binary wallet communication:
 - `mod.rs` - Module definitions and re-exports
-- `encoding.rs` - Binary encoding/decoding for all wallet types (~2,493 lines)
+- `encoding.rs` - Binary encoding/decoding for all wallet types (~2,432 lines)
+- `txid_codec.rs` - `read_txid`/`write_txid`, the one pair that converts a `Txid` to and from the 32 display-order bytes the wallet wire and the certificate binary carry (#843, W1)
 - `calls.rs` - Call frame definitions for all 28 wallet operations; an unknown code refused as `Invalid call code: N`, the reference's words (#914)
 - `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`); `linkage.rs` its two linkage calls (#406)
 - `processor.rs` - Request/response processing (`WalletWireProcessor`)
@@ -296,8 +298,8 @@ Validated structs (used after validation):
 The `types.rs` module includes serde helper modules for cross-SDK JSON compatibility:
 - `hex_bytes` - Serializes `Vec<u8>` as hex strings (use with `#[serde(with = "hex_bytes")]`)
 - `hex_bytes_option` - Serializes `Option<Vec<u8>>` as optional hex strings (use with `skip_serializing_if`)
-- `hex_txid` - Serializes `[u8; 32]` TxId as hex strings
-- `hex_txid_vec_option` - Serializes `Option<Vec<[u8; 32]>>` as optional arrays of hex strings
+- `hex_txid` - Serializes a `Txid` as its hex text (64 lower-case digits); read with the same decode and length check, in the same words, as before the type (#843, W1)
+- `hex_txid_vec_option` - Serializes `Option<Vec<Txid>>` as an optional array of hex strings, read as `hex_txid` reads each
 
 These serialize the byte fields that carry them as hex strings (e.g., `"76a914"`) rather than JSON arrays (e.g., `[118, 169, 20]`): scripts and txids, as BRC-100's `HexString` and `TXIDHexString`. BRC-100's `Byte[]`, `BEEF` and `AtomicBEEF` (`inputBEEF`, the action results' `tx`, internalizeAction's `tx`, listOutputs' `BEEF`) are serde's default arrays; `types/json_forms.rs` holds `hex_txid_option` (an optional txid) and `base64_bytes` (the signable reference, a `Base64String`). All types use `#[serde(rename_all = "camelCase")]` for JSON field naming consistency, with the BRC-100 names where camelCase is not it.
 
@@ -322,9 +324,9 @@ The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWa
 
 **OutputInclude** - What to include in output listings: `LockingScripts` or `EntireTransactions`.
 
-**Outpoint** - Transaction outpoint with `txid: TxId` and `vout: u32`. Parses from "txid.vout" string format. Supports both string and object serialization for cross-SDK compatibility.
+**Outpoint** - Transaction outpoint with `txid: Txid` and `vout: u32`, `Outpoint::new(Txid, u32)` (#843, W1). Parses from "txid.vout" string format (exactly 64 hex digits of either case, nothing trimmed, its words unchanged). Supports both string and object serialization for cross-SDK compatibility. Its rustdoc carries four `compile_fail` doc tests beside their compiling twins (`types/one_txid_843w1.md`): a transaction's `hash()` or `as_wire_bytes()` handed over as the id does not compile.
 
-**TxId** - Type alias for `[u8; 32]`.
+**Txid** - `wallet::Txid` is a re-export of the crate's one `Txid` (`transaction::Txid`, 32 bytes in wire order; `src/transaction/txid.rs`). The alias `TxId = [u8; 32]` (display order) is removed since #843's W1: a display-order array is `Txid::from_display_bytes(bytes)`, hex text `Txid::from_hex(&text)?`, a transaction's id `tx.txid()`. Every wallet type holds it (`Outpoint.txid`, `SendWithResult.txid`, `ReviewActionResult.txid` and `.competing_txs`, `CreateActionResult.txid`, `SignActionResult.txid`, `WalletAction.txid`, `CreateActionOptions.known_txids` and `.send_with`, `SignActionOptions.send_with`, `ReviewActionsRefusal.txid`, `ValidCreateActionOptions.known_txids` and `.send_with`). `Txid` has no serde: the JSON forms are the field-level adapters above, `Outpoint`'s own serde and `types/json_forms.rs`' `hex_txid_option`, their text and refusal sentences unchanged. The wallet wire carries the 32 bytes in display order, converted at `wire/txid_codec.rs` alone. No code under `src/wallet/` names a byte door of `Txid` but that file and `substrates/result_values/beef.rs` (a serialized transaction's own bytes, `from_wire_bytes`), held by `tests/arch_one_txid_843w1.rs`.
 
 **SatoshiValue** - Type alias for `u64`. Max: `MAX_SATOSHIS` (2.1 quadrillion).
 

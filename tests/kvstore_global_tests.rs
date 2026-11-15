@@ -232,7 +232,7 @@ impl WalletInterface for MockWallet {
             return Err(Error::WalletError("create_action error".to_string()));
         }
         Ok(CreateActionResult {
-            txid: Some([0xab; 32]),
+            txid: Some(bsv_rs::transaction::Txid::from_display_bytes([0xab; 32])),
             tx: None,
             no_send_change: None,
             send_with_results: None,
@@ -250,7 +250,7 @@ impl WalletInterface for MockWallet {
         _originator: Option<&str>,
     ) -> Result<SignActionResult> {
         Ok(SignActionResult {
-            txid: Some([0xab; 32]),
+            txid: Some(bsv_rs::transaction::Txid::from_display_bytes([0xab; 32])),
             tx: None,
             send_with_results: None,
         })

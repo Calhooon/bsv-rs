@@ -79,7 +79,7 @@ fn a_sign_action_spend_sequence_number_above_u32_max_is_refused_not_truncated() 
 
 fn action_input(sequence_number: u32) -> WalletActionInput {
     WalletActionInput {
-        source_outpoint: Outpoint::new([7u8; 32], 1),
+        source_outpoint: Outpoint::new(bsv_rs::transaction::Txid::from_display_bytes([7u8; 32]), 1),
         source_satoshis: 1000,
         source_locking_script: None,
         unlocking_script: None,
@@ -107,7 +107,7 @@ fn an_action_input_sequence_number_above_u32_max_is_refused_not_truncated() {
 
 fn action(version: u32, lock_time: u32) -> WalletAction {
     WalletAction {
-        txid: [9u8; 32],
+        txid: bsv_rs::transaction::Txid::from_display_bytes([9u8; 32]),
         satoshis: 1000,
         status: ActionStatus::Completed,
         is_outgoing: true,

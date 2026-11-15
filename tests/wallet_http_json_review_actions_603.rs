@@ -144,11 +144,11 @@ fn review_json(r: &ReviewActionsRefusal) -> Value {
         .iter()
         .map(|x| {
             let mut v = json!({
-                "txid": to_hex(&x.txid),
+                "txid": x.txid.to_string(),
                 "status": serde_json::to_value(x.status).unwrap(),
             });
             if let Some(txs) = &x.competing_txs {
-                v["competingTxs"] = json!(txs.iter().map(|t| to_hex(t)).collect::<Vec<_>>());
+                v["competingTxs"] = json!(txs.iter().map(|t| t.to_string()).collect::<Vec<_>>());
             }
             if let Some(beef) = &x.competing_beef {
                 v["competingBeef"] = json!(to_hex(beef));
@@ -160,10 +160,10 @@ fn review_json(r: &ReviewActionsRefusal) -> Value {
         "message": r.message,
         "reviewActionResults": results,
         "sendWithResults": serde_json::to_value(&r.send_with_results).unwrap(),
-        "txid": r.txid.map(|t| to_hex(&t)),
+        "txid": r.txid.map(|t| t.to_string()),
         "tx": r.tx.as_ref().map(|t| to_hex(t)),
         "noSendChange": r.no_send_change.as_ref().map(|o| {
-            o.iter().map(|o| format!("{}.{}", to_hex(&o.txid), o.vout)).collect::<Vec<_>>()
+            o.iter().map(|o| format!("{}.{}", o.txid, o.vout)).collect::<Vec<_>>()
         }),
     })
 }
@@ -193,7 +193,7 @@ async fn answer(c: &Case) -> Value {
     };
     project(&match outcome {
         Ok((txid, tx)) => json!({ "answered": {
-            "txid": txid.map(|t| to_hex(&t)),
+            "txid": txid.map(|t| t.to_string()),
             "tx": tx.map(|t| to_hex(&t)),
         } }),
         Err(Error::WalletReviewActions(review)) => json!({ "review": review_json(&review) }),

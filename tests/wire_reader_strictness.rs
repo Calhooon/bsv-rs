@@ -1376,7 +1376,7 @@ async fn a_certificates_page_past_the_requested_limit_is_refused() {
 fn action(satoshis: i64) -> Vec<u8> {
     let mut w = WireWriter::new();
     w.write_wallet_action(&WalletAction {
-        txid: [0x11; 32],
+        txid: bsv_rs::transaction::Txid::from_display_bytes([0x11; 32]),
         satoshis,
         status: ActionStatus::Completed,
         is_outgoing: false,

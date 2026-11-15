@@ -421,7 +421,7 @@ impl<W: WalletInterface + ?Sized> Revocation<'_, W> {
         let tx = result
             .tx
             .ok_or_else(|| refused("Failed to sign transaction"))?;
-        Ok((tx, result.txid.map(|txid| to_hex(&txid))))
+        Ok((tx, result.txid.map(|txid| txid.to_string())))
     }
 }
 

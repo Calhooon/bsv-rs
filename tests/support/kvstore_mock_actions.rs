@@ -15,13 +15,8 @@ pub struct Actions(Mutex<(HashMap<String, Transaction>, Option<Transaction>)>);
 
 impl Actions {
     #[allow(dead_code)] // Used by the integration wallet, not the unit wallet.
-    pub fn pending_id(&self) -> [u8; 32] {
-        Outpoint::from_string(&format!(
-            "{}.0",
-            self.0.lock().unwrap().1.as_ref().unwrap().id()
-        ))
-        .unwrap()
-        .txid
+    pub fn pending_id(&self) -> sdk::transaction::Txid {
+        self.0.lock().unwrap().1.as_ref().unwrap().txid()
     }
 
     #[allow(dead_code)] // Used by the integration wallet, not the unit wallet.
@@ -38,10 +33,7 @@ impl Actions {
         let mut state = self.0.lock().unwrap();
         let mut tx = Transaction::new();
         for input in args.inputs.iter().flatten() {
-            let source = state
-                .0
-                .get(&sdk::primitives::to_hex(&input.outpoint.txid))
-                .unwrap();
+            let source = state.0.get(&input.outpoint.txid.to_string()).unwrap();
             let mut candidate =
                 TransactionInput::with_source_transaction(source.clone(), input.outpoint.vout);
             candidate.unlocking_script = Some(UnlockingScript::new());

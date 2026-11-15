@@ -6,9 +6,11 @@ use crate::wallet::{ReviewActionResult, ReviewActionsRefusal};
 fn review() -> Error {
     Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(vec![
         ReviewActionResult {
-            txid: [0x22; 32],
+            txid: crate::transaction::Txid::from_display_bytes([0x22; 32]),
             status: ReviewActionResultStatus::DoubleSpend,
-            competing_txs: Some(vec![[0x33; 32]]),
+            competing_txs: Some(vec![crate::transaction::Txid::from_display_bytes(
+                [0x33; 32],
+            )]),
             competing_beef: Some(vec![1]),
         },
     ])))
@@ -30,12 +32,13 @@ fn absent_empty_or_duplicate_competing_evidence_is_not_retried() {
     let Error::WalletReviewActions(error) = review() else {
         unreachable!()
     };
+    let id = crate::transaction::Txid::from_display_bytes([0x33; 32]);
     for (txids, beef) in [
         (None, Some(vec![1])),
         (Some(vec![]), Some(vec![1])),
-        (Some(vec![[0x33; 32]; 2]), Some(vec![1])),
-        (Some(vec![[0x33; 32]]), None),
-        (Some(vec![[0x33; 32]]), Some(vec![])),
+        (Some(vec![id; 2]), Some(vec![1])),
+        (Some(vec![id]), None),
+        (Some(vec![id]), Some(vec![])),
     ] {
         let mut error = error.clone();
         error.review_action_results[0].competing_txs = txids;
@@ -54,7 +57,10 @@ fn review_result_and_competing_transaction_counts_are_bounded() {
     error.review_action_results.truncate(256);
     assert!(evidence(&Error::WalletReviewActions(error.clone())).is_some());
     error.review_action_results.truncate(1);
-    error.review_action_results[0].competing_txs = Some(vec![[0x33; 32]; 257]);
+    error.review_action_results[0].competing_txs = Some(vec![
+            crate::transaction::Txid::from_display_bytes([0x33; 32]);
+            257
+        ]);
     assert!(evidence(&Error::WalletReviewActions(error)).is_none());
 }
 

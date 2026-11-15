@@ -818,7 +818,7 @@ fn test_list_actions_result_cross_sdk() {
     let action = reader.read_wallet_action().unwrap();
     let expected = &json["actions"][0];
 
-    assert_eq!(hex::encode(action.txid), expected["txid"].as_str().unwrap());
+    assert_eq!(action.txid.to_string(), expected["txid"].as_str().unwrap());
     assert_eq!(action.satoshis, expected["satoshis"].as_i64().unwrap());
     assert_eq!(
         action.is_outgoing,

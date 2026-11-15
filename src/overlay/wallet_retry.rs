@@ -12,8 +12,7 @@
 //! makes four attempts by default.
 
 use crate::overlay::TopicBroadcaster;
-use crate::primitives::to_hex;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, Txid};
 use crate::wallet::ReviewActionResultStatus;
 use crate::{Error, Result};
 use std::collections::HashSet;
@@ -60,7 +59,7 @@ fn evidence(error: &Error) -> Option<Vec<Evidence<'_>>> {
         if txids.is_empty() || txids.len() > MAX_COMPETING_TRANSACTIONS {
             return None;
         }
-        let txids: Vec<String> = txids.iter().map(|t| to_hex(t)).collect();
+        let txids: Vec<String> = txids.iter().map(Txid::to_string).collect();
         if txids.iter().collect::<HashSet<_>>().len() != txids.len() {
             return None;
         }

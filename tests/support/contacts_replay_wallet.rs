@@ -200,17 +200,11 @@ fn counterparty_json(counterparty: &Option<Counterparty>) -> Value {
 }
 
 fn outpoint_text(outpoint: &Outpoint) -> String {
-    format!(
-        "{}.{}",
-        bsv_rs::primitives::to_hex(&outpoint.txid),
-        outpoint.vout
-    )
+    format!("{}.{}", outpoint.txid, outpoint.vout)
 }
 
-fn txid_of(tx: &Transaction) -> TxId {
-    Outpoint::from_string(&format!("{}.0", tx.id()))
-        .unwrap()
-        .txid
+fn txid_of(tx: &Transaction) -> Txid {
+    tx.txid()
 }
 
 // async_trait rewrites the impl it is applied to, so the macro writes the
@@ -367,7 +361,7 @@ macro_rules! basket {
                 let beef = args.input_beef.as_deref().unwrap();
                 let mut partial = Transaction::new();
                 for input in inputs {
-                    let txid = bsv_rs::primitives::to_hex(&input.outpoint.txid);
+                    let txid = input.outpoint.txid.to_string();
                     let source = Transaction::from_beef(beef, Some(&txid)).unwrap();
                     partial
                         .add_input(TransactionInput::with_source_transaction(source, input.outpoint.vout))

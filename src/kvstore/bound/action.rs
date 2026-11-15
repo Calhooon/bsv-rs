@@ -85,7 +85,7 @@ async fn sign_and_check<W: WalletInterface>(
         )
         .await?;
     let tx = validate_signed(&partial, args, &indexes, &spends, &signed)?;
-    let id = Outpoint::from_string(&format!("{}.0", tx.id()))?.txid;
+    let id = tx.txid();
     Ok((
         CreateActionResult {
             txid: Some(id),
@@ -166,7 +166,7 @@ fn validate_signed(
         }
     }
     if let Some(id) = result.txid {
-        if crate::primitives::to_hex(&id) != signed.id() {
+        if id != signed.txid() {
             return Err(refusal(
                 "Wallet signed transaction ID does not match its transaction data",
             ));

@@ -8,6 +8,7 @@ use super::{
     Response,
 };
 use crate::auth::{utils::create_nonce, Transport};
+use crate::transaction::Txid;
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionOptions, CreateActionOutput, GetPublicKeyArgs,
     Protocol, SecurityLevel, WalletInterface,
@@ -231,12 +232,13 @@ fn payment_action_args(
         .map(|ids| {
             ids.into_iter()
                 .map(|id| {
-                    let bytes = hex::decode(id).map_err(|error| words(&error.to_string()))?;
-                    bytes
-                        .try_into()
-                        .map_err(|_| words("Invalid transaction ID"))
+                    let bytes = hex::decode(&id).map_err(|error| words(&error.to_string()))?;
+                    if bytes.len() != 32 {
+                        return Err(words("Invalid transaction ID"));
+                    }
+                    Txid::from_hex(&id).map_err(|_| words("Invalid transaction ID"))
                 })
-                .collect::<Result<Vec<[u8; 32]>>>()
+                .collect::<Result<Vec<Txid>>>()
         })
         .transpose()?;
     Ok(CreateActionArgs {

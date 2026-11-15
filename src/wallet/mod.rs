@@ -232,7 +232,6 @@ pub use types::{
     SignActionSpend,
     SignableTransaction,
     TrustSelf,
-    TxId,
     // Wallet action types
     WalletAction,
     WalletActionInput,
@@ -244,6 +243,9 @@ pub use types::{
     WalletPayment,
     MAX_SATOSHIS,
 };
+// The crate's one transaction id (#843, W1): `wallet::TxId`, a display-order
+// array, is gone.
+pub use crate::transaction::Txid;
 pub use validation::{crypto::validate_result_public_key, validate_public_key};
 // The seven key calls' argument validators, each named for its reference site (#609).
 pub use validation::crypto::{

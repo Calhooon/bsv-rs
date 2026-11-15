@@ -28,7 +28,8 @@
 //! ```
 
 use crate::error::{Error, Result};
-use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
+use crate::transaction::Txid;
+use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, MAX_SATOSHIS};
 pub(crate) mod client;
 mod create_action_input;
 pub(crate) mod crypto;
@@ -412,13 +413,11 @@ pub fn parse_wallet_outpoint(outpoint: &str) -> Result<Outpoint> {
         ))
     })?;
 
-    let txid_bytes = crate::primitives::from_hex(&txid)
-        .map_err(|_| Error::WalletError("Invalid txid hex".to_string()))?;
+    // The validator's text, trimmed and lower-cased: 64 hex digits.
+    let txid =
+        Txid::from_hex(&txid).map_err(|_| Error::WalletError("Invalid txid hex".to_string()))?;
 
-    let mut txid_array: TxId = [0u8; 32];
-    txid_array.copy_from_slice(&txid_bytes);
-
-    Ok(Outpoint::new(txid_array, vout))
+    Ok(Outpoint::new(txid, vout))
 }
 
 /// Validates an outpoint string.
@@ -558,7 +557,7 @@ pub struct ValidCreateActionOptions {
     /// Whether to accept delayed broadcast.
     pub accept_delayed_broadcast: bool,
     /// Known transaction IDs.
-    pub known_txids: Vec<TxId>,
+    pub known_txids: Vec<Txid>,
     /// Whether to return only the txid.
     pub return_txid_only: bool,
     /// Whether to skip sending the transaction.
@@ -566,7 +565,7 @@ pub struct ValidCreateActionOptions {
     /// Change outpoints from prior noSend actions.
     pub no_send_change: Vec<Outpoint>,
     /// TXIDs to send with this transaction.
-    pub send_with: Vec<TxId>,
+    pub send_with: Vec<Txid>,
     /// Whether to randomize output order.
     pub randomize_outputs: bool,
 }
@@ -735,11 +734,8 @@ pub fn validate_create_action_options(
             .iter()
             .map(|t| {
                 let hex = validate_hex_string(t, "knownTxid", Some(64), Some(64))?;
-                let bytes = crate::primitives::from_hex(&hex)
-                    .map_err(|_| Error::WalletError("Invalid knownTxid hex".to_string()))?;
-                let mut arr: TxId = [0u8; 32];
-                arr.copy_from_slice(&bytes);
-                Ok(arr)
+                Txid::from_hex(&hex)
+                    .map_err(|_| Error::WalletError("Invalid knownTxid hex".to_string()))
             })
             .collect::<Result<_>>()?,
         return_txid_only: options.return_txid_only.unwrap_or(false),
@@ -754,11 +750,8 @@ pub fn validate_create_action_options(
             .iter()
             .map(|t| {
                 let hex = validate_hex_string(t, "sendWith", Some(64), Some(64))?;
-                let bytes = crate::primitives::from_hex(&hex)
-                    .map_err(|_| Error::WalletError("Invalid sendWith hex".to_string()))?;
-                let mut arr: TxId = [0u8; 32];
-                arr.copy_from_slice(&bytes);
-                Ok(arr)
+                Txid::from_hex(&hex)
+                    .map_err(|_| Error::WalletError("Invalid sendWith hex".to_string()))
             })
             .collect::<Result<_>>()?,
         randomize_outputs: options.randomize_outputs.unwrap_or(true),
@@ -1036,7 +1029,7 @@ mod tests {
 
         let outpoint = parse_wallet_outpoint(&outpoint_str).unwrap();
         assert_eq!(outpoint.vout, 5);
-        assert_eq!(outpoint.txid[31], 1);
+        assert_eq!(outpoint.txid.to_display_bytes()[31], 1);
     }
 
     #[test]

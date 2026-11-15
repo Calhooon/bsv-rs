@@ -53,7 +53,7 @@ struct MockOutput {
     /// Tags for this output.
     tags: Vec<String>,
     /// The mock transaction ID (unique per create_action call).
-    txid: [u8; 32],
+    txid: bsv_rs::transaction::Txid,
     /// The output index.
     vout: u32,
 }
@@ -237,10 +237,10 @@ impl WalletInterface for MockWallet {
             // (simulates spending old outputs when updating a key)
             if let Some(ref inputs) = args.inputs {
                 for input in inputs {
-                    let input_txid_hex = to_hex(&input.outpoint.txid);
+                    let input_txid_hex = input.outpoint.txid.to_string();
                     let input_vout = input.outpoint.vout;
                     stored.retain(|o| {
-                        let o_txid_hex = to_hex(&o.txid);
+                        let o_txid_hex = o.txid.to_string();
                         !(o_txid_hex == input_txid_hex && o.vout == input_vout)
                     });
                 }
@@ -260,10 +260,10 @@ impl WalletInterface for MockWallet {
             // Remove only (no new outputs) - this is the remove() path
             let mut stored = self.outputs.lock().unwrap();
             for input in inputs {
-                let input_txid_hex = to_hex(&input.outpoint.txid);
+                let input_txid_hex = input.outpoint.txid.to_string();
                 let input_vout = input.outpoint.vout;
                 stored.retain(|o| {
-                    let o_txid_hex = to_hex(&o.txid);
+                    let o_txid_hex = o.txid.to_string();
                     !(o_txid_hex == input_txid_hex && o.vout == input_vout)
                 });
             }
@@ -363,7 +363,9 @@ impl WalletInterface for MockWallet {
             })
             .collect();
 
-        let beef = self.actions.beef(limited.iter().map(|o| to_hex(&o.txid)));
+        let beef = self
+            .actions
+            .beef(limited.iter().map(|o| o.txid.to_string()));
         Ok(ListOutputsResult {
             outputs: wallet_outputs,
             total_outputs: total,
@@ -1300,10 +1302,7 @@ async fn test_local_kvstore_set_with_options() {
         assert_eq!(outputs.len(), 1);
         let token = &outputs[0];
         assert_eq!(token.satoshis, requested.unwrap_or(configured));
-        assert_eq!(
-            result,
-            Ok(format!("{}.{}", to_hex(&token.txid), token.vout))
-        );
+        assert_eq!(result, Ok(format!("{}.{}", token.txid, token.vout)));
     }
 }
 

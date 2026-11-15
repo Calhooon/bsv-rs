@@ -19,7 +19,7 @@ pub(crate) fn input_sources(
         let point = &input.outpoint;
         if let Some(output) = envelope
             .transactions
-            .get(&hex::encode(point.txid))
+            .get(&point.txid.to_string())
             .and_then(Option::as_ref)
             .and_then(|tx| tx.outputs.get(point.vout as usize))
         {

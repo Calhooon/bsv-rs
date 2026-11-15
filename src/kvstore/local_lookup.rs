@@ -243,7 +243,7 @@ fn source_output<'a>(
     if !output.spendable || output.satoshis > 2_100_000_000_000_000 {
         return Err(refused("Wallet returned invalid KVStore output metadata"));
     }
-    let txid = crate::primitives::to_hex(&output.outpoint.txid);
+    let txid = output.outpoint.txid.to_string();
     let tx = beef
         .find_txid(&txid)
         .and_then(|entry| entry.tx())

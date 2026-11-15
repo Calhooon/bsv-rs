@@ -169,7 +169,10 @@ fn a_certificate_signed_here_over_mixed_case_names_verifies_in_the_reference() {
         key(27).public_key(),
         key(25).public_key(),
     )
-    .with_revocation_outpoint(Some(Outpoint::new([10u8; 32], 1)))
+    .with_revocation_outpoint(Some(Outpoint::new(
+        bsv_rs::transaction::Txid::from_display_bytes([10u8; 32]),
+        1,
+    )))
     .with_fields(names);
     cert.sign(&key(25)).unwrap();
     assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
