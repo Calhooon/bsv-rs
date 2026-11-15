@@ -95,8 +95,9 @@ pub enum WalletRefusalClass {
 #[cfg(feature = "wallet")]
 impl WalletRefusalClass {
     /// Every class: the SDK's seven in the order of their code, then the
-    /// toolbox's other classes in the order of its file.
-    pub const ALL: [Self; 20] = [
+    /// toolbox's other classes in the order of its file. A slice, so a class
+    /// added later changes no public type (#843dall).
+    pub const ALL: &'static [Self] = &[
         Self::UnsupportedAction,
         Self::InvalidHmac,
         Self::InvalidSignature,
@@ -201,7 +202,8 @@ impl WalletRefusalClass {
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL
-            .into_iter()
+            .iter()
+            .copied()
             .find(|class| class.name() == name || class.code_name() == Some(name))
     }
 
@@ -270,7 +272,7 @@ mod all_is_every_variant_819_tests {
             .map(|v| format!("{v:?}"))
             .collect();
         assert_eq!(names, WalletRefusalClass::VARIANT_NAMES);
-        for (index, value) in WalletRefusalClass::ALL.into_iter().enumerate() {
+        for (index, value) in WalletRefusalClass::ALL.iter().copied().enumerate() {
             assert_eq!(position(value), index, "{value:?}");
         }
     }

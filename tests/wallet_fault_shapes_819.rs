@@ -66,7 +66,7 @@ fn the_wallet_refusal_class_hashes_as_it_compares_819() {
         .collect();
     assert_eq!(sdk.len(), 7);
     hashes_as_it_compares(&sdk);
-    hashes_as_it_compares(&WalletRefusalClass::ALL);
+    hashes_as_it_compares(WalletRefusalClass::ALL);
 }
 
 /// `ALL` holds twenty classes, each once, each found again by its name. That
@@ -76,9 +76,9 @@ fn the_wallet_refusal_class_hashes_as_it_compares_819() {
 #[test]
 fn the_wallet_refusal_classes_are_twenty_each_once_and_found_by_name_819() {
     assert_eq!(WalletRefusalClass::ALL.len(), 20);
-    let distinct: HashSet<WalletRefusalClass> = WalletRefusalClass::ALL.into_iter().collect();
+    let distinct: HashSet<WalletRefusalClass> = WalletRefusalClass::ALL.iter().copied().collect();
     assert_eq!(distinct.len(), 20);
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         assert_eq!(WalletRefusalClass::from_name(class.name()), Some(class));
     }
 }

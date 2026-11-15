@@ -166,7 +166,7 @@ fn each_class_carries_the_references_name_and_code() {
         })
         .collect();
     assert_eq!(classes, REFERENCE_TABLE);
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         assert_eq!(WalletRefusalClass::from_name(class.name()), Some(class));
         if let Some(key) = class.code_name() {
             assert_eq!(WalletRefusalClass::from_name(key), Some(class));
@@ -268,7 +268,7 @@ fn a_refusal_displays_its_words_and_compares_by_class_and_words() {
 /// toolbox's merkle-root 8 among them.
 #[tokio::test]
 async fn a_wallet_refusal_is_framed_with_its_sdk_code_or_as_wallet_operation_failed() {
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         let message = format!("refused as {class}");
         let frame = refusing(refusal(class))
             .process_message(&get_height_request())
@@ -323,7 +323,7 @@ async fn a_review_with_its_results_is_framed_with_code_5_and_read_back_as_the_cl
 /// processor; a class with no SDK code comes back as the un-coded error.
 #[tokio::test]
 async fn the_transceiver_reads_a_coded_frame_back_as_its_class() {
-    for class in WalletRefusalClass::ALL {
+    for &class in WalletRefusalClass::ALL {
         let result = WalletWireTransceiver::new(Loop(refusing(refusal(class))))
             .get_height(Some("test"))
             .await;
