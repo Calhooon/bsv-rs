@@ -851,16 +851,16 @@ pub fn validate_sign_action_spend(spend: &SignActionSpendRaw) -> Result<ValidSig
 // List Actions/Outputs Validation
 // =============================================================================
 
-/// Query mode for tag or label queries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QueryMode {
-    /// Match any of the specified items.
-    Any,
-    /// Match all of the specified items.
-    All,
-}
+/// The wallet's query mode for tag or label queries: the one type of
+/// [`crate::wallet::types`], re-exported here, so [`validate_query_mode`]'s
+/// answer and the validated argument records below go into a wallet argument
+/// as they are (#843; a second enum of the same two variants was declared
+/// here until then).
+pub use super::types::QueryMode;
 
-/// Validates a query mode string.
+/// Validates a query mode string: absent or `"any"` is [`QueryMode::Any`],
+/// `"all"` is [`QueryMode::All`], any other text (another case included) is
+/// refused.
 pub fn validate_query_mode(mode: Option<&str>, name: &str) -> Result<QueryMode> {
     match mode {
         None | Some("any") => Ok(QueryMode::Any),
