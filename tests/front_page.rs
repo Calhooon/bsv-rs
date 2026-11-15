@@ -25,6 +25,19 @@
 //! continuation (`cargo \` then `publish` on the next line: a line is read alone). None can
 //! publish: no workflow but `release.yml` can obtain a registry token (`stored_token`), and
 //! crates.io's trusted publisher names `release.yml`.
+//!
+//! The security page (#849): `SECURITY.md` says where an advisory of this crate is published (this
+//! repository's Security tab and nowhere else), that none is filed with the RustSec database since
+//! 2026-11-13, so `cargo audit` and `cargo deny` report no later one, and, since the fold of
+//! 2026-11-15, what is true of CVE ids: a CVE was requested from GitHub for each of the six
+//! advisories published through 2026-11-13, at its publication (`CVE_REQUESTED_849` holds the
+//! days), GitHub's record showed no CVE id for any of them on 2026-11-15, a later advisory's CVE
+//! id is in the advisory, and the page states no rule about requesting one.
+//! `security_page_refusals` holds each sentence, refuses the sentences the page carried until
+//! #849 and the three on a CVE that the fold removed (`FORMER_CVE_CLAIMS_849`), and holds the
+//! table of the six advisories published through 2026-11-13 to `ADVISORIES_849`: the table is
+//! closed, a record of a read of the public databases on 2026-11-14 that no test can make again
+//! (no network), so a row that moves fails.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: a failed read is the test failing
 
 use std::collections::BTreeSet;
@@ -1918,6 +1931,447 @@ fn the_front_files_exist_and_the_manifest_owns_the_pages() {
         assert!(
             package.lines().any(|l| l.trim() == field),
             "Cargo.toml's [package] lacks `{field}`: the manifest owns the crates.io and docs.rs pages"
+        );
+    }
+}
+
+/// The advisories published through 2026-11-13, in the order of publication (#849): the GHSA id,
+/// the stable patch its record names, and the ids under which the public RustSec database lists
+/// it (none: it lists it under no id), as `crates/bsv-rs/` of `rustsec/advisory-db` read at
+/// `4ef2df8e` on 2026-11-14 (the read is in `docs/lanes/fix-849-security-page.md`). The table of
+/// `SECURITY.md` is these rows and no other: it is closed, so a row added, dropped or changed
+/// fails here and is a decision, never an edit in passing.
+const ADVISORIES_849: &[(&str, &str, &[&str])] = &[
+    (
+        "GHSA-j8hr-pjhm-6h27",
+        "0.8.5",
+        &["RUSTSEC-2026-0498", "RUSTSEC-2026-0500"],
+    ),
+    ("GHSA-9c8r-76f3-m426", "0.8.6", &["RUSTSEC-2026-0499"]),
+    ("GHSA-84xq-3662-pvx5", "0.8.6", &["RUSTSEC-2026-0497"]),
+    ("GHSA-cwxv-4866-5gq2", "0.8.7", &["RUSTSEC-2026-0501"]),
+    ("GHSA-gg5p-wgff-v3hr", "0.8.8", &[]),
+    ("GHSA-mj2m-jxgv-r446", "0.8.9", &["RUSTSEC-2026-0529"]),
+];
+
+/// What the security page says of where an advisory is published, each with what a reader of
+/// `cargo audit` or `cargo deny` loses if the sentence goes (#849).
+const SECURITY_PAGE_SAYS_849: &[(&str, &str)] = &[
+    (
+        "the one place where every advisory of this crate is published",
+        "the Security tab is the record",
+    ),
+    (
+        "This project files no advisory of this crate with the RustSec advisory database any more (a decision of the project's owner, 2026-11-13)",
+        "no advisory is filed with the RustSec database",
+    ),
+    (
+        "neither tool reports an advisory of this crate published after 2026-11-13",
+        "`cargo audit` and `cargo deny` report no later advisory",
+    ),
+    (
+        "a clean `cargo audit` or `cargo deny check advisories` says nothing about one",
+        "a clean run is no evidence",
+    ),
+    (
+        "The table is closed: it gains no row",
+        "the table holds the advisories published through 2026-11-13 alone",
+    ),
+    (
+        "Dependabot reads the GitHub Advisory Database (`github.com/advisories`), which is not this repository's Security tab",
+        "Dependabot does not read the Security tab",
+    ),
+    (
+        "A CVE was requested from GitHub for each of the six advisories of the table, at its publication",
+        "a CVE was requested for each of the six advisories",
+    ),
+    (
+        "GitHub's record showed no CVE id for any of the six on 2026-11-15",
+        "none of the six had a CVE id on the day the record was read",
+    ),
+    (
+        "The CVE id of an advisory published after 2026-11-13, if it has one, is in the advisory on the Security tab",
+        "a later advisory's CVE id is read from the advisory",
+    ),
+    (
+        "This page states no rule about requesting one",
+        "the page claims no rule about a CVE request",
+    ),
+    (
+        "No file is sent to the RustSec advisory database (\"Published advisories\", below; \"CVE ids\" there says what is true of a CVE id)",
+        "the steps after a report name no RustSec file and point at the page's part on CVE ids",
+    ),
+    (
+        "### CVE ids",
+        "the part on CVE ids that the steps after a report point at is there",
+    ),
+    (
+        "### How to hear of an advisory",
+        "the reader is told what to read in the tools' place",
+    ),
+];
+
+/// What the page said until #849 and may not say again: each a claim that an advisory of this
+/// crate is filed with the RustSec database or reaches `cargo audit` or `cargo deny`, or the
+/// page's older words that every advisory is published with a CVE requested (what is true of a
+/// CVE since the fold of 2026-11-15 is `SECURITY_PAGE_SAYS_849`'s and `CVE_REQUESTED_849`'s).
+const STALE_ADVISORY_CLAIMS_849: &[&str] = &[
+    "CVE requested",
+    "and in the RustSec advisory database",
+    "is also filed with",
+    "through `cargo audit` and `cargo deny`",
+    "once its maintainers merge the file",
+    "This page keeps no table",
+];
+
+/// What the page said of a CVE from #849's lane until its fold of 2026-11-15 and may not say
+/// again. That no CVE is requested, or one only where the page names the advisory: nobody made
+/// that rule (the decision of 2026-11-13 is about the RustSec advisory database alone), and a CVE
+/// was requested from GitHub for each of the six advisories. That no advisory of this crate has a
+/// CVE id: read so on 2026-11-14, but written in the present tense of advisories for each of which
+/// a CVE was requested, so the page gives the dated reading of the six in its place.
+/// Each is refused by its literal, case-sensitive text alone (the bound the cold read of the
+/// fold found, 2026-11-15): the same rule in another spelling or case (`No CVE is requested`,
+/// `This project requests no CVE`) passes, and is a reviewer's matter.
+const FORMER_CVE_CLAIMS_849: &[&str] = &[
+    "no CVE is requested",
+    "only where this page names the advisory and says so",
+    "No advisory of this crate has a CVE id",
+];
+
+/// The day each of the six advisories was published and a CVE requested from GitHub for it, in
+/// the table's order (#849, the fold of 2026-11-15): the day, in UTC, of each published
+/// advisory's `published_at` as GitHub's API gave it on 2026-11-15, which is also the day of the
+/// comment on #849 that records its release and says a CVE is requested for it (the reads are in
+/// `docs/lanes/fix-849-security-page.md`, "The fold of 2026-11-15"). The page's sentence names
+/// each advisory with its day; an id or a day that moves fails, as a row of the table does.
+const CVE_REQUESTED_849: &[(&str, &str)] = &[
+    ("GHSA-j8hr-pjhm-6h27", "2026-11-10"),
+    ("GHSA-9c8r-76f3-m426", "2026-11-11"),
+    ("GHSA-84xq-3662-pvx5", "2026-11-11"),
+    ("GHSA-cwxv-4866-5gq2", "2026-11-12"),
+    ("GHSA-gg5p-wgff-v3hr", "2026-11-12"),
+    ("GHSA-mj2m-jxgv-r446", "2026-11-13"),
+];
+
+/// The six requests as the page lists them: `<id> on <day>` for each row of `CVE_REQUESTED_849`,
+/// joined by commas and a last `and`.
+fn cve_requests_listed() -> String {
+    let named: Vec<String> = CVE_REQUESTED_849
+        .iter()
+        .map(|(id, day)| format!("{id} on {day}"))
+        .collect();
+    match named.split_last() {
+        Some((last, rest)) => format!("{} and {last}", rest.join(", ")),
+        None => String::new(),
+    }
+}
+
+/// A row of the page's table as read: the GHSA id, the patch, the RustSec ids.
+type AdvisoryRow = (String, String, Vec<String>);
+
+/// A row of the page's table: `| [<id>](<the id's page>) | <patch> | <yes: ids, or no> |`.
+fn advisory_row(line: &str) -> Result<AdvisoryRow, String> {
+    let cells: Vec<&str> = line.trim().trim_matches('|').split('|').collect();
+    let [advisory, patch, rustsec] = cells.as_slice() else {
+        return Err(format!("a row of {} cells, not three: {line}", cells.len()));
+    };
+    let advisory = advisory.trim();
+    let id = advisory
+        .strip_prefix('[')
+        .and_then(|rest| rest.split_once("]("))
+        .ok_or_else(|| format!("a row whose advisory is no link: {line}"))?;
+    let page = format!(
+        "https://github.com/Calhooon/bsv-rs/security/advisories/{})",
+        id.0
+    );
+    if id.1 != page {
+        return Err(format!(
+            "the row of {} links `{}`, not its own page",
+            id.0,
+            id.1.trim_end_matches(')')
+        ));
+    }
+    let rustsec = rustsec.trim();
+    let ids: Vec<String> = if rustsec == "no" {
+        Vec::new()
+    } else if let Some(list) = rustsec.strip_prefix("yes: ") {
+        list.split(", ").map(str::to_string).collect()
+    } else {
+        let answers = "neither `no` nor `yes: <ids>`";
+        return Err(format!("the row of {} says `{rustsec}`, {answers}", id.0));
+    };
+    let is_rustsec_id = |i: &str| {
+        i.strip_prefix("RUSTSEC-")
+            .is_some_and(|n| n.len() == 9 && n.chars().all(|c| c.is_ascii_digit() || c == '-'))
+    };
+    if let Some(bad) = ids.iter().find(|i| !is_rustsec_id(i)) {
+        return Err(format!("the row of {} names `{bad}`, no RustSec id", id.0));
+    }
+    Ok((id.0.to_string(), patch.trim().to_string(), ids))
+}
+
+/// Every refusal of a security page's text (#849): a sentence of `SECURITY_PAGE_SAYS_849` it
+/// lacks, a claim of `STALE_ADVISORY_CLAIMS_849` or of `FORMER_CVE_CLAIMS_849` it makes, a list of
+/// the six CVE requests that is not `CVE_REQUESTED_849`, a table that is not `ADVISORIES_849`.
+fn security_page_refusals(page: &str) -> Vec<String> {
+    let mut refusals = Vec::new();
+    for (sentence, why) in SECURITY_PAGE_SAYS_849 {
+        if !page.contains(sentence) {
+            refusals.push(format!(
+                "SECURITY.md no longer says that {why}: it lacks `{sentence}` (#849)"
+            ));
+        }
+    }
+    for claim in STALE_ADVISORY_CLAIMS_849 {
+        if let Some((n, line)) = page.lines().enumerate().find(|(_, l)| l.contains(claim)) {
+            refusals.push(format!(
+                "SECURITY.md:{}: `{claim}` is wording the page carried until #849 and does not carry since: {line}",
+                n + 1
+            ));
+        }
+    }
+    for claim in FORMER_CVE_CLAIMS_849 {
+        if let Some((n, line)) = page.lines().enumerate().find(|(_, l)| l.contains(claim)) {
+            refusals.push(format!(
+                "SECURITY.md:{}: `{claim}` is a sentence on a CVE that the fold of 2026-11-15 removed (a CVE was requested for each of the six advisories, and nobody made a rule about a later request; #849): {line}",
+                n + 1
+            ));
+        }
+    }
+    let requests = cve_requests_listed();
+    if !page.contains(&requests) {
+        refusals.push(format!(
+            "SECURITY.md does not give each of the six advisories the day a CVE was requested for it (#849, the fold of 2026-11-15): it lacks `{requests}`"
+        ));
+    }
+    let mut rows = Vec::new();
+    for line in page.lines().filter(|l| l.starts_with("| [GHSA-")) {
+        match advisory_row(line) {
+            Ok(row) => rows.push(row),
+            Err(e) => refusals.push(format!("SECURITY.md: {e} (#849)")),
+        }
+    }
+    let pinned: Vec<AdvisoryRow> = ADVISORIES_849
+        .iter()
+        .map(|(id, patch, ids)| {
+            let ids = ids.iter().map(|i| i.to_string()).collect();
+            (id.to_string(), patch.to_string(), ids)
+        })
+        .collect();
+    if rows != pinned {
+        let named = |rows: &[AdvisoryRow]| {
+            rows.iter()
+                .map(|(id, patch, ids)| format!("{id} {patch} [{}]", ids.join(", ")))
+                .collect::<Vec<_>>()
+                .join("; ")
+        };
+        let (reads, pins) = (named(&rows), named(&pinned));
+        refusals.push(format!(
+            "SECURITY.md's table is not the closed one (#849): it reads {reads}, pinned {pins}"
+        ));
+    }
+    refusals
+}
+
+/// #849: the security page says where an advisory of this crate is published and that none is
+/// filed with the RustSec database since 2026-11-13, so that a reader who relies on `cargo audit`
+/// or `cargo deny` is told they report no later advisory. Until #849 it said every advisory is
+/// published "on GitHub (with a CVE requested) and in the RustSec advisory database" and reaches
+/// users "through `cargo audit` and `cargo deny`". The fold of 2026-11-15: the page says what is
+/// true of CVE ids (a CVE was requested from GitHub for each of the six advisories at its
+/// publication, each named with its day; none had a CVE id on 2026-11-15; a later advisory's is
+/// in the advisory) and claims no rule about requesting one, where the lane's page said that a
+/// CVE is requested only where the page names the advisory.
+#[test]
+fn the_security_page_says_where_advisories_are_published_and_that_none_is_filed_to_rustsec_849() {
+    let page = read("SECURITY.md").unwrap();
+    let refusals = security_page_refusals(&page);
+    assert!(refusals.is_empty(), "{}", refusals.join("\n"));
+
+    // Each sentence is held: the page without it is refused by that sentence's name.
+    for (sentence, why) in SECURITY_PAGE_SAYS_849 {
+        let planted = page.replace(sentence, "");
+        assert_ne!(planted, page, "{sentence}");
+        let refusals = security_page_refusals(&planted);
+        assert!(
+            refusals.iter().any(|r| r.contains(why)),
+            "{sentence}: {refusals:?}"
+        );
+    }
+
+    // Each sentence of the page before #849 is refused where it returns.
+    for (old, claim) in [
+        (
+            "3. The patch lands, is tagged and is published to crates.io in one sitting, and the advisory is published then, on GitHub (with a CVE requested) and in the RustSec advisory database: the affected range.",
+            "CVE requested",
+        ),
+        (
+            "4. The advisory is what reaches users, through `cargo audit` and `cargo deny`.",
+            "through `cargo audit` and `cargo deny`",
+        ),
+        (
+            "Each is also filed with the [RustSec advisory database](https://github.com/rustsec/advisory-db), which `cargo audit` and `cargo deny` read once its maintainers merge the file.",
+            "is also filed with",
+        ),
+        (
+            "This page keeps no table of them: a table kept by hand goes stale.",
+            "This page keeps no table",
+        ),
+    ] {
+        let planted = format!("{page}\n{old}\n");
+        let refusals = security_page_refusals(&planted);
+        assert!(
+            refusals
+                .iter()
+                .any(|r| r.contains(&format!("`{claim}` is wording the page carried until #849"))),
+            "{old}: {refusals:?}"
+        );
+    }
+
+    // Each sentence on a CVE that the fold of 2026-11-15 removed is refused where it returns.
+    for (old, claim) in [
+        (
+            "3. The patch lands, is tagged and is published to crates.io in one sitting, and the advisory is published then on this repository's Security tab. No file is sent to the RustSec advisory database and no CVE is requested (\"Published advisories\", below).",
+            "no CVE is requested",
+        ),
+        (
+            "A CVE is requested for an advisory only where this page names the advisory and says so, and it names none.",
+            "only where this page names the advisory and says so",
+        ),
+        (
+            "No advisory of this crate has a CVE id (GitHub's record on 2026-11-14).",
+            "No advisory of this crate has a CVE id",
+        ),
+    ] {
+        let planted = format!("{page}\n{old}\n");
+        let refusals = security_page_refusals(&planted);
+        assert!(
+            refusals.iter().any(|r| r.contains(&format!(
+                "`{claim}` is a sentence on a CVE that the fold of 2026-11-15 removed"
+            ))),
+            "{old}: {refusals:?}"
+        );
+    }
+
+    // The six requests are the table's six advisories, in its order, each with the day it was
+    // published: a day moved, an advisory dropped from the list or two changing places is refused.
+    let requested: Vec<&str> = CVE_REQUESTED_849.iter().map(|(id, _)| *id).collect();
+    let tabled: Vec<&str> = ADVISORIES_849.iter().map(|(id, _, _)| *id).collect();
+    assert_eq!(requested, tabled);
+    for (what, planted) in [
+        (
+            "a day moved",
+            page.replace(
+                "GHSA-cwxv-4866-5gq2 on 2026-11-12",
+                "GHSA-cwxv-4866-5gq2 on 2026-11-13",
+            ),
+        ),
+        (
+            "the last day moved",
+            page.replace(
+                "GHSA-mj2m-jxgv-r446 on 2026-11-13",
+                "GHSA-mj2m-jxgv-r446 on 2026-11-14",
+            ),
+        ),
+        (
+            "an advisory dropped from the list",
+            page.replace("GHSA-84xq-3662-pvx5 on 2026-11-11, ", ""),
+        ),
+        (
+            "two advisories changing places",
+            page.replace(
+                "GHSA-9c8r-76f3-m426 on 2026-11-11, GHSA-84xq-3662-pvx5 on 2026-11-11",
+                "GHSA-84xq-3662-pvx5 on 2026-11-11, GHSA-9c8r-76f3-m426 on 2026-11-11",
+            ),
+        ),
+    ] {
+        assert_ne!(planted, page, "{what}");
+        let refusals = security_page_refusals(&planted);
+        assert!(
+            refusals
+                .iter()
+                .any(|r| r.contains("the day a CVE was requested for it")),
+            "{what}: {refusals:?}"
+        );
+    }
+
+    // The table is closed: a row added, dropped, re-pointed or re-answered is refused.
+    let row = |id: &str| {
+        page.lines()
+            .find(|l| l.starts_with(&format!("| [{id}]")))
+            .unwrap_or_else(|| panic!("SECURITY.md has no row of {id}"))
+            .to_string()
+    };
+    let unlisted = row("GHSA-gg5p-wgff-v3hr");
+    let listed = row("GHSA-9c8r-76f3-m426");
+    for (what, planted, expected) in [
+        (
+            "a row added",
+            page.replace(
+                &unlisted,
+                &format!(
+                    "{unlisted}\n| [GHSA-aaaa-bbbb-cccc](https://github.com/Calhooon/bsv-rs/security/advisories/GHSA-aaaa-bbbb-cccc) | 0.8.10 | no |"
+                ),
+            ),
+            "is not the closed one",
+        ),
+        (
+            "a row dropped",
+            page.replace(&format!("{listed}\n"), ""),
+            "is not the closed one",
+        ),
+        (
+            "an unlisted advisory answered yes",
+            page.replace(
+                &unlisted,
+                &unlisted.replace("| no |", "| yes: RUSTSEC-2026-0999 |"),
+            ),
+            "is not the closed one",
+        ),
+        (
+            "a listed advisory answered no",
+            page.replace(
+                &listed,
+                &listed.replace("| yes: RUSTSEC-2026-0499 |", "| no |"),
+            ),
+            "is not the closed one",
+        ),
+        (
+            "a patch moved",
+            page.replace(&listed, &listed.replace("| 0.8.6 |", "| 0.8.5 |")),
+            "is not the closed one",
+        ),
+        (
+            "a link to another advisory's page",
+            page.replace(
+                &listed,
+                &listed.replace(
+                    "advisories/GHSA-9c8r-76f3-m426)",
+                    "advisories/GHSA-84xq-3662-pvx5)",
+                ),
+            ),
+            "not its own page",
+        ),
+        (
+            "an answer that is neither",
+            page.replace(&unlisted, &unlisted.replace("| no |", "| pending |")),
+            "neither `no` nor `yes: <ids>`",
+        ),
+        (
+            "a yes that names no RustSec id",
+            page.replace(
+                &listed,
+                &listed.replace("RUSTSEC-2026-0499", "GHSA-9c8r-76f3-m426"),
+            ),
+            "no RustSec id",
+        ),
+    ] {
+        assert_ne!(planted, page, "{what}");
+        let refusals = security_page_refusals(&planted);
+        assert!(
+            refusals.iter().any(|r| r.contains(expected)),
+            "{what}: {refusals:?}"
         );
     }
 }
