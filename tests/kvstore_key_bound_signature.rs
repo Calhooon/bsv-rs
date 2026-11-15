@@ -299,3 +299,126 @@ async fn set_refuses_tags_its_reader_refuses_before_the_wallet_is_asked() {
         assert!(wallet.calls().is_empty(), "{:?}", wallet.calls());
     }
 }
+
+/// A key-bound token under the protocol `[1, name]` as `name` is written
+/// (its case and spaces kept): the lock derived under that protocol.
+fn token_named(controller: &PrivateKey, name: &str, key_text: &str, value: &str) -> PushDrop {
+    let wallet = ProtoWallet::new(Some(controller.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, name);
+    let mut fields = vec![
+        serde_json::to_vec(&(1u8, name)).unwrap(),
+        key_text.as_bytes().to_vec(),
+        value.as_bytes().to_vec(),
+        controller.public_key().to_compressed().to_vec(),
+    ];
+    let signature = wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            protocol_id: protocol.clone(),
+            key_id: key_text.to_owned(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    fields.push(signature);
+    let lock = wallet
+        .key_deriver()
+        .derive_public_key(&protocol, key_text, &Counterparty::Anyone, true)
+        .unwrap();
+    PushDrop::decode(&PushDrop::new(lock, fields).lock()).unwrap()
+}
+
+/// The asked protocol and the token's own compare as the derivation reads
+/// them on BOTH sides (trimmed, lowercase): a token whose protocol field
+/// names `KVStore` is the protocol a caller configured as `kvstore`, and one
+/// naming another protocol is not.
+#[test]
+fn the_tokens_protocol_name_is_compared_as_the_derivation_reads_it() {
+    let controller = key("controller", 4);
+    let written = token_named(&controller, "KVStore", "k1", "v");
+    let fields = KVStoreInterpreter::extract_fields(&script(&written)).unwrap();
+    for asked in ["kvstore", "KVSTORE", " kvstore "] {
+        assert!(
+            KVStoreInterpreter::verify_signature(&fields, asked),
+            "{asked}"
+        );
+    }
+    let other = token_named(&controller, "Another Store", "k1", "v");
+    let fields = KVStoreInterpreter::extract_fields(&script(&other)).unwrap();
+    assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    assert!(KVStoreInterpreter::verify_signature(
+        &fields,
+        "another store"
+    ));
+}
+
+/// The store's read refuses a key-bound token divided into fields otherwise
+/// and a key-bound token of another protocol, each signed by its controller.
+#[tokio::test]
+async fn the_store_refuses_a_divided_key_bound_token_and_one_of_another_protocol() {
+    let controller = key("controller", 5);
+    let honest = token(&controller, false, "k12", "vv", true);
+    assert_eq!(
+        read_by_the_store(&honest, "k12", "kv-bound-4mcm-s3-honest")
+            .await
+            .as_deref(),
+        Some("vv")
+    );
+    for (at, shift, key_text) in [(1, 1, "k1"), (1, -1, "k12v")] {
+        let moved = divided(&honest, at, shift).unwrap();
+        assert_eq!(
+            read_by_the_store(&moved, key_text, &format!("kv-bound-4mcm-s3-{shift}")).await,
+            None,
+            "{at} {shift}"
+        );
+    }
+    let other = token_named(&controller, "another store", "k12", "v");
+    assert_eq!(
+        read_by_the_store(&other, "k12", "kv-bound-4mcm-s3-other").await,
+        None
+    );
+}
+
+/// `set`'s bounds are its reader's, at the boundary: a key of 800 bytes and
+/// a value of 1 MiB reach the wallet; one byte more is refused in the
+/// reader's words before the wallet is asked anything.
+#[tokio::test]
+async fn set_refuses_one_byte_past_the_readers_key_and_value_bounds() {
+    const MIB: usize = 1024 * 1024;
+    for (key_len, value_len, refusal) in [
+        (800, 1, None),
+        (801, 1, Some("KVStore key has an invalid length")),
+        (1, MIB, None),
+        (1, MIB + 1, Some("KVStore value has an invalid length")),
+    ] {
+        let wallet = identity_reveal_wallet::Counting::of_scalar(9);
+        let config = KVStoreConfig::default();
+        let resolver = LookupResolver::new(LookupResolverConfig {
+            network_preset: NetworkPreset::Local,
+            host_overrides: Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec![format!(
+                    "https://kv-bounds-4mcm-{key_len}-{value_len}.invalid"
+                )],
+            )])),
+            slap_trackers: Some(Vec::new()),
+            facilitator: Some(Arc::new(TokenLookup(Vec::new()))),
+            ..Default::default()
+        });
+        let store =
+            GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
+        let result = store
+            .set(&"k".repeat(key_len), &"v".repeat(value_len), None)
+            .await;
+        match refusal {
+            Some(words) => {
+                assert_eq!(result, Err(bsv_rs::Error::KvStoreError(words.into())));
+                assert!(wallet.calls().is_empty(), "{key_len} {value_len}");
+            }
+            None => {
+                assert!(!wallet.calls().is_empty(), "{key_len} {value_len}");
+            }
+        }
+    }
+}
