@@ -238,8 +238,9 @@ println!("Downloaded {} bytes", result.data.len());
 
 1. Query `ls_uhrp` lookup service with the UHRP URL
 2. Parse BEEF outputs to get PushDrop advertisement tokens
-3. Extract host URLs and expiry times from token fields (fields: protocol, identity, domain, expiry)
-4. Filter out expired advertisements (compares expiry time against current time)
+3. Skip an advertisement its host did not sign (#544's storage site, `advertisement.rs`): six fields, the host's 33-byte identity key first, the hash of the file asked for second, the sixth the host's signature over the five data fields (the protocol `uhrp advertisement` at level 2, key ID `1`, for `anyone`), locked with the host's linked key
+4. Extract host URLs and expiry times from token fields (field 2 the location, field 3 the expiry)
+5. Filter out expired advertisements (compares expiry time against current time)
 5. Validate host URLs (must start with `http://` or `https://`)
 6. Return list of available host URLs
 

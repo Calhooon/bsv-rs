@@ -25,11 +25,12 @@ use bsv_rs::kvstore::{
 };
 use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
-    OverlayLookupFacilitator,
+    OutputListItem, OverlayLookupFacilitator,
 };
 use bsv_rs::primitives::{to_hex, PrivateKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
+use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
     CreateActionArgs, CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
@@ -112,6 +113,10 @@ struct MockWallet {
     get_public_key_count: AtomicU32,
     /// Counter for create_signature calls.
     create_signature_count: AtomicU32,
+    /// When set, create_signature signs with this key as a wallet does.
+    signer: Option<PrivateKey>,
+    /// The locking scripts of the outputs create_action was asked for.
+    written: Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
 }
 
 impl MockWallet {
@@ -127,6 +132,18 @@ impl MockWallet {
             create_action_count: AtomicU32::new(0),
             get_public_key_count: AtomicU32::new(0),
             create_signature_count: AtomicU32::new(0),
+            signer: None,
+            written: Arc::new(std::sync::Mutex::new(Vec::new())),
+        }
+    }
+
+    /// A wallet whose identity key is `controller`'s and whose signatures are
+    /// that key's, as a wallet makes them.
+    fn signing(controller: &PrivateKey) -> Self {
+        Self {
+            public_key_hex: to_hex(&controller.public_key().to_compressed()),
+            signer: Some(controller.clone()),
+            ..Self::new()
         }
     }
 
@@ -191,6 +208,9 @@ impl WalletInterface for MockWallet {
         _originator: &str,
     ) -> Result<CreateSignatureResult> {
         self.create_signature_count.fetch_add(1, Ordering::SeqCst);
+        if let Some(signer) = &self.signer {
+            return ProtoWallet::new(Some(signer.clone())).create_signature(_args);
+        }
         Ok(CreateSignatureResult {
             signature: vec![0u8; 64],
         })
@@ -226,6 +246,12 @@ impl WalletInterface for MockWallet {
         _originator: &str,
     ) -> Result<CreateActionResult> {
         self.create_action_count.fetch_add(1, Ordering::SeqCst);
+        for output in _args.outputs.iter().flatten() {
+            self.written
+                .lock()
+                .unwrap()
+                .push(output.locking_script.clone());
+        }
         if self.create_action_error.load(Ordering::SeqCst) {
             return Err(Error::WalletError("create_action error".to_string()));
         }
@@ -1886,4 +1912,216 @@ fn test_query_large_limit_and_skip() {
     let query = KVStoreQuery::new().with_limit(u32::MAX).with_skip(u32::MAX);
     assert_eq!(query.limit, Some(u32::MAX));
     assert_eq!(query.skip, Some(u32::MAX));
+}
+
+// =============================================================================
+// The writer's own tokens through the interpreter (#544's interpreter site)
+// =============================================================================
+
+/// A host name no other test uses: the host reputation tracker is global.
+fn key_hosts() -> u32 {
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    NEXT.fetch_add(1, Ordering::SeqCst)
+}
+
+/// A lookup host that answers every question with no output.
+struct EmptyLookupFacilitator;
+
+#[async_trait::async_trait(?Send)]
+impl OverlayLookupFacilitator for EmptyLookupFacilitator {
+    async fn lookup(
+        &self,
+        _url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        Ok(LookupAnswer::OutputList {
+            outputs: Vec::new(),
+        })
+    }
+}
+
+/// The locking script `GlobalKVStore::set` writes for `controller`.
+async fn written_by_set(controller: &PrivateKey, options: KVStoreSetOptions) -> LockingScript {
+    written_by_set_value(controller, "v", options).await
+}
+
+/// The locking script `GlobalKVStore::set` writes for `controller` and `value`.
+async fn written_by_set_value(
+    controller: &PrivateKey,
+    value: &str,
+    options: KVStoreSetOptions,
+) -> LockingScript {
+    let wallet = MockWallet::signing(controller);
+    let written = wallet.written.clone();
+    let config = KVStoreConfig::default();
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        network_preset: NetworkPreset::Local,
+        facilitator: Some(Arc::new(EmptyLookupFacilitator)),
+        slap_trackers: Some(Vec::new()),
+        host_overrides: Some(std::collections::HashMap::from([(
+            config.service_name.clone(),
+            vec![format!("https://set-{}-544.invalid", key_hosts())],
+        )])),
+        ..Default::default()
+    });
+    let store = GlobalKVStore::with_resolver(wallet, config, NetworkPreset::Local, resolver);
+    store.set("k", value, Some(options)).await.unwrap();
+    let written = written.lock().unwrap();
+    assert_eq!(written.len(), 1);
+    LockingScript::from_binary(&written[0]).unwrap()
+}
+
+#[tokio::test]
+async fn a_token_global_kvstore_set_writes_reads_through_the_interpreter_544() {
+    for tags in [None, Some(vec!["a".to_string(), "b".to_string()])] {
+        let controller = PrivateKey::random();
+        let options = KVStoreSetOptions {
+            tags: tags.clone(),
+            ..Default::default()
+        };
+        let script = written_by_set(&controller, options).await;
+        let ctx = KVStoreContext::new("k", KVStoreConfig::default().protocol_id);
+        for entry in [
+            KVStoreInterpreter::interpret_script(&script, None),
+            KVStoreInterpreter::interpret_script(&script, Some(&ctx)),
+        ] {
+            let entry = entry.expect("the writer's own token reads");
+            assert_eq!(entry.value, "v");
+            assert_eq!(
+                entry.controller,
+                to_hex(&controller.public_key().to_compressed())
+            );
+            assert_eq!(entry.tags, tags.clone().unwrap_or_default());
+        }
+    }
+}
+
+/// A token `set` writes under a `protocol_id` option other than the store's
+/// configured one is signed under the configured one, which the token does
+/// not carry: no reader can authenticate it, and the interpreter reads none.
+#[tokio::test]
+async fn a_token_set_writes_under_another_protocol_option_is_no_entry_544() {
+    let controller = PrivateKey::random();
+    let options = KVStoreSetOptions {
+        protocol_id: Some("other store".to_string()),
+        ..Default::default()
+    };
+    let script = written_by_set(&controller, options).await;
+    let fields = KVStoreInterpreter::extract_fields(&script).unwrap();
+    assert_eq!(fields.protocol_id_string().as_deref(), Some("other store"));
+    assert!(KVStoreInterpreter::interpret_script(&script, None).is_none());
+
+    // The store's own reader refuses it too, as it did before the port
+    let mut tx = Transaction::new();
+    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+        .unwrap();
+    tx.add_output(TransactionOutput::new(1, script)).unwrap();
+    let item = OutputListItem {
+        beef: tx.to_beef(true).unwrap(),
+        output_index: 0,
+        context: None,
+    };
+    let config = KVStoreConfig::default();
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        network_preset: NetworkPreset::Local,
+        facilitator: Some(Arc::new(AnsweringLookupFacilitator(vec![item]))),
+        slap_trackers: Some(Vec::new()),
+        host_overrides: Some(std::collections::HashMap::from([(
+            config.service_name.clone(),
+            vec!["https://get-protocol-option-544.invalid".to_string()],
+        )])),
+        ..Default::default()
+    });
+    let store =
+        GlobalKVStore::with_resolver(MockWallet::new(), config, NetworkPreset::Local, resolver);
+    let read = store
+        .get(
+            "k",
+            Some(KVStoreGetOptions {
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap();
+    assert!(read.is_none());
+}
+
+/// A token `set` writes for an empty value carries it as `OP_0`, the push
+/// PushDrop writes for one zero byte, which every reader reads back as the
+/// one zero byte: the controller's signature over the empty value never
+/// verifies, so the interpreter reads no entry from it (`GlobalKVStore::get`
+/// read none before). Its bytes are the zero-byte token's but the signature.
+#[tokio::test]
+async fn a_token_signed_over_an_empty_value_is_no_entry_544() {
+    let controller = PrivateKey::random();
+    let options = KVStoreSetOptions {
+        tags: Some(vec!["t".to_string()]),
+        ..Default::default()
+    };
+    let zero = written_by_set_value(&controller, "\0", options).await;
+    let decoded = PushDrop::decode(&zero).unwrap();
+    let mut fields = decoded.fields;
+    assert_eq!(
+        fields[2],
+        vec![0u8],
+        "the value field reads as one zero byte"
+    );
+    let data_fields = fields.clone();
+    let signed = |value: &[u8]| {
+        let data = [
+            &data_fields[0][..],
+            &data_fields[1][..],
+            value,
+            &data_fields[3][..],
+            &data_fields[4][..],
+        ]
+        .concat();
+        ProtoWallet::new(Some(controller.clone()))
+            .create_signature(CreateSignatureArgs {
+                data: Some(data),
+                hash_to_directly_sign: None,
+                protocol_id: Protocol::new(SecurityLevel::App, "kvstore"),
+                key_id: "kvstore-token".to_string(),
+                counterparty: Some(Counterparty::Anyone),
+            })
+            .unwrap()
+            .signature
+    };
+    let last = fields.len() - 1;
+    fields[last] = signed(&[0]);
+    let control = PushDrop::new(controller.public_key(), fields.clone()).lock();
+    assert_eq!(control, zero, "the signer is the writer's");
+    fields[last] = signed(&[]);
+    let empty = PushDrop::new(controller.public_key(), fields).lock();
+    let ctx = KVStoreContext::new("k", KVStoreConfig::default().protocol_id);
+    let mut tx = Transaction::new();
+    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+        .unwrap();
+    tx.add_output(TransactionOutput::new(1, empty.clone()))
+        .unwrap();
+    assert!(KVStoreInterpreter::interpret_script(&empty, None).is_none());
+    assert!(KVStoreInterpreter::interpret_script(&empty, Some(&ctx)).is_none());
+    assert!(KVStoreInterpreter::interpret(&tx, 0, Some(&ctx)).is_none());
+    assert_eq!(
+        KVStoreInterpreter::interpret_script(&control, Some(&ctx)).map(|e| e.value),
+        Some("\0".to_string())
+    );
+}
+
+/// A lookup host that answers every question with the same outputs.
+struct AnsweringLookupFacilitator(Vec<OutputListItem>);
+
+#[async_trait::async_trait(?Send)]
+impl OverlayLookupFacilitator for AnsweringLookupFacilitator {
+    async fn lookup(
+        &self,
+        _url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        Ok(LookupAnswer::OutputList {
+            outputs: self.0.clone(),
+        })
+    }
 }

@@ -264,3 +264,44 @@ fn a_field_changed_after_signing_is_no_entry_544() {
         }
     }
 }
+
+/// The kvstore cases of `tests/vectors/token_envelope_544.json`
+/// (`tests/support/token_envelope_544.mjs`) this port judges: the canonical
+/// writer's token with and without tags reads to its value; the raw-protocol
+/// variant (its signature no longer covers its fields), the unsigned, the
+/// wrongly locked and the wrongly signed ones are no entry.
+/// `noncanonical_envelope` is an envelope's form, not a token's author: the
+/// stable line reads it as it did, and it is outside this file.
+#[test]
+fn the_vectors_signed_tokens_read_and_their_unauthenticated_variants_do_not_544() {
+    let v: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/token_envelope_544.json")).unwrap();
+    let key = v["kvstore"]["context"]["key"].as_str().unwrap();
+    let ctx = KVStoreContext::new(key, r#"[1,"kvstore"]"#);
+    let judged = [
+        "reference",
+        "reference_tags",
+        "raw_protocol",
+        "unsigned",
+        "wrong_lock_key",
+        "bad_signature",
+    ];
+    let mut seen = 0;
+    for case in v["kvstore"]["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        if !judged.contains(&name) {
+            continue;
+        }
+        seen += 1;
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        let expected = case["value"].as_str();
+        for read in [
+            KVStoreInterpreter::interpret_script(&script, None),
+            KVStoreInterpreter::interpret_script(&script, Some(&ctx)),
+            KVStoreInterpreter::interpret(&in_a_transaction(&script), 0, Some(&ctx)),
+        ] {
+            assert_eq!(read.map(|entry| entry.value).as_deref(), expected, "{name}");
+        }
+    }
+    assert_eq!(seen, judged.len());
+}

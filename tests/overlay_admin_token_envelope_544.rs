@@ -258,3 +258,66 @@ async fn a_discovery_admits_no_host_from_the_other_protocols_advertisement_544()
         .await
         .is_empty());
 }
+
+/// The overlay cases of `tests/vectors/token_envelope_544.json`
+/// (`tests/support/token_envelope_544.mjs`) this port judges: the canonical
+/// writer's SHIP and SLAP advertisements admit their host; the legacy
+/// unsigned one, and those signed by another key or locked with another key,
+/// admit none. The other cases are an advertisement's form (its protocol
+/// text, its URI, its name, its key's encoding, its signature's length, its
+/// envelope), not its author: the stable line reads them as it did, and they
+/// are outside this file.
+#[tokio::test(flavor = "current_thread")]
+async fn the_vectors_signed_advertisements_admit_their_host_and_the_unauthenticated_none_544() {
+    let v: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/token_envelope_544.json")).unwrap();
+    let judged = [
+        ("reference_ship", true),
+        ("reference_slap", true),
+        ("legacy_unsigned", false),
+        ("wrong_signer", false),
+        ("wrong_lock_key", false),
+        ("slap_wrong_signer", false),
+        ("slap_wrong_lock_key", false),
+    ];
+    let mut seen = 0;
+    for case in v["overlay"]["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let Some((_, admitted)) = judged.iter().find(|(judged, _)| *judged == name) else {
+            continue;
+        };
+        seen += 1;
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        let token = PushDrop::decode(&script).unwrap();
+        let protocol = String::from_utf8(token.fields[0].clone()).unwrap();
+        let domain = String::from_utf8(token.fields[2].clone()).unwrap();
+        let name_field = String::from_utf8(token.fields[3].clone()).unwrap();
+        let tracker = format!("https://vector-{name}-544.invalid");
+        let found = match protocol.as_str() {
+            "SLAP" => resolver("ls_slap", &tracker, &script)
+                .find_competent_hosts(&name_field)
+                .await
+                .unwrap(),
+            _ => {
+                let broadcaster = TopicBroadcaster::new(
+                    vec![name_field.clone()],
+                    TopicBroadcasterConfig {
+                        network_preset: NetworkPreset::Mainnet,
+                        resolver: Some(Arc::new(resolver("ls_ship", &tracker, &script))),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
+                broadcaster
+                    .find_interested_hosts()
+                    .await
+                    .unwrap()
+                    .into_keys()
+                    .collect()
+            }
+        };
+        let expected = if *admitted { vec![domain] } else { Vec::new() };
+        assert_eq!(found, expected, "{name}");
+    }
+    assert_eq!(seen, judged.len());
+}
