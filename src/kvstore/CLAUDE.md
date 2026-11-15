@@ -804,6 +804,15 @@ limit present in the reference.
    level 1). The older raw protocol form written by this crate (key ID
    `"kvstore-token"`, the controller's own lock) authenticates nowhere since
    GHSA-4mcm-g5xq-jv3r: its signature does not bind the key.
+   The asked protocol is compared trimmed and lowercase at
+   `verify_signature`; `interpret_script`'s context compares the field's
+   text exactly. The store asks both, so a token whose protocol field is a
+   case or space variant of the configured name is refused there (it fails
+   safe; no cell exposes the difference: the strength read's S4, a note).
+   The store's own `verify_signature` gate before `interpret` refuses no
+   token the interpreter's authentication accepts (removing it is an
+   equivalent mutation; `tests/kvstore_key_bound_signature.rs` pins the
+   store's answer instead).
 3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`.
    All present fields preceding the signature are signed, including `[]`.
    PushDrop writes an empty field as `OP_0`, read back as one zero byte, so a
