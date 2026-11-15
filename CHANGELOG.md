@@ -550,6 +550,8 @@ No SDK has a twin of the judge. No verdict, word or byte of the crate moves, no 
 3. Treat a broadcaster's `BroadcastFailure` with code `ERR_TXID_MISMATCH` as a refusal: a 2xx that named another transaction was a success before (GHSA-qhj8-j8mj-9cgc).
 4. Read Extended Format bytes from a party you do not trust through `from_ef_bounded` or `from_hex_ef_bounded`, with a figure your memory allows (GHSA-82g9-h6jw-r99f).
 
+The 0.9 line does not read a stable-line entry written with a repeated tag, an empty tag, or a value larger than one mebibyte; such an entry remains an output its controller's wallet can spend.
+
 The fee-policy reader, the text doors and the template classifiers need nothing of a caller who did not rely on an answer their entries name (GHSA-crr5-gh8p-q2h2, GHSA-x3m6-jp5x-236c, GHSA-vmgj-w2jr-c52x).
 
 ### Security: a `GlobalKVStore` token in the form whose signature does not bind its key passed this crate's two signature checks; every door that judges a token now reads only the form that binds it, and `set` writes no token its reader refuses (GHSA-4mcm-g5xq-jv3r)
