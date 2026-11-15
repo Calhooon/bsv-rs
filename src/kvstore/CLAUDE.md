@@ -17,10 +17,11 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
 | `local.rs` | LocalKVStore implementation with MockWallet tests | ~1743 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`) before the wallet is asked | ~838 |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~609 |
-| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged; on this line it answers `true` for untagged and namespace tokens their controller signed, which `verify_signature` answers `false` (`tests/kvstore_legacy_signature_verdict.rs`) | 94 |
-| `token_validation.rs` | The interpreter's authentication of a token (crate-internal; #544's interpreter site) | ~110 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`) before the wallet is asked, and writes the key-bound form (`token_signature`: field 0 `[1, <protocol>]`, the key as key ID, the wallet's derived key as the lock) | ~837 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification; `verify_signature` through `token_derivation.rs`, the protocol field naming the protocol asked; a context's plain protocol name matches `[1, name]` | ~637 |
+| `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the one derivation every door judges a token under (`token_derivation.rs`: the `[level, name]` namespace, the key as key ID, a locking key derived from the controller); a token of the earlier plain-name form (key ID `kvstore-token`) `false` (GHSA-4mcm-g5xq-jv3r); a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds and the push encoding not judged; on this line it answers `true` for untagged tokens their controller signed (`tests/kvstore_legacy_signature_verdict.rs`) | 74 |
+| `token_derivation.rs` | The one derivation a token's signature is judged under at every door (`verify_signature`, `verify_signature_legacy`, the interpreter; the store's reads and history walk through them): the protocol field canonical JSON `[level, name]`, the key as key ID, the lock the controller's key linked to `anyone`; with a protocol asked, the field must name it (trimmed, lowercase; a plain name is level 1); any other form, the earlier plain-name one among them, authenticates nowhere (GHSA-4mcm-g5xq-jv3r) | 57 |
+| `token_validation.rs` | The interpreter's authentication of a token (crate-internal; #544's interpreter site): the key-bound derivation of `token_derivation.rs` and the controller's signature | ~52 |
 
 ## Key Exports
 
@@ -337,10 +338,11 @@ impl KVStoreInterpreter {
 
     /// Interpret a locking script directly. An entry only for a token its
     /// controller signed and its writer locked (#544's interpreter site,
-    /// `token_validation.rs`): GlobalKVStore::set's form (the raw protocol
-    /// ID, key ID `kvstore-token`, locked with the controller's key) or the
-    /// canonical one (the protocol ID as JSON `[level, name]`, the entry's
-    /// key as key ID, locked with the controller's key for `anyone`). A
+    /// `token_validation.rs`), in the form whose signature binds the key,
+    /// the one GlobalKVStore::set writes (the protocol ID as JSON
+    /// `[level, name]`, the entry's key as key ID, locked with the
+    /// controller's key for `anyone`); the form earlier releases wrote (the
+    /// raw protocol ID, key ID `kvstore-token`) is none (GHSA-4mcm). A
     /// token written for an empty value is none: PushDrop writes an empty
     /// field as `OP_0`, read back as one zero byte, so the controller's
     /// signature over the empty value never verifies
@@ -565,9 +567,11 @@ it after completion.
 ### Signature Verification
 
 `GlobalKVStore` verifies token signatures on retrieval. The verification:
-1. Concatenates fields 0-4 (protocol_id + key + value + controller + optional tags)
-2. Uses `SecurityLevel::App` protocol with key_id `"kvstore-token"`
+1. Concatenates fields 0-4 (protocol_id + key + value + controller + optional tags; a five-field token's field 4 is its signature)
+2. Reads the protocol field as canonical JSON `[level, name]`, uses that protocol with the token's key as key ID, and checks the locking key is the controller's linked to `anyone` under them (`token_derivation.rs`, the one derivation every judging door uses); `verify_signature`'s protocol argument must be the protocol the field names (trimmed, lowercase; a plain name is level 1)
 3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`
+
+The form `GlobalKVStore::set` wrote before this release (the protocol as raw text, key ID `"kvstore-token"`, the controller's own key as the lock) authenticates at no door (GHSA-4mcm-g5xq-jv3r): its signature does not bind the key. `set` writes the key-bound form: field 0 `[1, <protocol>]` for the protocol it signs under (the option, else the configuration), the key as key ID, the lock from the wallet's derived key.
 
 ### History Building
 

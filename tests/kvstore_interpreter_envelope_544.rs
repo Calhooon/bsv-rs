@@ -1,12 +1,14 @@
 //! The interpreter returns an entry only for a token its controller signed
 //! and its writer locked (the stable line's port of #544's interpreter
 //! site): `KVStoreInterpreter::interpret` and `interpret_script` on tokens
-//! of this crate's writer (`GlobalKVStore::set`: the raw protocol ID, the
-//! key ID `kvstore-token`, locked with the controller's key) and of the
-//! canonical form (the protocol ID as JSON `[level, name]`, the entry's key
-//! as key ID, locked with the controller's key for `anyone`), each honest
-//! with and without tags, and each refused unsigned, signed by another key,
-//! locked with another key, or naming its controller by a 65-byte key.
+//! of the canonical form, the one `GlobalKVStore::set` writes (the protocol
+//! ID as JSON `[level, name]`, the entry's key as key ID, locked with the
+//! controller's key for `anyone`), honest with and without tags, and
+//! refused unsigned, signed by another key, locked with another key, or
+//! naming its controller by a 65-byte key; and on the form `set` wrote
+//! before (the raw protocol ID, the key ID `kvstore-token`, locked with the
+//! controller's key), refused honest or not: its signature does not bind
+//! the key (GHSA-4mcm-g5xq-jv3r).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "kvstore")]
 
@@ -21,7 +23,7 @@ use bsv_rs::wallet::{
 
 #[derive(Clone, Copy)]
 enum Form {
-    /// `GlobalKVStore::set`'s token.
+    /// The form `GlobalKVStore::set` wrote before the key-bound one.
     Crate,
     /// The canonical token: `[1, protocol]` as JSON, the key as key ID.
     Canonical,
@@ -184,7 +186,11 @@ fn a_signed_token_locked_with_another_key_is_no_entry_544() {
 
 #[test]
 fn a_token_its_controller_signed_reads_to_its_entry_with_and_without_tags_544() {
-    for form in [Form::Crate, Form::Canonical] {
+    for tags in [false, true] {
+        let earlier = honest(Form::Crate, &PrivateKey::random(), tags);
+        assert_eq!(read_count(Form::Crate, &earlier), 0, "the earlier form");
+    }
+    for form in [Form::Canonical] {
         for tags in [false, true] {
             let controller = PrivateKey::random();
             let script = honest(form, &controller, tags);
