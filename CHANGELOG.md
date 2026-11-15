@@ -549,6 +549,7 @@ No SDK has a twin of the judge. No verdict, word or byte of the crate moves, no 
 2. `set` refuses, before the wallet is asked, an empty value (clear a key with `remove`), a repeated or empty tag, a key over 800 bytes and a value over 1 MiB, in the reader's words: write within those bounds.
 3. Treat a broadcaster's `BroadcastFailure` with code `ERR_TXID_MISMATCH` as a refusal: a 2xx that named another transaction was a success before (GHSA-qhj8-j8mj-9cgc).
 4. Read Extended Format bytes from a party you do not trust through `from_ef_bounded` or `from_hex_ef_bounded`, with a figure your memory allows (GHSA-82g9-h6jw-r99f).
+5. A caller that sets a work budget on verification (`verify_with_work_budget`, `verify_with_work_budgets`, the reader's `set_work_limit` or `with_work_budget`, `InputRules::with_work_limit`) and spends coins locked by `OP_HASH160 <20 bytes> OP_EQUAL` reads the figure from an unbudgeted `verify_input`, whose `work_spent` now counts the pay-to-script-hash step, and sets its budget to cover it (GHSA-fr33-7jw7-mwwh).
 
 The 0.9 line does not read a stable-line entry written with a repeated tag, an empty tag, or a value larger than one mebibyte; such an entry remains an output its controller's wallet can spend.
 
