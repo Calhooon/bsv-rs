@@ -618,45 +618,33 @@ impl Script {
     }
 
     /// Check if this is a Pay-to-Public-Key-Hash script
-    /// Pattern: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+    /// Pattern: OP_DUP OP_HASH160 <0x14 + 20 bytes> OP_EQUALVERIFY OP_CHECKSIG (the 25 bytes)
     pub fn is_p2pkh(&self) -> bool {
         let chunks = self.chunks();
         chunks.len() == 5
             && chunks[0].op == OP_DUP
             && chunks[1].op == OP_HASH160
-            && chunks[2]
-                .data
-                .as_ref()
-                .map(|d| d.len() == 20)
-                .unwrap_or(false)
+            && super::template_push::template_push(&chunks[2], &[20]).is_some()
             && chunks[3].op == OP_EQUALVERIFY
             && chunks[4].op == OP_CHECKSIG
     }
 
     /// Check if this is a Pay-to-Public-Key script
-    /// Pattern: <33 or 65 bytes pubkey> OP_CHECKSIG
+    /// Pattern: <0x21 + 33 or 0x41 + 65 bytes pubkey> OP_CHECKSIG
     pub fn is_p2pk(&self) -> bool {
         let chunks = self.chunks();
         chunks.len() == 2
-            && chunks[0]
-                .data
-                .as_ref()
-                .map(|d| d.len() == 33 || d.len() == 65)
-                .unwrap_or(false)
+            && super::template_push::template_push(&chunks[0], &[33, 65]).is_some()
             && chunks[1].op == OP_CHECKSIG
     }
 
     /// Check if this is a Pay-to-Script-Hash script
-    /// Pattern: OP_HASH160 <20 bytes> OP_EQUAL
+    /// Pattern: OP_HASH160 <0x14 + 20 bytes> OP_EQUAL (the 23 bytes)
     pub fn is_p2sh(&self) -> bool {
         let chunks = self.chunks();
         chunks.len() == 3
             && chunks[0].op == OP_HASH160
-            && chunks[1]
-                .data
-                .as_ref()
-                .map(|d| d.len() == 20)
-                .unwrap_or(false)
+            && super::template_push::template_push(&chunks[1], &[20]).is_some()
             && chunks[2].op == OP_EQUAL
     }
 
@@ -684,7 +672,7 @@ impl Script {
     }
 
     /// Check if this is a multisig script, returns (M, N) if so
-    /// Pattern: `OP_M <pubkey>... OP_N OP_CHECKMULTISIG`
+    /// Pattern: `OP_M <pubkey>... OP_N OP_CHECKMULTISIG`, each key pushed by `0x21` or `0x41`
     pub fn is_multisig(&self) -> Option<(u8, u8)> {
         let chunks = self.chunks();
         if chunks.len() < 4 {
@@ -707,12 +695,9 @@ impl Script {
             return None;
         }
 
-        // Verify all middle elements are pubkeys (33 or 65 bytes)
+        // Verify all middle elements are pubkeys (33 or 65 bytes, pushed by their length)
         for chunk in chunks.iter().take((n as usize) + 1).skip(1) {
-            let data = chunk.data.as_ref()?;
-            if data.len() != 33 && data.len() != 65 {
-                return None;
-            }
+            super::template_push::template_push(chunk, &[33, 65])?;
         }
 
         Some((m, n))
