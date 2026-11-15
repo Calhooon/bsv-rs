@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 5. Treat a broadcaster's `BroadcastFailure` with code `ERR_TXID_MISMATCH` as a refusal: a 2xx that named another transaction was a success before (GHSA-qhj8-j8mj-9cgc).
 6. Read Extended Format bytes from a party you do not trust through `from_ef_bounded` or `from_hex_ef_bounded`, with a figure your memory allows (GHSA-82g9-h6jw-r99f).
 
+Entries this release's store writer creates with a repeated tag, an empty tag, or a value larger than one mebibyte read back only on the stable line; the 0.9 prerelease line and the reference refuse those three shapes, as they already refused every entry 0.8.9 wrote.
+
 The fee-policy reader, the text doors and the template classifiers need nothing of a caller who did not rely on an answer their entries name (GHSA-crr5-gh8p-q2h2, GHSA-x3m6-jp5x-236c, GHSA-vmgj-w2jr-c52x).
 
 ### Security: a `GlobalKVStore` token's signature did not bind its key; every door that judges a token now reads only the form that binds it, and `set` writes that form (GHSA-4mcm-g5xq-jv3r)
