@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.10] - 2026-11-15
+
 ### Migration: what a caller does for this release, in order
 
 1. Before upgrading, keep your own record of what each `GlobalKVStore` key you control holds (key, value, tags): after it, a token earlier releases' `set` wrote reads no entry, and your record is what you write again (GHSA-4mcm-g5xq-jv3r).
