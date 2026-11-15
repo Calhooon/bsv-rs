@@ -161,7 +161,11 @@ fn signature(tx: &Transaction, script_code: &[u8]) -> Vec<u8> {
 
 /// The child of `cell` spending a coin proven at `height`.
 fn spend_at(cell: &Cell, height: u32) -> Transaction {
-    let coin = parent(&cell.lock, height);
+    spend_of(cell, parent(&cell.lock, height))
+}
+
+/// The child of `cell` spending output 0 of `coin`.
+fn spend_of(cell: &Cell, coin: Transaction) -> Transaction {
     let code = cell.redeem.clone().unwrap_or_else(|| cell.lock.clone());
     let mut unlocking = cell.below.clone();
     if cell.signed {
@@ -218,6 +222,10 @@ fn refused_by_the_rules_of_the_era() -> Vec<Cell> {
     let two_mul = vec![0x52, 0x8d, 0x54, 0x87];
     vec![
         signed("a push above 520 bytes", p2pkh(), 2, push(&[7u8; 521])),
+        // 997 below the signature and key: 1,001 elements once the lock
+        // pushes its hash, one past the bound.
+        signed("exactly 1,001 stack elements", p2pkh(), 2, vec![0x00; 997]),
+        unlocking_of(10_001),
         signed("more than 1,000 stack elements", p2pkh(), 2, deep),
         signed("an unlocking script above 10,000 bytes", p2pkh(), 2, big),
         cell("more than 500 opcodes", many_ops, 2),
@@ -344,7 +352,34 @@ fn accepted_by_the_rules_of_the_era() -> Vec<Cell> {
         },
         cell("a product of 8 bytes from operands of 4", wide_result, 2),
         cell("OP_MUL executed", vec![0x52, 0x53, 0x95, 0x56, 0x87], 2),
+        unlocking_of(10_000),
     ]
+}
+
+/// A spend whose unlocking script is exactly `size` bytes (10,000 or
+/// 10,001): twenty pushes of 497 bytes (500 bytes each), and for 10,001 an
+/// `OP_0` after them; the lock drops every element and leaves `OP_1`.
+fn unlocking_of(size: usize) -> Cell {
+    let mut below = Vec::new();
+    for _ in 0..20 {
+        below.extend(push(&[9u8; 497]));
+    }
+    let mut lock = vec![0x6d; 10];
+    if size == 10_001 {
+        below.push(0x00);
+        lock.push(0x75);
+    }
+    lock.push(0x51);
+    assert_eq!(below.len(), size);
+    let name = if size == 10_001 {
+        "an unlocking script of exactly 10,001 bytes"
+    } else {
+        "an unlocking script of exactly 10,000 bytes"
+    };
+    Cell {
+        below,
+        ..cell(name, lock, 2)
+    }
 }
 
 /// The tip, its network named by its Genesis height (a field deprecated on
@@ -360,8 +395,13 @@ fn tip(genesis_height: u32) -> ChainTip {
     }
 }
 
+/// The first transaction up the chain of first inputs that carries a proof.
 fn parent_of(tx: &Transaction) -> &Transaction {
-    tx.inputs()[0].source_transaction.as_ref().unwrap()
+    let mut parent = tx.inputs()[0].source_transaction.as_ref().unwrap();
+    while parent.merkle_path.is_none() {
+        parent = parent.inputs()[0].source_transaction.as_ref().unwrap();
+    }
+    parent
 }
 
 /// The tracker and headers of every door: the parent's root, and the tip
@@ -441,7 +481,11 @@ const DOORS: [Door; 7] = [
 
 /// `door`'s answer on `tx`, the chain named by `tip` (none: no tip).
 async fn answer(door: Door, tx: &Transaction, tip: Option<ChainTip>) -> Answer {
-    let beef = tx.to_beef(false).unwrap();
+    answer_on(door, tx, tip, tx.to_beef(false).unwrap()).await
+}
+
+/// `door`'s answer on `tx` read from `beef` (the stream doors read it).
+async fn answer_on(door: Door, tx: &Transaction, tip: Option<ChainTip>, beef: Vec<u8>) -> Answer {
     let headers = tracker(tx, tip);
     match door {
         Door::Verify => whole_answer(tx.verify(&headers, None, None).await),
@@ -618,6 +662,87 @@ async fn a_test_chain_names_its_genesis_height_by_its_tip_h4m7() {
             let got = answer(door, &tx, named).await;
             if got != expected {
                 wrong.push(format!("{door:?} ({named:?}): {got:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// The close reaches a coin whose creating transaction is proven: a coin
+/// created by a transaction presented unproven (its own ancestor proven
+/// below Genesis) carries no era, and every door judges its spend by the
+/// post-Genesis rules, as before the fix. A verifier of outside BEEFs that
+/// must hold such a coin to the older rules asks for the coin's own proof
+/// (the advisory's workaround). The same spend of the same coin, proven, is
+/// refused.
+#[tokio::test]
+async fn a_coin_whose_creating_transaction_is_unproven_is_judged_by_the_post_genesis_rules_h4m7() {
+    let cell = signed("a push above 520 bytes", p2pkh(), 2, push(&[7u8; 521]));
+    let ancestor = parent(&[0x51], COIN_HEIGHT);
+    let mut coin = Transaction::new();
+    let mut input = TransactionInput::with_source_transaction(ancestor, 0);
+    input.set_unlocking_script(UnlockingScript::new());
+    coin.add_input(input).unwrap();
+    coin.add_output(TransactionOutput::new(
+        COIN_VALUE,
+        LockingScript::from_binary(&p2pkh()).unwrap(),
+    ))
+    .unwrap();
+    let unproven = spend_of(&cell, coin);
+    let proven = spend(&cell);
+    let mut wrong = Vec::new();
+    for door in DOORS {
+        for (tx, expected) in [(&unproven, Answer::Valid), (&proven, Answer::Refused)] {
+            let got = answer(door, tx, Some(tip(MAINNET_GENESIS))).await;
+            if got != expected {
+                wrong.push(format!("{door:?} (expected {expected:?}): {got:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// `tx`'s BEEF (V2, this crate's writer) with the child's entry written ahead
+/// of its parent's: the reader holds the child until the parent arrives.
+fn held_order(tx: &Transaction) -> Vec<u8> {
+    let beef = tx.to_beef(false).unwrap();
+    let (parent, child) = (parent_of(tx).to_binary(), tx.to_binary());
+    let at = |raw: &[u8]| beef.windows(raw.len()).position(|w| w == raw).unwrap();
+    let (p, c) = (at(&parent), at(&child));
+    assert_eq!(beef[..4], [0x02, 0x00, 0xbe, 0xef]);
+    // The parent's entry is `01 <bump index 0> <raw>`, the child's `00 <raw>`.
+    assert_eq!((beef[p - 2], beef[p - 1], beef[c - 1]), (1, 0, 0));
+    assert_eq!(c, p + parent.len() + 1);
+    let held = [&beef[..p - 2], &beef[c - 1..], &beef[p - 2..c - 1]].concat();
+    assert_eq!(held.len(), beef.len());
+    held
+}
+
+/// A child written ahead of the parent that proves its coin is judged when
+/// the parent arrives, by its coin's era: refused at the four stream doors
+/// with mainnet's tip and with none, valid with a tip naming the chain's
+/// Genesis height 1 (the way out reaches the held path too).
+#[tokio::test]
+async fn a_child_held_for_its_parent_is_judged_by_its_coins_era_h4m7() {
+    let mut wrong = Vec::new();
+    for cell in refused_by_the_rules_of_the_era()
+        .into_iter()
+        .filter(|cell| cell.redeem.is_none())
+    {
+        let tx = spend(&cell);
+        for door in [Door::Stream, Door::TwoPass, Door::Stepping, Door::Async] {
+            for (named, expected) in [
+                (Some(tip(MAINNET_GENESIS)), Answer::Refused),
+                (None, Answer::Refused),
+                (Some(tip(1)), Answer::Valid),
+            ] {
+                let got = answer_on(door, &tx, named, held_order(&tx)).await;
+                if got != expected {
+                    wrong.push(format!(
+                        "{} through {door:?} ({named:?}): {got:?}",
+                        cell.name
+                    ));
+                }
             }
         }
     }
