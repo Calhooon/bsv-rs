@@ -129,19 +129,16 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         Ok(entries.into_iter().next())
     }
 
-    /// Set a key-value pair.
-    ///
-    /// Creates a token and broadcasts to the overlay network.
+    /// Set a key-value pair: creates a token, broadcasts it to the overlay
+    /// network and returns its outpoint string. An empty value is refused
+    /// (`Error::KvStoreInvalidValue`) before the wallet is asked: its token
+    /// could not be verified (PushDrop reads `OP_0` back as one zero byte).
     ///
     /// # Arguments
     ///
     /// * `key` - The key to set
     /// * `value` - The value to store
     /// * `options` - Optional operation options
-    ///
-    /// # Returns
-    ///
-    /// The outpoint string of the new token.
     pub async fn set(
         &self,
         key: &str,
@@ -150,6 +147,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     ) -> Result<String> {
         if key.is_empty() {
             return Err(Error::KvStoreError("Key cannot be empty".to_string()));
+        }
+        if value.is_empty() {
+            return Err(Error::KvStoreInvalidValue);
         }
 
         let options = options.unwrap_or_default();
@@ -510,7 +510,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     ///
     /// # Errors
     ///
-    /// Returns an error if any key is empty, or if wallet/overlay operations fail.
+    /// Returns an error if any key or value is empty, or if wallet/overlay operations fail.
     /// If an error occurs partway through, earlier entries will already be set.
     pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()> {
         for (key, value) in entries {

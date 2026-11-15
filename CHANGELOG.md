@@ -26,6 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   let value = KVStoreInterpreter::interpret_script(&script, ctx).map(|e| e.value).unwrap_or_default();
   ```
 
+### Fixed: `GlobalKVStore::set` refuses an empty value, which it wrote as a token no reader returns
+
+- What was wrong. `set` refused an empty key and wrote any value. For an empty value it wrote a token whose value field is `OP_0` (the push PushDrop writes for one zero byte, which every reader reads back as that byte) under a signature over no bytes: `GlobalKVStore::get` never returned it, and the interpreter now reads no entry from it either (the Security entry above), so the call spent the token amount on an entry no read of this crate returns. The reference refuses the value at write (`validateKVStoreValue`, `ts-stack@edf6e03` `kvStoreTokenValidation.ts:49-56`, "KVStore value has an invalid length"), as `LocalKVStore::set` does here.
+- The fix. `set` (and `batch_set`, through it) answers `Error::KvStoreInvalidValue` for an empty value, beside the empty key's refusal, before the wallet is asked anything. Every other value writes the same token as before.
+- Honest calls, by run. 20,000 honest `set` calls (keys and values of a mixed alphabet, tags or none, 1,240 with an empty value, 1,279 with a protocol option), each made with this change and without it: 1,240 answer differently, every one an empty value (the refusal, where the wallet was asked to write a token), and the other 18,760 ask the wallet to write the same bytes and answer the same, one digest.
+- The tests. `tests/kvstore_global_tests.rs` `an_empty_value_is_refused_before_the_wallet_is_asked`: `set` with and without tags, and `batch_set`, the refusal; a wallet that refuses its identity key (the first call `set` makes) shows no call was made, and a signing wallet is asked to write nothing. RED without the change (the wallet was asked).
+- Migration. No signature moved. `set(key, "", ..)` and `batch_set` with an empty value now return `Err(Error::KvStoreInvalidValue)` where they wrote a token. Where code set an empty value to clear a key, remove the key:
+
+  ```rust
+  match store.remove(key, None).await {
+      Ok(_) | Err(Error::KvStoreKeyNotFound(_)) => {}
+      Err(e) => return Err(e),
+  }
+  ```
+
 ### Fixed: the SLAP and SHIP discoveries admit a host only from an advertisement its identity's linked key signed and locks, as the reference's do (#544's discovery sites, ported from beta `a21d02ad`)
 
 - What was wrong. `LookupResolver::find_competent_hosts` (SLAP, and every `query` that uses it) and `TopicBroadcaster::find_interested_hosts` (SHIP, and `broadcast_tx`) admitted the host of any SHIP or SLAP advertisement in a discovery answer, decoded by `decode_overlay_admin_token`, which does not establish the author: an advertisement its identity's linked key did not sign, or one locked with another key, admitted the host it names, where the reference skips it. Every published version reads this way (`0.2.0` through `0.8.9`, and `0.9.0-beta.1` through `0.9.0-beta.4`; `0.9.0-beta.5` and later carry #544).
