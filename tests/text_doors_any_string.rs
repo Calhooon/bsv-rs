@@ -400,6 +400,10 @@ fn every_public_text_door_answers_every_string_of_the_family() {
         door!("transaction/transaction.rs from_hex_ef", |s| {
             transaction::Transaction::from_hex_ef(s)
         }),
+        door!(
+            "transaction/transaction/ef_reader.rs from_hex_ef_bounded",
+            |s| { transaction::Transaction::from_hex_ef_bounded(s, 1) }
+        ),
         door!("transaction/transaction.rs add_p2pkh_output", |s| {
             transaction::Transaction::new().add_p2pkh_output(s, Some(1))
         }),
@@ -712,4 +716,4 @@ fn every_public_text_door_answers_every_string_of_the_family() {
     feature = "socketio",
     feature = "totp"
 ))]
-const DOORS: usize = 103;
+const DOORS: usize = 104;
