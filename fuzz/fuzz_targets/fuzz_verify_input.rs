@@ -22,7 +22,10 @@
 //! evaluation never reaches the interpreter (bytes refused: the one-shot's
 //! `Transaction` arm with the reader's error, whatever the index; an index
 //! past the inputs: `InputIndex`, whatever the scripts); a decline carries
-//! its budget, a verdict none; a valid input reports its work, at least 1.
+//! its budget, a verdict none; a valid input reports its work, at least 1;
+//! in the default mode a valid spend of a coin locked by `a9 14 <20 bytes>
+//! 87` has a push-only unlocking script (the node's pay-to-script-hash step,
+//! GHSA-fr33-7jw7-mwwh).
 use bsv_rs::script::ScriptFlags;
 use bsv_rs::transaction::{
     verify_input, DefaultMode, InputRefusal, InputRules, SpendingTransaction, Transaction,
@@ -166,6 +169,17 @@ fuzz_target!(|data: &[u8]| {
             if let Ok(verified) = &answer {
                 // The work is always counted: a valid input reached an opcode.
                 assert!(verified.work_spent >= 1);
+                // The node's pay-to-script-hash step (GHSA-fr33-7jw7-mwwh): a
+                // coin of that shape spent valid in the default mode has a
+                // push-only unlocking script, at every version.
+                let p2sh = lock.len() == 23 && lock[..2] == [0xa9, 0x14] && lock[22] == 0x87;
+                if p2sh && rules.word().is_none() {
+                    let unlocking = tx.inputs()[index].unlocking_script.as_ref();
+                    assert!(
+                        unlocking.is_some_and(|s| s.as_script().is_push_only()),
+                        "a coin of the P2SH shape spent valid by a script that is not push-only"
+                    );
+                }
             }
         }
         (read, prepared) => panic!("the readers disagree: {read:?} against {prepared:?}"),

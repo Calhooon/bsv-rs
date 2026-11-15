@@ -2,7 +2,9 @@
 //! `SpendingTransaction::from_bytes(..).verify_input(..)` and the one-shot
 //! `verify_input(..)` in the node's argument order.
 //!
-//! (a) the door equals a `Spend::new` built by hand, verdict, words and
+//! (a) the door equals a `Spend::new` built by hand (in the default mode,
+//! with the node's pay-to-script-hash step for a coin of that shape, a second
+//! `Spend::new` built by hand: GHSA-fr33-7jw7-mwwh), verdict, words and
 //! resource fields, on every spend of `vectors/spend_valid.json`,
 //! `script_valid.json` and `script_invalid.json`, at versions 1 and 2, in the
 //! default mode and under `ScriptFlags::block(era)` and `standard(era)` of
@@ -116,7 +118,57 @@ fn by_hand(
         spend.set_flags(word);
     }
     let verdict = spend.validate();
-    (verdict, spend.work_spent())
+    let work = spend.work_spent();
+    match (&verdict, word, redeem_step(lock, unlock)) {
+        (Ok(true), None, Some((unlocking, redeem))) => {
+            let mut step = Spend::new(SpendParams {
+                source_txid: [0u8; 32],
+                source_output_index: 0,
+                source_satoshis: 1,
+                locking_script: LockingScript::from_binary(&redeem).unwrap(),
+                transaction_version: version as i32,
+                other_inputs: vec![],
+                outputs: vec![],
+                input_index: 0,
+                unlocking_script: UnlockingScript::from_binary(&unlocking).unwrap(),
+                input_sequence: 0xffff_ffff,
+                lock_time: 0,
+                memory_limit: budget.memory,
+                work_limit: Some(budget.work.unwrap_or(u64::MAX).saturating_sub(work)),
+            });
+            step.set_require_push_only(true);
+            step.set_utxo_after_chronicle(false);
+            let verdict = step.validate();
+            (verdict, work + step.work_spent())
+        }
+        _ => (verdict, work),
+    }
+}
+
+/// The node's pay-to-script-hash step in the default mode (GHSA-fr33-7jw7-mwwh;
+/// bitcoin-sv v1.2.2 `interpreter.cpp:2380-2420`), for a locking script of
+/// exactly `a9 14 <20 bytes> 87`: the unlocking script without its last push
+/// and that push's element as the redeem script, or the unlocking script
+/// whole (and the locking script) when it is not push-only, for the step's
+/// push-only rule to refuse.
+fn redeem_step(lock: &[u8], unlock: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    let shape = lock.len() == 23 && lock[..2] == [0xa9, 0x14] && lock[22] == 0x87;
+    if !shape {
+        return None;
+    }
+    let script = bsv_rs::script::Script::from_binary(unlock).unwrap();
+    let mut chunks = script.chunks();
+    let pushes = script.is_push_only() && script.truncated_push().is_none();
+    let Some(last) = chunks.pop().filter(|c| pushes && c.op != 0x50) else {
+        return Some((unlock.to_vec(), lock.to_vec()));
+    };
+    let element = match last.op {
+        0x4f => vec![0x81],
+        0x51..=0x60 => vec![last.op - 0x50],
+        _ => last.data.unwrap_or_default(),
+    };
+    let before = bsv_rs::script::Script::from_chunks(chunks).to_binary();
+    Some((before, element))
 }
 
 /// `None` when the door answers what the hand-built `Spend` answered; else
