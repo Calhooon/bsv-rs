@@ -55,6 +55,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError`; `check` names the missing flag, explains that a word without it is not implemented and lists all three required flags: SIGHASH_FORKID, GENESIS and UTXO_AFTER_GENESIS (#453). A word's mandatory fork-ID and strict encoding checks would otherwise differ from the node; default mode can compute the original digest without FORKID (#429). The file remains 872 lines |
 | `input_flags.rs` | Under `block`, `Word::{Standard, Block}` and `ChainParams::word_for_input` expose typed refusals and own the no-tip latest-era rule (#520); the private `checked_input_script_flags` composes spend-era flags plus source-era UTXO bits, shared with the unchanged `input_script_flags` API (#440) |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
+| `template_push.rs` | `template_push`: the push a standard template holds, by the opcode that is its length; the one check `is_p2pkh`, `is_p2pk`, `is_p2sh` and `is_multisig` ask (`pub(crate)`) |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
 | `templates/p2pkh.rs` | P2PKH (Pay-to-Public-Key-Hash) template |
@@ -181,12 +182,16 @@ impl Script {
     pub fn is_unlocking_script(&self) -> bool // Always false for base Script
 
     // Script Type Detection
-    pub fn is_p2pkh(&self) -> bool             // OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG
-    pub fn is_p2pk(&self) -> bool              // <33|65 bytes> OP_CHECKSIG
-    pub fn is_p2sh(&self) -> bool              // OP_HASH160 <20> OP_EQUAL
+    // The four classifiers below answer by the template's bytes: each push the
+    // template holds made by the opcode that is its length (`template_push.rs`),
+    // so OP_PUSHDATA1/2/4 framing the same data is no template
+    // (`tests/script_template_bytes.rs`)
+    pub fn is_p2pkh(&self) -> bool             // OP_DUP OP_HASH160 0x14<20> OP_EQUALVERIFY OP_CHECKSIG (25 bytes)
+    pub fn is_p2pk(&self) -> bool              // 0x21<33>|0x41<65> OP_CHECKSIG
+    pub fn is_p2sh(&self) -> bool              // OP_HASH160 0x14<20> OP_EQUAL (23 bytes)
     pub fn is_data(&self) -> bool              // OP_RETURN or OP_FALSE OP_RETURN
     pub fn is_safe_data_carrier(&self) -> bool // OP_FALSE OP_RETURN only (prunable, unspendable)
-    pub fn is_multisig(&self) -> Option<(u8, u8)>  // Returns (M, N) if multisig
+    pub fn is_multisig(&self) -> Option<(u8, u8)>  // Returns (M, N) if multisig, each key 0x21<33>|0x41<65>
     pub fn opcode_to_small_int(op: u8) -> Option<u8>  // OP_1..OP_16 -> 1..16
     pub fn extract_pubkey_hash(&self) -> Option<[u8; 20]>  // From P2PKH scripts
     pub fn get_public_key(&self) -> Option<Vec<u8>>        // From P2PK scripts (matches Go PubKey())
