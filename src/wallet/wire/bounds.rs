@@ -75,6 +75,20 @@ impl WireReader<'_> {
         self.read_bounded_strings(count)
     }
 
+    /// An optional list of a result: -1 absent, else the count and its
+    /// entries, an empty list kept apart from an absent one, as the reference
+    /// keeps it (Transceiver:428-435,681-698; #1002).
+    pub(super) fn read_optional_response_strings(
+        &mut self,
+        name: &str,
+    ) -> Result<Option<Vec<String>>, Error> {
+        let count = self.read_response_count(name, 100_000, 1)?;
+        if count == u64::MAX {
+            return Ok(None);
+        }
+        self.read_bounded_strings(count).map(Some)
+    }
+
     pub(super) fn read_insertion_tags(&mut self) -> Result<Vec<String>, Error> {
         // Processor:1121-1132: optional, unlike signAction's required spends.
         let count = self.read_optional_count()?;

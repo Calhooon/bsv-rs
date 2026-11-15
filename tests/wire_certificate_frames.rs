@@ -216,7 +216,7 @@ async fn a_listed_verifier_of_another_length_is_refused() {
     assert_eq!(
         err,
         Error::WalletError(
-            "invalid listCertificates verifier length: expected 33 bytes, received 66".into()
+            "Invalid listCertificates verifier length: expected 33 bytes, received 66".into()
         )
     );
 }

@@ -205,27 +205,16 @@ impl<'a> WireReader<'a> {
         Ok(Some(Protocol::new(security_level, protocol_name)))
     }
 
-    /// Reads an action status code.
+    /// Reads an action status code: 1 to 8, or -1 as `None`, the twin of
+    /// [`WireWriter::write_action_status`]'s `None`. No method of the wire
+    /// carries -1 (the reference writes a status 1 to 8 and refuses another
+    /// byte, `WalletWireTransceiver.ts:395-399` at `ts-stack@edf6e03`), and
+    /// listActions' reader refuses it (#1002).
     pub fn read_action_status(&mut self) -> Result<Option<ActionStatus>, Error> {
-        let code = self.read_i8()?;
-        let status = match code {
-            1 => Some(ActionStatus::Completed),
-            2 => Some(ActionStatus::Unprocessed),
-            3 => Some(ActionStatus::Sending),
-            4 => Some(ActionStatus::Unproven),
-            5 => Some(ActionStatus::Unsigned),
-            6 => Some(ActionStatus::NoSend),
-            7 => Some(ActionStatus::NonFinal),
-            8 => Some(ActionStatus::Failed),
-            -1 => None,
-            _ => {
-                return Err(Error::WalletError(format!(
-                    "invalid action status code: {}",
-                    code
-                )))
-            }
-        };
-        Ok(status)
+        match self.read_i8()? {
+            -1 => Ok(None),
+            code => super::flags::action_status(code).map(Some),
+        }
     }
 
     /// Reads a 32-byte txid as hex string.
@@ -244,7 +233,8 @@ impl<'a> WireReader<'a> {
     // New type encoding methods
     // =========================================================================
 
-    /// Reads a query mode (0 = any, 1 = all).
+    /// Reads a query mode (0 = any, 1 = all): no method of the wire carries these bytes
+    /// (#1002; the mode `listActions` carries is [`Self::read_optional_query_mode`]).
     pub fn read_query_mode(&mut self) -> Result<QueryMode, Error> {
         let val = self.read_u8()?;
         match val {
@@ -257,21 +247,16 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads an optional query mode.
+    /// Reads listActions' `labelQueryMode` as the reference's processor
+    /// reads it: -1 absent, 1 `any`, 2 `all`, another byte refused in its
+    /// words (`WalletWireProcessor.ts:831-842` at `ts-stack@edf6e03`; #1002,
+    /// 0 and 1 until then). Not listOutputs' `tagQueryMode`, which the
+    /// reference assigns the other way round (1 `all`, 2 `any`, `:1206-1217`).
     pub fn read_optional_query_mode(&mut self) -> Result<Option<QueryMode>, Error> {
-        let val = self.read_i8()?;
-        match val {
-            -1 => Ok(None),
-            0 => Ok(Some(QueryMode::Any)),
-            1 => Ok(Some(QueryMode::All)),
-            _ => Err(Error::WalletError(format!(
-                "invalid query mode: expected -1, 0, or 1, got {}",
-                val
-            ))),
-        }
+        self.read_label_query_mode()
     }
 
-    /// Reads an output include mode.
+    /// Reads an output include mode (0, 1): no method's bytes; the `include` of `listOutputs` is 1 and 2 (#1002).
     pub fn read_output_include(&mut self) -> Result<OutputInclude, Error> {
         let val = self.read_u8()?;
         match val {
@@ -284,7 +269,7 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads an optional output include mode.
+    /// Reads an optional output include mode (-1, 0, 1): no method's bytes, as above (#1002).
     pub fn read_optional_output_include(&mut self) -> Result<Option<OutputInclude>, Error> {
         let val = self.read_i8()?;
         match val {
@@ -579,7 +564,7 @@ impl<'a> WireReader<'a> {
         let output_index = self.read_var_int_u32("listActions output outputIndex")?;
         let satoshis = self.read_satoshis("listActions output satoshis")?;
         let locking_script = self.read_optional_bytes()?;
-        let spendable = self.read_optional_bool()?.unwrap_or(false);
+        let spendable = self.read_boolean_flag("listOutputs spendable")?;
         let output_description = self.read_string()?;
         let basket = self.read_optional_string()?.unwrap_or_default();
         let tags = self.read_response_strings("listActions output tags")?;
@@ -608,19 +593,10 @@ impl<'a> WireReader<'a> {
         txid.copy_from_slice(txid_bytes);
         // The reference's signed net amount in its bound (bsv-rs#236)
         let satoshis = self.read_action_satoshis()?;
-        let status = self
-            .read_action_status()?
-            .unwrap_or(ActionStatus::Unprocessed);
-        let is_outgoing = self.read_optional_bool()?.unwrap_or(false);
+        let status = self.read_listed_action_status()?;
+        let is_outgoing = self.read_boolean_flag("listActions isOutgoing")?;
         let description = self.read_string()?;
-        let labels = {
-            let arr = self.read_response_strings("listActions labels")?;
-            if arr.is_empty() {
-                None
-            } else {
-                Some(arr)
-            }
-        };
+        let labels = self.read_optional_response_strings("listActions labels")?;
         // Go uses VarInt for version/lockTime (not u32_le)
         let version = self.read_var_int_u32("listActions version")?;
         let lock_time = self.read_var_int_u32("listActions lockTime")?;
@@ -677,22 +653,8 @@ impl<'a> WireReader<'a> {
         let satoshis = self.read_satoshis("listOutputs satoshis")?;
         let locking_script = self.read_optional_bytes()?;
         let custom_instructions = self.read_optional_string()?;
-        let tags = {
-            let arr = self.read_response_strings("listOutputs tags")?;
-            if arr.is_empty() {
-                None
-            } else {
-                Some(arr)
-            }
-        };
-        let labels = {
-            let arr = self.read_response_strings("listOutputs labels")?;
-            if arr.is_empty() {
-                None
-            } else {
-                Some(arr)
-            }
-        };
+        let tags = self.read_optional_response_strings("listOutputs tags")?;
+        let labels = self.read_optional_response_strings("listOutputs labels")?;
 
         Ok(WalletOutput {
             satoshis,
@@ -961,7 +923,8 @@ impl WireWriter {
     // New type encoding methods
     // =========================================================================
 
-    /// Writes a query mode (0 = any, 1 = all).
+    /// Writes a query mode (0 = any, 1 = all): no method of the wire carries these bytes
+    /// (#1002; the mode `listActions` carries is [`Self::write_optional_query_mode`]).
     pub fn write_query_mode(&mut self, mode: QueryMode) -> &mut Self {
         let val = match mode {
             QueryMode::Any => 0,
@@ -970,16 +933,19 @@ impl WireWriter {
         self.write_u8(val)
     }
 
-    /// Writes an optional query mode (-1 = None).
+    /// Writes listActions' `labelQueryMode` as the reference's transceiver
+    /// writes it: -1 absent, 1 `any`, 2 `all` (`WalletWireTransceiver.ts:358-360`
+    /// at `ts-stack@edf6e03`; #1002, 0 and 1 until then). Not listOutputs'
+    /// `tagQueryMode` (1 `all`, 2 `any`, `:636-638`).
     pub fn write_optional_query_mode(&mut self, mode: Option<QueryMode>) -> &mut Self {
         match mode {
             None => self.write_i8(-1),
-            Some(QueryMode::Any) => self.write_i8(0),
-            Some(QueryMode::All) => self.write_i8(1),
+            Some(QueryMode::Any) => self.write_i8(1),
+            Some(QueryMode::All) => self.write_i8(2),
         }
     }
 
-    /// Writes an output include mode.
+    /// Writes an output include mode (0, 1): no method's bytes; the `include` of `listOutputs` is 1 and 2 (#1002).
     pub fn write_output_include(&mut self, mode: OutputInclude) -> &mut Self {
         let val = match mode {
             OutputInclude::LockingScripts => 0,
@@ -988,7 +954,7 @@ impl WireWriter {
         self.write_u8(val)
     }
 
-    /// Writes an optional output include mode.
+    /// Writes an optional output include mode (-1, 0, 1): no method's bytes, as above (#1002).
     pub fn write_optional_output_include(&mut self, mode: Option<OutputInclude>) -> &mut Self {
         match mode {
             None => self.write_i8(-1),
@@ -1231,8 +1197,7 @@ impl WireWriter {
         self.write_action_status(Some(action.status));
         self.write_optional_bool(Some(action.is_outgoing));
         self.write_string(&action.description);
-        let labels = action.labels.as_deref().unwrap_or(&[]);
-        self.write_string_array(labels);
+        self.write_optional_string_array(action.labels.as_deref());
         // Go uses VarInt for version/lockTime (not u32_le)
         self.write_var_int(action.version as u64);
         self.write_var_int(action.lock_time as u64);
@@ -1275,10 +1240,8 @@ impl WireWriter {
         self.write_var_int(output.satoshis);
         self.write_optional_bytes(output.locking_script.as_deref());
         self.write_optional_string(output.custom_instructions.as_deref());
-        let tags = output.tags.as_deref().unwrap_or(&[]);
-        self.write_string_array(tags);
-        let labels = output.labels.as_deref().unwrap_or(&[]);
-        self.write_string_array(labels)
+        self.write_optional_string_array(output.tags.as_deref());
+        self.write_optional_string_array(output.labels.as_deref())
     }
 }
 

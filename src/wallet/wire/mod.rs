@@ -78,6 +78,7 @@ mod calls;
 mod diagnostics;
 mod discovery;
 mod encoding;
+mod flags;
 mod linkage;
 mod originator;
 mod processor;
