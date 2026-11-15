@@ -297,6 +297,9 @@ impl TopicBroadcaster {
     /// Find hosts interested in the configured topics.
     ///
     /// Returns a map of host URL to the set of topics that host is interested in.
+    /// A host is admitted only from a SHIP advertisement its identity's linked
+    /// key signed and locks, as `create_signed_overlay_admin_token` writes it;
+    /// any other advertisement is skipped.
     pub async fn find_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>> {
         // Handle local preset
         if self.network_preset == NetworkPreset::Local {

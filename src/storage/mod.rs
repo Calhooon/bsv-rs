@@ -75,6 +75,7 @@
 //! - `storage` - Enables the storage module
 //! - `http` - Required for actual file download/upload operations
 
+mod advertisement;
 pub mod downloader;
 pub mod types;
 pub mod uploader;

@@ -18,8 +18,9 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
 | `local.rs` | LocalKVStore implementation with MockWallet tests | ~1743 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~826 |
-| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~609 |
 | `legacy_signature.rs` | The verdict of the deprecated `verify_signature_legacy`: `true` only for a five- or six-field token whose controller field is the key given and whose last field is that key's signature over the others, under the derivation its protocol field names (the `[level, name]` namespace: the key as key ID and a locking key derived from the controller; a plain name: `kvstore-token`), a field read as `OP_0` taken as signed either way; a signature verdict alone: the tags' bounds, the push encoding and a plain-name token's locking key not judged; on this line it answers `true` for untagged and namespace tokens their controller signed, which `verify_signature` answers `false` (`tests/kvstore_legacy_signature_verdict.rs`) | 94 |
+| `token_validation.rs` | The interpreter's authentication of a token (crate-internal; #544's interpreter site) | ~110 |
 
 ## Key Exports
 
@@ -333,7 +334,15 @@ impl KVStoreInterpreter {
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry>;
 
-    /// Interpret a locking script directly
+    /// Interpret a locking script directly. An entry only for a token its
+    /// controller signed and its writer locked (#544's interpreter site,
+    /// `token_validation.rs`): GlobalKVStore::set's form (the raw protocol
+    /// ID, key ID `kvstore-token`, locked with the controller's key) or the
+    /// canonical one (the protocol ID as JSON `[level, name]`, the entry's
+    /// key as key ID, locked with the controller's key for `anyone`). A
+    /// token written for an empty value is none: PushDrop writes an empty
+    /// field as `OP_0`, read back as one zero byte, so the controller's
+    /// signature over the empty value never verifies
     pub fn interpret_script(
         script: &LockingScript,
         ctx: Option<&KVStoreContext>,

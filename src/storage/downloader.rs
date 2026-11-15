@@ -78,6 +78,9 @@ impl StorageDownloader {
     /// Resolve a UHRP URL to find storage hosts.
     ///
     /// Queries the `ls_uhrp` lookup service to find hosts that have the file.
+    /// A host is named only from an advertisement its host signed and its
+    /// host's linked key locks, for the file the URL names; any other
+    /// advertisement is skipped.
     ///
     /// # Arguments
     ///
@@ -100,6 +103,8 @@ impl StorageDownloader {
             _ => return Ok(Vec::new()),
         };
 
+        // The file the URL names: an advertisement for another is skipped
+        let requested_hash = super::utils::get_hash_from_url(uhrp_url)?;
         let current_time = crate::util::time::current_time_secs() as i64;
 
         let mut hosts = Vec::new();
@@ -125,6 +130,12 @@ impl StorageDownloader {
 
             // Need at least 4 fields: protocol, identity, domain, expiry
             if pd.fields.len() < 4 {
+                continue;
+            }
+
+            // The host signed the advertisement and its linked key locks it,
+            // for the file asked for (#544's storage site): any other is skipped
+            if !super::advertisement::authenticated(&pd, &requested_hash) {
                 continue;
             }
 

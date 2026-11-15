@@ -297,7 +297,7 @@ Detects double-spend errors by matching: `double spend`, `double-spend`, `txn-me
 
 ### Host Discovery
 1. `LookupResolver` queries SLAP trackers to find hosts advertising a service
-2. Responses are admin tokens decoded via `decode_overlay_admin_token`
+2. Responses are admin tokens decoded via `decode_overlay_admin_token` and authenticated (#544's discovery sites, `admin_token_validation.rs`, crate-internal): the protocol asked for, five fields, the fifth a DER signature over the four data fields by the identity key's linked key (BRC-42 for `anyone`, the protocol's BRC-43 name at level 2, key ID `1`), locked with that key, as `create_signed_overlay_admin_token` writes it; any other is skipped. SHIP discovery (`TopicBroadcaster::find_interested_hosts`) authenticates the same way. `decode_overlay_admin_token` itself is a decode and does not establish the author
 3. Results are cached with configurable TTL (default 5 minutes)
 4. Additional hosts can be specified via `additional_hosts` config
 
