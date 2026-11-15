@@ -800,6 +800,9 @@ limit present in the reference.
    `SecurityLevel::App` with key ID `"kvstore-token"`.
 3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`.
    All present fields preceding the signature are signed, including `[]`.
+   PushDrop writes an empty field as `OP_0`, read back as one zero byte, so a
+   token written for an empty value never verifies and is no entry (since
+   `0.9.0-beta.4`, as the reference reads none; `tests/kvstore_empty_value.rs`).
 
 Since #544 `interpret_script` reads a token through `token_validation.rs`,
 the reference's `decodeAndVerifyKVStoreToken` whole (the canonical envelope,
