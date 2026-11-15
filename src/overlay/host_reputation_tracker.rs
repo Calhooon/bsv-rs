@@ -26,6 +26,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 // a lock poisoned by a panic elsewhere still holds whole entries (#134): read on, never panic again
+use super::rank_change_receiver::RankChangeReceiver;
 use std::sync::{PoisonError, RwLock};
 use tokio::sync::broadcast;
 
@@ -456,58 +457,34 @@ impl HostReputationTracker {
 
     /// Subscribe to rank change events.
     ///
-    /// Returns a `broadcast::Receiver` that receives `RankChangeEvent` whenever
-    /// a host's reputation score changes due to `record_success()` or `record_failure()`.
+    /// Returns this crate's [`RankChangeReceiver`] (#843dforeign; a `tokio`
+    /// receiver until then), which reads every `RankChangeEvent` a
+    /// `record_success()` or `record_failure()` sends after this call, in
+    /// order. Dropping it unsubscribes. A receiver more than 64 events behind
+    /// reads on from the oldest event kept and counts what it passed over
+    /// (`missed()`).
     ///
-    /// Dropping the receiver naturally unsubscribes. If the receiver falls behind,
-    /// older messages are dropped (lagged).
-    ///
-    /// ```rust,ignore
-    /// use bsv_rs::overlay::host_reputation_tracker::{HostReputationTracker, RankChangeEvent};
-    ///
-    /// let tracker = HostReputationTracker::new();
-    /// let mut rx = tracker.subscribe();
-    ///
-    /// // In an async context:
-    /// tokio::spawn(async move {
-    ///     while let Ok(event) = rx.recv().await {
-    ///         println!("{}: {} -> {} ({})", event.host, event.old_rank, event.new_rank, event.reason);
-    ///     }
-    /// });
-    /// ```
-    pub fn subscribe(&self) -> broadcast::Receiver<RankChangeEvent> {
-        self.rank_change_tx.subscribe()
-    }
-
-    /// Register a callback for rank change events.
-    ///
-    /// Spawns a tokio task that listens for `RankChangeEvent`s and invokes the
-    /// provided callback for each one. The task runs until the tracker is dropped
-    /// or the channel closes.
-    ///
-    /// Returns a `tokio::task::JoinHandle` that can be used to abort the listener.
-    ///
-    /// ```rust,ignore
+    /// ```rust
     /// use bsv_rs::overlay::host_reputation_tracker::HostReputationTracker;
     ///
     /// let tracker = HostReputationTracker::new();
-    /// let handle = tracker.on_rank_change(|event| {
-    ///     println!("Host {} rank changed: {} -> {}", event.host, event.old_rank, event.new_rank);
-    /// });
-    ///
-    /// // To stop listening:
-    /// handle.abort();
+    /// let mut rx = tracker.subscribe();
+    /// tracker.record_success("https://host.example", 100);
+    /// // In an async context: `while let Some(event) = rx.recv().await { .. }`
+    /// let event = rx.try_recv().expect("one rank change");
+    /// assert_eq!(event.host, "https://host.example");
     /// ```
-    pub fn on_rank_change(
-        &self,
-        callback: impl Fn(RankChangeEvent) + Send + Sync + 'static,
-    ) -> tokio::task::JoinHandle<()> {
-        let mut rx = self.subscribe();
-        tokio::spawn(async move {
-            while let Ok(event) = rx.recv().await {
-                callback(event);
-            }
-        })
+    ///
+    /// The callback form `on_rank_change`, which spawned a task on the
+    /// caller's tokio runtime and returned its `JoinHandle`, left with
+    /// #843dforeign: read the receiver on the caller's own executor.
+    ///
+    /// ```compile_fail,E0599
+    /// let tracker = bsv_rs::overlay::HostReputationTracker::new();
+    /// let _ = tracker.on_rank_change(|_event| {});
+    /// ```
+    pub fn subscribe(&self) -> RankChangeReceiver {
+        RankChangeReceiver::new(self.rank_change_tx.subscribe())
     }
 
     /// Export all entries as JSON.

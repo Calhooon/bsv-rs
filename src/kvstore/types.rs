@@ -250,6 +250,13 @@ impl KVStoreLookupResult {
 ///
 /// Supports filtering by key, controller, protocol ID, and tags with
 /// pagination and sorting options.
+///
+/// Its JSON is the type's serde (`serde_json::to_value(&query)`); `to_json`
+/// is the store's own door since #843dforeign:
+///
+/// ```compile_fail,E0624
+/// let _ = bsv_rs::kvstore::KVStoreQuery::default().to_json();
+/// ```
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KVStoreQuery {
@@ -333,8 +340,9 @@ impl KVStoreQuery {
         self
     }
 
-    /// Converts the query to a JSON Value for overlay lookup.
-    pub fn to_json(&self) -> serde_json::Value {
+    /// Converts the query to a JSON Value for overlay lookup; the store's own
+    /// door since #843dforeign (a caller writes `serde_json::to_value(&query)`).
+    pub(crate) fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or(serde_json::Value::Object(Default::default()))
     }
 }

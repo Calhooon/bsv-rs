@@ -63,6 +63,7 @@ pub mod clients;
 mod header_debug;
 pub mod peer;
 mod requested_certificates_json;
+pub mod session_handle;
 pub mod session_manager;
 pub mod transports;
 pub mod types;
@@ -72,6 +73,7 @@ pub mod utils;
 pub use certificates::{Certificate, MasterCertificate, VerifiableCertificate};
 pub use clients::{AuthFetch, AuthFetchOptions, Response};
 pub use peer::{Peer, PeerOptions};
+pub use session_handle::{SessionManagerHandle, SessionManagerReadGuard, SessionManagerWriteGuard};
 pub use session_manager::SessionManager;
 #[cfg(feature = "socketio")]
 pub use transports::{

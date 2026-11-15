@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use tokio::sync::{oneshot, Mutex as AsyncMutex, RwLock};
+use tokio::sync::{oneshot, Mutex as AsyncMutex};
 
 type TransportFactory<T> = dyn Fn(&str, usize) -> Result<T> + Send + Sync;
 
@@ -112,7 +112,7 @@ impl AuthFetchOptions {
 pub struct AuthFetch<W: WalletInterface, T: Transport = SimplifiedFetchTransport> {
     pub(super) wallet: Arc<W>,
     pub(super) requested_certificates: Option<RequestedCertificateSet>,
-    pub(super) session_manager: Arc<RwLock<SessionManager>>,
+    pub(super) session_manager: crate::auth::SessionManagerHandle,
     pub(super) peers: AsyncMutex<HashMap<String, Arc<PeerState<W, T>>>>,
     pub(super) transport: Box<TransportFactory<T>>,
     pub(super) received: Arc<Mutex<VecDeque<crate::auth::VerifiableCertificate>>>,
@@ -121,7 +121,7 @@ pub struct AuthFetch<W: WalletInterface, T: Transport = SimplifiedFetchTransport
     pub(super) response_timeout_ms: u64,
     pub(super) max_response_bytes: usize,
     #[cfg(feature = "http")]
-    pub(super) http_client: crate::auth::transports::NativeFetchClient,
+    pub(super) http_client: crate::auth::transports::fetch_client::NativeFetchClient,
 }
 
 impl<W: WalletInterface + 'static> AuthFetch<W> {
@@ -146,12 +146,20 @@ impl<W: WalletInterface + 'static> AuthFetch<W> {
 
     /// Uses the caller's HTTP client for transport and unauthenticated fallback.
     /// The caller owns its redirect policy, as with the transport's `with_client`.
+    ///
+    /// The client is named as `reqwest::Client` (the reference's `fetchClient`,
+    /// `AuthFetch.ts:197` at `ts-stack@edf6e03`: the caller's own instance);
+    /// the alias `NativeFetchClient` left the public surface with #843dforeign:
+    ///
+    /// ```compile_fail,E0432
+    /// use bsv_rs::auth::transports::NativeFetchClient;
+    /// ```
     #[cfg(feature = "http")]
     pub fn with_client(
         wallet: W,
         requested_certificates: Option<RequestedCertificateSet>,
         session_manager: Option<SessionManager>,
-        client: crate::auth::transports::NativeFetchClient,
+        client: reqwest::Client,
     ) -> Self {
         let transport_client = client.clone();
         let mut fetch = Self::with_response_transport_factory(
@@ -194,7 +202,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> AuthFetch<W, T> {
         Self {
             wallet: Arc::new(wallet),
             requested_certificates,
-            session_manager: Arc::new(RwLock::new(session_manager.unwrap_or_default())),
+            session_manager: crate::auth::SessionManagerHandle::new(
+                session_manager.unwrap_or_default(),
+            ),
             peers: AsyncMutex::new(HashMap::new()),
             transport: Box::new(transport),
             received: Arc::new(Mutex::new(VecDeque::new())),

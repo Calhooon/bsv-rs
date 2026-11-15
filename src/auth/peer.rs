@@ -5,6 +5,7 @@
 
 use crate::auth::{
     certificates::VerifiableCertificate,
+    session_handle::SessionManagerHandle,
     session_manager::SessionManager,
     transports::Transport,
     types::{
@@ -225,7 +226,7 @@ impl<W: WalletInterface, T: Transport> PeerOptions<W, T> {
 pub struct Peer<W: WalletInterface, T: Transport> {
     wallet: Arc<W>,
     transport: TransportHold<T>,
-    session_manager: Arc<RwLock<SessionManager>>,
+    session_manager: SessionManagerHandle,
     certificates_to_request: Option<RequestedCertificateSet>,
 
     // Callbacks
@@ -257,7 +258,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         Self {
             wallet: Arc::new(options.wallet),
             transport: TransportHold::Owned(Arc::new(options.transport)),
-            session_manager: Arc::new(RwLock::new(options.session_manager.unwrap_or_default())),
+            session_manager: SessionManagerHandle::new(options.session_manager.unwrap_or_default()),
             certificates_to_request: options.certificates_to_request,
             general_message_callbacks: Arc::new(RwLock::new(HashMap::new())),
             certificate_callbacks: Arc::new(RwLock::new(HashMap::new())),
@@ -272,7 +273,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     }
 
     /// Shares the client-wide manager across per-origin peers.
-    pub(crate) fn share_session_manager(&mut self, manager: Arc<RwLock<SessionManager>>) {
+    pub(crate) fn share_session_manager(&mut self, manager: SessionManagerHandle) {
         self.session_manager = manager;
     }
 
@@ -310,7 +311,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         Self {
             wallet: Arc::clone(&self.wallet),
             transport: TransportHold::Callback(transport),
-            session_manager: Arc::clone(&self.session_manager),
+            session_manager: self.session_manager.clone(),
             certificates_to_request: self.certificates_to_request.clone(),
             general_message_callbacks: Arc::clone(&self.general_message_callbacks),
             certificate_callbacks: Arc::clone(&self.certificate_callbacks),
@@ -542,8 +543,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         cbs.remove(&callback_id);
     }
 
-    /// Returns the session manager.
-    pub fn session_manager(&self) -> &Arc<RwLock<SessionManager>> {
+    /// Returns the handle to this peer's session store: `read().await` and
+    /// `write().await` answer guards that dereference to the
+    /// [`SessionManager`], and a clone shares the store (#843dforeign; a
+    /// `tokio` lock until then). The reference's `Peer` exposes the store as a
+    /// public property (`Peer.ts:55` at `ts-stack@edf6e03`).
+    pub fn session_manager(&self) -> &SessionManagerHandle {
         &self.session_manager
     }
 

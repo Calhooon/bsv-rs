@@ -306,7 +306,7 @@ impl KVStoreQuery {
     pub fn with_limit(self, limit: u32) -> Self;
     pub fn with_skip(self, skip: u32) -> Self;
     pub fn with_sort_order(self, order: impl Into<String>) -> Self;
-    pub fn to_json(&self) -> serde_json::Value;
+    // `to_json` is crate-private since #843dforeign: `serde_json::to_value(&query)`
 }
 ```
 
