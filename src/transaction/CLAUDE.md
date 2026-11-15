@@ -34,6 +34,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection (the three BEEF doors through one private `ancestry_beef`, the plain doors' collected order written as collected since 0.8.8, the atomic door's closure sorted with the subject moved last) |
+| `transaction/ef_reader.rs` | `transaction.rs`'s child module: the one Extended Format reader, `read_ef`, which `from_ef`, `from_hex_ef`, `from_ef_bounded` and `from_hex_ef_bounded` read through; an input spending output `n` is given a source transaction of `n + 1` outputs, the spent one at `n`, built in `source_for` alone, which counts it against the bounded doors' figure (the outputs of every input's source together) before it builds it. Pinned by `tests/transaction_ef_bounded.rs` and `tests/arch_ef_one_reader.rs` (every `from_..ef..` door listed and reading through `read_ef`; one site builds the run of default outputs, after the count) and `fuzz_transaction_parser`'s bounded-door invariant |
 | `transaction_reader.rs` | `Transaction::from_reader` (public since #840, the reference's `fromReader`: one transaction from the front, the rest unread, nothing cached) and the words the whole readers refuse a byte after the transaction in (`TRAILING_DATA`, `EF_TRAILING_DATA`, `refuse_trailing`); a child file on the stable line alone, so the fix does not raise `transaction.rs` over its ratchet ceiling (3,000 lines at 0.8.3) |
 | `amount.rs` | `add_amount`, a sum of a caller's amounts past `u64` refused in the reference's `addSatoshiAmount` words (`fee`, `get_fee`, #868, cherry-picked from beta, where the file also holds #844's judgment of an amount read from bytes) |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON`; a field-built input's `txid` member exactly 64 hex digits, held in lower case, else `Invalid txid of input N: expected 64 hex digits` (#845) |
@@ -134,6 +135,8 @@ impl Transaction {
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_ef(ef: &[u8]) -> Result<Self>           // Extended Format (BRC-30)
     pub fn from_hex_ef(hex: &str) -> Result<Self>
+    pub fn from_ef_bounded(ef: &[u8], max_source_outputs: usize) -> Result<Self>   // from_ef's answer, or refused past the figure
+    pub fn from_hex_ef_bounded(hex: &str, max_source_outputs: usize) -> Result<Self>
     pub fn from_reader(reader: &mut Reader) -> Result<Self> // one from the front, the rest unread; no cache (#840)
     pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self>
     pub fn from_atomic_beef(beef: &[u8]) -> Result<Self>

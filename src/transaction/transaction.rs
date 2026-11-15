@@ -13,11 +13,13 @@ use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
-use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
+use crate::primitives::{from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
 
 use super::transaction_reader::{refuse_trailing, EF_TRAILING_DATA, TRAILING_DATA};
+
+mod ef_reader;
 
 /// Number of placeholder outputs to fabricate for an EF source transaction whose
 /// spent output index is `source_output_index`, or `None` if that many outputs
@@ -226,110 +228,11 @@ impl Transaction {
     /// # Returns
     ///
     /// The parsed transaction with source transaction data populated.
+    /// An input spending output `n` is given a source transaction of `n + 1`
+    /// outputs, the spent one at `n`; [`from_ef_bounded`](Self::from_ef_bounded)
+    /// reads under a figure for those outputs over every input.
     pub fn from_ef(ef: &[u8]) -> Result<Self> {
-        let mut reader = Reader::new(ef);
-
-        let version = reader.read_u32_le()?;
-
-        // Check for EF marker: 6 bytes of 0x0000000000EF
-        let marker = reader.read_bytes(6)?;
-        if marker != [0x00, 0x00, 0x00, 0x00, 0x00, 0xEF] {
-            return Err(crate::Error::TransactionError(
-                "Invalid EF marker".to_string(),
-            ));
-        }
-
-        // Parse inputs with source data
-        let input_count = reader.read_var_int_num()?;
-        // Bound the pre-allocation by what the buffer can actually hold: a bogus
-        // count varint must never trigger a capacity-overflow / OOM abort before
-        // any input is read. Each EF input is >= 50 bytes (txid 32 + vout 4 +
-        // script len 1 + sequence 4 + source satoshis 8 + source script len 1).
-        let mut inputs = Vec::with_capacity(bounded_capacity(input_count, reader.remaining(), 50));
-
-        for _ in 0..input_count {
-            // Read TXID (reversed in EF format)
-            let txid_bytes = reader.read_bytes(32)?;
-            let mut txid_reversed = [0u8; 32];
-            for (i, byte) in txid_bytes.iter().enumerate() {
-                txid_reversed[31 - i] = *byte;
-            }
-            let source_txid = to_hex(&txid_reversed);
-
-            let source_output_index = reader.read_u32_le()?;
-
-            // Read unlocking script
-            let script_len = reader.read_var_int_num()?;
-            let script_bytes = reader.read_bytes(script_len)?;
-            let unlocking_script = UnlockingScript::from_binary(script_bytes)?;
-
-            let sequence = reader.read_u32_le()?;
-
-            // Read source satoshis
-            let source_satoshis = reader.read_u64_le()?;
-
-            // Read source locking script
-            let locking_script_len = reader.read_var_int_num()?;
-            let locking_script_bytes = reader.read_bytes(locking_script_len)?;
-            let locking_script = LockingScript::from_binary(locking_script_bytes)?;
-
-            // Create a minimal source transaction with just the output we need.
-            // The real output must live at `source_output_index`, so the
-            // placeholder vec has to be that long — but `source_output_index` is
-            // an attacker-controlled u32 (up to ~4.29e9). Fabricating billions of
-            // default outputs would OOM-abort the parser, so reject indices whose
-            // placeholder allocation would exceed a sane memory budget. The count
-            // is computed in u64 (see `ef_source_placeholder_len`) so the `+ 1`
-            // cannot overflow on 32-bit targets (wasm32).
-            let needed = ef_source_placeholder_len(source_output_index).ok_or_else(|| {
-                crate::Error::TransactionError(format!(
-                    "EF source output index {} is implausibly large",
-                    source_output_index
-                ))
-            })?;
-            let mut source_tx = Transaction::new();
-            source_tx.outputs = vec![TransactionOutput::default(); needed];
-            source_tx.outputs[source_output_index as usize] = TransactionOutput {
-                satoshis: Some(source_satoshis),
-                locking_script,
-                change: false,
-            };
-
-            inputs.push(TransactionInput {
-                source_transaction: Some(Box::new(source_tx)),
-                source_txid: Some(source_txid),
-                source_output_index,
-                unlocking_script: Some(unlocking_script),
-                unlocking_script_template: None,
-                sequence,
-            });
-        }
-
-        // Parse outputs
-        let output_count = reader.read_var_int_num()?;
-        // Each output is >= 9 bytes (satoshis 8 + script len 1); bound the
-        // pre-allocation so a bogus count cannot OOM-abort before any read.
-        let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
-
-        for _ in 0..output_count {
-            let satoshis = reader.read_u64_le()?;
-            let script_len = reader.read_var_int_num()?;
-            let script_bytes = reader.read_bytes(script_len)?;
-            let locking_script = LockingScript::from_binary(script_bytes)?;
-
-            outputs.push(TransactionOutput {
-                satoshis: Some(satoshis),
-                locking_script,
-                change: false,
-            });
-        }
-
-        let lock_time = reader.read_u32_le()?;
-        // The reference's words for a byte after the EF frame
-        // (`Transaction.ts:419`, #840).
-        refuse_trailing(&reader, EF_TRAILING_DATA)?;
-
-        Ok(Self::with_params(version, inputs, outputs, lock_time))
+        Self::read_ef(ef, None)
     }
 
     /// Parses a transaction from a hex-encoded Extended Format string.
@@ -340,7 +243,8 @@ impl Transaction {
     ///
     /// # Returns
     ///
-    /// The parsed transaction.
+    /// The parsed transaction, as [`from_ef`](Self::from_ef) reads its bytes;
+    /// [`from_hex_ef_bounded`](Self::from_hex_ef_bounded) reads under a figure.
     pub fn from_hex_ef(hex: &str) -> Result<Self> {
         let bin = from_hex(hex)?;
         Self::from_ef(&bin)
