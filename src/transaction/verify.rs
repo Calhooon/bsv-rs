@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::block::ChainParams;
 use crate::primitives::bsv::sighash::TxSighashCache;
+use crate::script::Spend;
 use crate::{Error, Result};
 
 use super::amount::{add_amount, require_satoshi_amount};
@@ -160,6 +161,7 @@ impl Transaction {
 struct Evaluation<'a> {
     chain: Option<&'a ChainParams>,
     tip_height: Option<u32>,
+    genesis_height: u64,
     memory_limit: Option<usize>,
     work: WorkBudget,
     fee_model: Option<&'a dyn FeeModel>,
@@ -187,11 +189,16 @@ pub(super) async fn verify(
         } else {
             None
         },
+        genesis_height: 0,
         memory_limit,
         work,
         fee_model,
     };
     let by_txid = root.reachable_by_txid();
+    let evaluation = Evaluation {
+        genesis_height: genesis_height(chain, tracker, &by_txid).await,
+        ..evaluation
+    };
     let mut verified = HashSet::new();
     let mut queue = vec![root.id()];
     while let Some(txid) = queue.pop() {
@@ -210,6 +217,26 @@ pub(super) async fn verify(
         }
     }
     Ok(true)
+}
+
+/// The chain's Genesis height for the default mode (GHSA-h4m7-c6p8-725m):
+/// the tracker's tip's when its `mining_tip` names one, mainnet's otherwise
+/// (also when it fails). Asked once, and only when no chain parameters are
+/// given and a reachable transaction carries a merkle path.
+#[allow(deprecated)] // ChainTip's copy serves the default path until the api-break.
+async fn genesis_height(
+    chain: Option<&ChainParams>,
+    tracker: &dyn ChainTracker,
+    reachable: &HashMap<String, &Transaction>,
+) -> u64 {
+    let mainnet = u64::from(ChainParams::mainnet().genesis_height);
+    if chain.is_some() || !reachable.values().any(|tx| tx.merkle_path.is_some()) {
+        return mainnet;
+    }
+    match tracker.mining_tip().await {
+        Ok(Some(tip)) => u64::from(tip.genesis_height),
+        _ => mainnet,
+    }
 }
 
 async fn proven(tx: &Transaction, txid: &str, tracker: &dyn ChainTracker) -> Result<bool> {
@@ -374,20 +401,35 @@ impl Evaluation<'_> {
             Error::TransactionError(format!("Input {vin} is missing unlocking script"))
         })?;
         let rules = InputRules::for_verifier(flags, self.memory_limit, self.work.input_limit());
-        let judged = judge_input(
-            &shared,
-            vin,
-            &source.output.locking_script.to_binary(),
-            &unlocking.to_binary(),
-            source.satoshis,
-            &rules,
+        let (lock, unlock) = (
+            source.output.locking_script.to_binary(),
+            unlocking.to_binary(),
         );
-        match judged.result {
-            Ok(verified) => Ok(verified.work_spent),
+        let judged = judge_input(&shared, vin, &lock, &unlock, source.satoshis, &rules);
+        let verified = match judged.result {
+            Ok(verified) => verified,
             Err(refusal) => {
                 let error = refusal.before_evaluation()?;
-                Err(super::verify_refusal::script_refusal(&tx.id(), vin, error))
+                return Err(super::verify_refusal::script_refusal(&tx.id(), vin, error));
+            }
+        };
+        let before_genesis = self.chain.is_none()
+            && source
+                .height
+                .is_some_and(|height| u64::from(height) < self.genesis_height);
+        if before_genesis {
+            let refused = Spend::pre_genesis_refusal(
+                &shared,
+                vin,
+                &lock,
+                &unlock,
+                source.satoshis,
+                self.memory_limit,
+            );
+            if let Some(error) = refused {
+                return Err(super::verify_refusal::script_refusal(&tx.id(), vin, error));
             }
         }
+        Ok(verified.work_spent)
     }
 }

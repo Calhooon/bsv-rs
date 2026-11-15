@@ -31,6 +31,7 @@ impl Spend {
         }
         let buf2 = self.pop_stack()?;
         let mut result = self.pop_stack()?;
+        self.pre_genesis_element(i64::try_from(result.len() + buf2.len()).unwrap_or(i64::MAX))?;
         result.try_reserve_exact(buf2.len()).map_err(|_| {
             let in_hand = (result.len() + buf2.len()) as u64;
             self.allocation_declined_holding(in_hand, buf2.len())
@@ -108,6 +109,7 @@ impl Spend {
     /// and the local memory budget.
     fn num2bin_size(&self, size_bn: &BigNumber) -> Result<usize, ScriptEvaluationError> {
         let size = size_bn.to_i64().unwrap_or(-1);
+        self.pre_genesis_element(size)?;
 
         if self.flags.is_some() {
             // Under a word the reference's bound: a size below 0 or above

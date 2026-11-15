@@ -2,6 +2,7 @@
 //! element is charged (the default mode's per-stack count, or the node's
 //! count under a word).
 
+use crate::primitives::to_hex;
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource};
 use crate::script::flags::STACK_ELEMENT_OVERHEAD;
 use crate::script::op::opcode_to_name;
@@ -9,6 +10,22 @@ use crate::script::op::opcode_to_name;
 use super::Spend;
 
 impl Spend {
+    /// A refusal of this evaluation, with its state at the refusal.
+    pub(super) fn error(&self, message: &str) -> ScriptEvaluationError {
+        ScriptEvaluationError::new(
+            message,
+            to_hex(&self.source_txid),
+            self.source_output_index,
+            self.context,
+            self.program_counter,
+            snapshot(&self.stack),
+            snapshot(&self.alt_stack),
+            self.if_stack.clone(),
+            self.stack_mem,
+            self.alt_stack_mem,
+        )
+    }
+
     // ========================================================================
     // Stack Helpers
     // ========================================================================
