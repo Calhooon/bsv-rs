@@ -53,6 +53,7 @@ Wire protocol implementation for binary wallet communication:
 - `calls.rs` - Call frame definitions for all 28 wallet operations; an unknown code refused as `Invalid call code: N`, the reference's words (#914)
 - `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`); `linkage.rs` its two linkage calls (#406)
 - `processor.rs` - Request/response processing (`WalletWireProcessor`)
+- `flags.rs` - The flag bytes read as the reference reads them (#1002; the table is `docs/lanes/fix-1002-wire-flags.md`)
 - See `wire/CLAUDE.md` for details
 
 ## Key Exports

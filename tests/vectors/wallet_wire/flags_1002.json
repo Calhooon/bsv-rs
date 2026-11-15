@@ -1,0 +1,5671 @@
+{
+  "reference": "ts-stack@edf6e03 (unmodified)",
+  "node": "v22.18.0",
+  "recorder": "tests/support/wire_flags_1002.mjs",
+  "crate_base_writer": "bsv-rs@d892e206 WalletWireTransceiver::list_actions",
+  "request_rows": [
+    {
+      "name": "listActions labelQueryMode: absent",
+      "group": "listActions labelQueryMode",
+      "state": "absent",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ]
+      },
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listActions labelQueryMode: any",
+      "group": "listActions labelQueryMode",
+      "state": "any",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "labelQueryMode": "any"
+      },
+      "request_hex": "04000105616c70686101ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "labelQueryMode": "any"
+      }
+    },
+    {
+      "name": "listActions labelQueryMode: all",
+      "group": "listActions labelQueryMode",
+      "state": "all",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "labelQueryMode": "all"
+      },
+      "request_hex": "04000105616c70686102ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "labelQueryMode": "all"
+      }
+    },
+    {
+      "name": "listActions includeLabels: absent",
+      "group": "listActions includeLabels",
+      "state": "absent",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ]
+      },
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listActions includeLabels: false",
+      "group": "listActions includeLabels",
+      "state": "false",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "includeLabels": false
+      },
+      "request_hex": "04000105616c706861ff00ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "includeLabels": false
+      }
+    },
+    {
+      "name": "listActions includeLabels: true",
+      "group": "listActions includeLabels",
+      "state": "true",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "includeLabels": true
+      },
+      "request_hex": "04000105616c706861ff01ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "includeLabels": true
+      }
+    },
+    {
+      "name": "listActions seekPermission: absent",
+      "group": "listActions seekPermission",
+      "state": "absent",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ]
+      },
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "labels": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listActions seekPermission: false",
+      "group": "listActions seekPermission",
+      "state": "false",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "seekPermission": false
+      },
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "listActions seekPermission: true",
+      "group": "listActions seekPermission",
+      "state": "true",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "alpha"
+        ],
+        "seekPermission": true
+      },
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffff01",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "seekPermission": true
+      }
+    },
+    {
+      "name": "listOutputs tagQueryMode: absent",
+      "group": "listOutputs tagQueryMode",
+      "state": "absent",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      },
+      "request_hex": "060005666c6167730105616c706861ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listOutputs tagQueryMode: all",
+      "group": "listOutputs tagQueryMode",
+      "state": "all",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "tagQueryMode": "all"
+      },
+      "request_hex": "060005666c6167730105616c70686101ffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "tagQueryMode": "all"
+      }
+    },
+    {
+      "name": "listOutputs tagQueryMode: any",
+      "group": "listOutputs tagQueryMode",
+      "state": "any",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "tagQueryMode": "any"
+      },
+      "request_hex": "060005666c6167730105616c70686102ffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "tagQueryMode": "any"
+      }
+    },
+    {
+      "name": "listOutputs include: absent",
+      "group": "listOutputs include",
+      "state": "absent",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      },
+      "request_hex": "060005666c6167730105616c706861ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listOutputs include: locking scripts",
+      "group": "listOutputs include",
+      "state": "locking scripts",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "include": "locking scripts"
+      },
+      "request_hex": "060005666c6167730105616c706861ff01ffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "include": "locking scripts"
+      }
+    },
+    {
+      "name": "listOutputs include: entire transactions",
+      "group": "listOutputs include",
+      "state": "entire transactions",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "include": "entire transactions"
+      },
+      "request_hex": "060005666c6167730105616c706861ff02ffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "include": "entire transactions"
+      }
+    },
+    {
+      "name": "listOutputs includeTags: absent",
+      "group": "listOutputs includeTags",
+      "state": "absent",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      },
+      "request_hex": "060005666c6167730105616c706861ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listOutputs includeTags: false",
+      "group": "listOutputs includeTags",
+      "state": "false",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "includeTags": false
+      },
+      "request_hex": "060005666c6167730105616c706861ffffff00ffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "includeTags": false
+      }
+    },
+    {
+      "name": "listOutputs includeTags: true",
+      "group": "listOutputs includeTags",
+      "state": "true",
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "includeTags": true
+      },
+      "request_hex": "060005666c6167730105616c706861ffffff01ffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "basket": "flags",
+        "tags": [
+          "alpha"
+        ],
+        "includeTags": true
+      }
+    },
+    {
+      "name": "createAction trustSelf: absent",
+      "group": "createAction trustSelf",
+      "state": "absent",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {}
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "description": "flag tests",
+        "options": {}
+      }
+    },
+    {
+      "name": "createAction trustSelf: known",
+      "group": "createAction trustSelf",
+      "state": "known",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "trustSelf": "known"
+        }
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "description": "flag tests",
+        "options": {
+          "trustSelf": "known"
+        }
+      }
+    },
+    {
+      "name": "createAction signAndProcess: absent",
+      "group": "createAction signAndProcess",
+      "state": "absent",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {}
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "description": "flag tests",
+        "options": {}
+      }
+    },
+    {
+      "name": "createAction signAndProcess: false",
+      "group": "createAction signAndProcess",
+      "state": "false",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "signAndProcess": false
+        }
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "description": "flag tests",
+        "options": {
+          "signAndProcess": false
+        }
+      }
+    },
+    {
+      "name": "createAction signAndProcess: true",
+      "group": "createAction signAndProcess",
+      "state": "true",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "signAndProcess": true
+        }
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0101ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "description": "flag tests",
+        "options": {
+          "signAndProcess": true
+        }
+      }
+    },
+    {
+      "name": "getPublicKey forSelf: absent",
+      "group": "getPublicKey forSelf",
+      "state": "absent",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1"
+      },
+      "request_hex": "080000010a666c6167207465737473013100ffffffff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1"
+      }
+    },
+    {
+      "name": "getPublicKey forSelf: false",
+      "group": "getPublicKey forSelf",
+      "state": "false",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": false
+      },
+      "request_hex": "080000010a666c6167207465737473013100ffff00ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": false
+      }
+    },
+    {
+      "name": "getPublicKey forSelf: true",
+      "group": "getPublicKey forSelf",
+      "state": "true",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": true
+      },
+      "request_hex": "080000010a666c6167207465737473013100ffff01ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": true
+      }
+    },
+    {
+      "name": "getPublicKey privileged: absent",
+      "group": "getPublicKey privileged",
+      "state": "absent",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privilegedReason": "a reason"
+      },
+      "request_hex": "080000010a666c6167207465737473013100ff086120726561736f6effff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privilegedReason": "a reason"
+      }
+    },
+    {
+      "name": "getPublicKey privileged: false",
+      "group": "getPublicKey privileged",
+      "state": "false",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privilegedReason": "a reason",
+        "privileged": false
+      },
+      "request_hex": "080000010a666c616720746573747301310000086120726561736f6effff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privileged": false,
+        "privilegedReason": "a reason"
+      }
+    },
+    {
+      "name": "getPublicKey privileged: true",
+      "group": "getPublicKey privileged",
+      "state": "true",
+      "call": "getPublicKey",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privilegedReason": "a reason",
+        "privileged": true
+      },
+      "request_hex": "080000010a666c616720746573747301310001086120726561736f6effff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "privileged": true,
+        "privilegedReason": "a reason"
+      }
+    },
+    {
+      "name": "createAction_options_absent",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests"
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      "observed": {
+        "description": "flag tests"
+      }
+    },
+    {
+      "name": "createAction_options_all",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "lockTime": 0,
+        "version": 1,
+        "labels": [],
+        "options": {
+          "signAndProcess": true,
+          "acceptDelayedBroadcast": false,
+          "trustSelf": "known",
+          "knownTxids": [
+            "1111111111111111111111111111111111111111111111111111111111111111"
+          ],
+          "returnTXIDOnly": true,
+          "noSend": false,
+          "noSendChange": [],
+          "sendWith": [],
+          "randomizeOutputs": false
+        }
+      },
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffff000100010100010111111111111111111111111111111111111111111111111111111111111111110100000000",
+      "observed": {
+        "description": "flag tests",
+        "lockTime": 0,
+        "version": 1,
+        "labels": [],
+        "options": {
+          "signAndProcess": true,
+          "acceptDelayedBroadcast": false,
+          "trustSelf": "known",
+          "knownTxids": [
+            "1111111111111111111111111111111111111111111111111111111111111111"
+          ],
+          "returnTXIDOnly": true,
+          "noSend": false,
+          "noSendChange": [],
+          "sendWith": [],
+          "randomizeOutputs": false
+        }
+      }
+    },
+    {
+      "name": "signAction_options_absent",
+      "group": null,
+      "state": null,
+      "call": "signAction",
+      "args": {
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        },
+        "reference": "AQ=="
+      },
+      "request_hex": "020001000151ffffffffffffffffff010100",
+      "observed": {
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        },
+        "reference": "AQ=="
+      }
+    },
+    {
+      "name": "signAction_options_all",
+      "group": null,
+      "state": null,
+      "call": "signAction",
+      "args": {
+        "spends": {
+          "0": {
+            "unlockingScript": "51",
+            "sequenceNumber": 7
+          }
+        },
+        "reference": "AQ==",
+        "options": {
+          "acceptDelayedBroadcast": true,
+          "returnTXIDOnly": false,
+          "noSend": true,
+          "sendWith": [
+            "1111111111111111111111111111111111111111111111111111111111111111"
+          ]
+        }
+      },
+      "request_hex": "02000100015107010101010001011111111111111111111111111111111111111111111111111111111111111111",
+      "observed": {
+        "spends": {
+          "0": {
+            "unlockingScript": "51",
+            "sequenceNumber": 7
+          }
+        },
+        "reference": "AQ==",
+        "options": {
+          "acceptDelayedBroadcast": true,
+          "returnTXIDOnly": false,
+          "noSend": true,
+          "sendWith": [
+            "1111111111111111111111111111111111111111111111111111111111111111"
+          ]
+        }
+      }
+    },
+    {
+      "name": "listActions_limit_offset",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": [],
+        "limit": 10,
+        "offset": 3
+      },
+      "request_hex": "040000ffffffffffffff0a03ff",
+      "observed": {
+        "labels": [],
+        "limit": 10,
+        "offset": 3
+      }
+    },
+    {
+      "name": "listOutputs_limit_offset",
+      "group": null,
+      "state": null,
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "limit": 10,
+        "offset": 3
+      },
+      "request_hex": "060005666c61677300ffffffffff0a03ff",
+      "observed": {
+        "basket": "flags",
+        "limit": 10,
+        "offset": 3
+      }
+    },
+    {
+      "name": "internalizeAction_both_protocols",
+      "group": null,
+      "state": null,
+      "call": "internalizeAction",
+      "args": {
+        "tx": [
+          1,
+          1,
+          1,
+          1,
+          214,
+          75,
+          250,
+          253,
+          76,
+          144,
+          115,
+          172,
+          99,
+          110,
+          186,
+          16,
+          68,
+          102,
+          48,
+          205,
+          35,
+          69,
+          125,
+          253,
+          167,
+          185,
+          83,
+          228,
+          134,
+          199,
+          78,
+          237,
+          6,
+          35,
+          31,
+          121,
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          2,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          2,
+          144,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          244,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "description": "flag tests",
+        "seekPermission": false,
+        "outputs": [
+          {
+            "outputIndex": 0,
+            "protocol": "wallet payment",
+            "paymentRemittance": {
+              "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "derivationPrefix": "AQ==",
+              "derivationSuffix": "Ag=="
+            }
+          },
+          {
+            "outputIndex": 1,
+            "protocol": "basket insertion",
+            "insertionRemittance": {
+              "basket": "flags"
+            }
+          }
+        ]
+      },
+      "request_hex": "0500dc01010101d64bfafd4c9073ac636eba10446630cd23457dfda7b953e486c74eed06231f790100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650201000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e803000000000000015100000000010001000000014bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf65000000000151ffffffff0290010000000000000151f401000000000000015100000000000200010279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179801010102010205666c616773ffffffffffffffffff00ffffffffffffffffff0a666c616720746573747300",
+      "observed": {
+        "tx": [
+          1,
+          1,
+          1,
+          1,
+          214,
+          75,
+          250,
+          253,
+          76,
+          144,
+          115,
+          172,
+          99,
+          110,
+          186,
+          16,
+          68,
+          102,
+          48,
+          205,
+          35,
+          69,
+          125,
+          253,
+          167,
+          185,
+          83,
+          228,
+          134,
+          199,
+          78,
+          237,
+          6,
+          35,
+          31,
+          121,
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          2,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          2,
+          144,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          244,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "outputs": [
+          {
+            "outputIndex": 0,
+            "protocol": "wallet payment",
+            "paymentRemittance": {
+              "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "derivationPrefix": "AQ==",
+              "derivationSuffix": "Ag=="
+            }
+          },
+          {
+            "outputIndex": 1,
+            "protocol": "basket insertion",
+            "insertionRemittance": {
+              "basket": "flags",
+              "tags": []
+            }
+          }
+        ],
+        "description": "flag tests",
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "getPublicKey_identityKey",
+      "group": null,
+      "state": null,
+      "call": "getPublicKey",
+      "args": {
+        "identityKey": true
+      },
+      "request_hex": "080001ffffff",
+      "observed": {
+        "identityKey": true
+      }
+    },
+    {
+      "name": "getPublicKey_identityKey_privileged",
+      "group": null,
+      "state": null,
+      "call": "getPublicKey",
+      "args": {
+        "identityKey": true,
+        "privileged": true,
+        "privilegedReason": "a reason",
+        "seekPermission": false
+      },
+      "request_hex": "08000101086120726561736f6e00",
+      "observed": {
+        "identityKey": true,
+        "privileged": true,
+        "privilegedReason": "a reason",
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "createSignature_data",
+      "group": null,
+      "state": null,
+      "call": "createSignature",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      },
+      "request_hex": "0f00010a666c6167207465737473013100ffff0103010203ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "createSignature_hash",
+      "group": null,
+      "state": null,
+      "call": "createSignature",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "hashToDirectlySign": [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "request_hex": "0f00010a666c6167207465737473013100ffff020404040404040404040404040404040404040404040404040404040404040404ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "hashToDirectlySign": [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      }
+    },
+    {
+      "name": "encrypt_counterparty_self",
+      "group": null,
+      "state": null,
+      "call": "encrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "self",
+        "plaintext": [
+          1
+        ]
+      },
+      "request_hex": "0b00010a666c616720746573747301310bffff0101ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "self",
+        "plaintext": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "encrypt_counterparty_anyone",
+      "group": null,
+      "state": null,
+      "call": "encrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "anyone",
+        "plaintext": [
+          1
+        ],
+        "seekPermission": true
+      },
+      "request_hex": "0b00010a666c616720746573747301310cffff010101",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "anyone",
+        "plaintext": [
+          1
+        ],
+        "seekPermission": true
+      }
+    },
+    {
+      "name": "acquireCertificate_direct_certifier",
+      "group": null,
+      "state": null,
+      "call": "acquireCertificate",
+      "args": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "acquisitionProtocol": "direct",
+        "fields": {
+          "name": "YQ=="
+        },
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+        "signature": "3006020101020101",
+        "keyringRevealer": "certifier",
+        "keyringForSubject": {
+          "name": "YQ=="
+        }
+      },
+      "request_hex": "11000101010101010101010101010101010101010101010101010101010101010101025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc01046e616d650459513d3dffff0102020202020202020202020202020202020202020202020202020202020202021111111111111111111111111111111111111111111111111111111111111111010830060201010201010b01046e616d650161",
+      "observed": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "fields": {
+          "name": "YQ=="
+        },
+        "acquisitionProtocol": "direct",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+        "signature": "3006020101020101",
+        "keyringRevealer": "certifier",
+        "keyringForSubject": {
+          "name": "YQ=="
+        }
+      }
+    },
+    {
+      "name": "acquireCertificate_issuance",
+      "group": null,
+      "state": null,
+      "call": "acquireCertificate",
+      "args": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "acquisitionProtocol": "issuance",
+        "fields": {
+          "name": "YQ=="
+        },
+        "certifierUrl": "https://certifier.invalid",
+        "privileged": false
+      },
+      "request_hex": "11000101010101010101010101010101010101010101010101010101010101010101025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc01046e616d650459513d3d00ff021968747470733a2f2f6365727469666965722e696e76616c6964",
+      "observed": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "fields": {
+          "name": "YQ=="
+        },
+        "privileged": false,
+        "acquisitionProtocol": "issuance",
+        "certifierUrl": "https://certifier.invalid"
+      }
+    },
+    {
+      "name": "listCertificates_limit_offset_privileged",
+      "group": null,
+      "state": null,
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ],
+        "limit": 10,
+        "offset": 3,
+        "privileged": true,
+        "privilegedReason": "a reason"
+      },
+      "request_hex": "120001025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc0101010101010101010101010101010101010101010101010101010101010101010a0301086120726561736f6e",
+      "observed": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ],
+        "limit": 10,
+        "offset": 3,
+        "privileged": true,
+        "privilegedReason": "a reason"
+      }
+    },
+    {
+      "name": "listCertificates_absent",
+      "group": null,
+      "state": null,
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [],
+        "types": []
+      },
+      "request_hex": "12000000ffffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "certifiers": [],
+        "types": []
+      }
+    },
+    {
+      "name": "discoverByIdentityKey_limit_offset",
+      "group": null,
+      "state": null,
+      "call": "discoverByIdentityKey",
+      "args": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 3,
+        "seekPermission": false
+      },
+      "request_hex": "15000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817980a0300",
+      "observed": {
+        "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "limit": 10,
+        "offset": 3,
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "discoverByAttributes_absent",
+      "group": null,
+      "state": null,
+      "call": "discoverByAttributes",
+      "args": {
+        "attributes": {
+          "name": "a"
+        }
+      },
+      "request_hex": "160001046e616d650161ffffffffffffffffffffffffffffffffffffff",
+      "observed": {
+        "attributes": {
+          "name": "a"
+        }
+      }
+    },
+    {
+      "name": "encrypt_counterparty_key",
+      "group": null,
+      "state": null,
+      "call": "encrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "plaintext": [
+          1
+        ],
+        "seekPermission": false
+      },
+      "request_hex": "0b00010a666c61672074657374730131022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4ffff010100",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "plaintext": [
+          1
+        ],
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "decrypt_seekPermission_false",
+      "group": null,
+      "state": null,
+      "call": "decrypt",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "ciphertext": [
+          1,
+          2
+        ],
+        "seekPermission": false
+      },
+      "request_hex": "0c00010a666c6167207465737473013100ffff02010200",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "ciphertext": [
+          1,
+          2
+        ],
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "createHmac_absent",
+      "group": null,
+      "state": null,
+      "call": "createHmac",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1
+        ]
+      },
+      "request_hex": "0d00010a666c6167207465737473013100ffff0101ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "verifyHmac_seekPermission_true",
+      "group": null,
+      "state": null,
+      "call": "verifyHmac",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1
+        ],
+        "hmac": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "seekPermission": true
+      },
+      "request_hex": "0e00010a666c6167207465737473013100ffff0505050505050505050505050505050505050505050505050505050505050505010101",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "hmac": [
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5,
+          5
+        ],
+        "data": [
+          1
+        ],
+        "seekPermission": true
+      }
+    },
+    {
+      "name": "verifySignature_data_forSelf_true",
+      "group": null,
+      "state": null,
+      "call": "verifySignature",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "data": [
+          1,
+          2,
+          3
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "forSelf": true
+      },
+      "request_hex": "1000010a666c6167207465737473013100ffff010830060201010201010103010203ff",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": true,
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "data": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "verifySignature_hash_forSelf_false",
+      "group": null,
+      "state": null,
+      "call": "verifySignature",
+      "args": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "hashToDirectlyVerify": [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ],
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "forSelf": false,
+        "seekPermission": false
+      },
+      "request_hex": "1000010a666c6167207465737473013100ffff0008300602010102010102040404040404040404040404040404040404040404040404040404040404040400",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "forSelf": false,
+        "signature": [
+          48,
+          6,
+          2,
+          1,
+          1,
+          2,
+          1,
+          1
+        ],
+        "hashToDirectlyVerify": [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ],
+        "seekPermission": false
+      }
+    },
+    {
+      "name": "revealCounterpartyKeyLinkage_absent",
+      "group": null,
+      "state": null,
+      "call": "revealCounterpartyKeyLinkage",
+      "args": {
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      },
+      "request_hex": "0900ffff03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+      "observed": {
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      }
+    },
+    {
+      "name": "revealCounterpartyKeyLinkage_privileged",
+      "group": null,
+      "state": null,
+      "call": "revealCounterpartyKeyLinkage",
+      "args": {
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "privileged": true,
+        "privilegedReason": "a reason"
+      },
+      "request_hex": "090001086120726561736f6e03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+      "observed": {
+        "privileged": true,
+        "privilegedReason": "a reason",
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      }
+    },
+    {
+      "name": "revealSpecificKeyLinkage_absent",
+      "group": null,
+      "state": null,
+      "call": "revealSpecificKeyLinkage",
+      "args": {
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1"
+      },
+      "request_hex": "0a00010a666c6167207465737473013103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbeffff022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+      "observed": {
+        "protocolID": [
+          1,
+          "flag tests"
+        ],
+        "keyID": "1",
+        "counterparty": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      }
+    },
+    {
+      "name": "proveCertificate_absent",
+      "group": null,
+      "state": null,
+      "call": "proveCertificate",
+      "args": {
+        "certificate": {
+          "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+          "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+          "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+          "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+          "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+          "fields": {
+            "name": "YQ=="
+          },
+          "signature": "3006020101020101"
+        },
+        "fieldsToReveal": [
+          "name"
+        ],
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      },
+      "request_hex": "1300010101010101010101010101010101010101010101010101010101010101010103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe0202020202020202020202020202020202020202020202020202020202020202025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110108300602010102010101046e616d650459513d3d01046e616d65022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4ffff",
+      "observed": {
+        "certificate": {
+          "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+          "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+          "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+          "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+          "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+          "signature": "3006020101020101",
+          "fields": {
+            "name": "YQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "name"
+        ],
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+      }
+    },
+    {
+      "name": "proveCertificate_privileged",
+      "group": null,
+      "state": null,
+      "call": "proveCertificate",
+      "args": {
+        "certificate": {
+          "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+          "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+          "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+          "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+          "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+          "fields": {
+            "name": "YQ=="
+          },
+          "signature": "3006020101020101"
+        },
+        "fieldsToReveal": [
+          "name"
+        ],
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "privileged": true,
+        "privilegedReason": "a reason"
+      },
+      "request_hex": "1300010101010101010101010101010101010101010101010101010101010101010103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe0202020202020202020202020202020202020202020202020202020202020202025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110108300602010102010101046e616d650459513d3d01046e616d65022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe401086120726561736f6e",
+      "observed": {
+        "certificate": {
+          "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+          "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+          "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+          "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+          "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+          "signature": "3006020101020101",
+          "fields": {
+            "name": "YQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "name"
+        ],
+        "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+        "privileged": true,
+        "privilegedReason": "a reason"
+      }
+    },
+    {
+      "name": "createAction_input_unlocking_length",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "inputBEEF": [
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          1,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "inputs": [
+          {
+            "outpoint": "65df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b.0",
+            "unlockingScriptLength": 1,
+            "inputDescription": "flag tests"
+          }
+        ],
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 400,
+            "outputDescription": "flag tests"
+          }
+        ]
+      },
+      "request_hex": "01000a666c61672074657374736f0100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650101000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e80300000000000001510000000001000165df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b00ffffffffffffffffff010a666c6167207465737473ffffffffffffffffff010151fd90010a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      "observed": {
+        "description": "flag tests",
+        "inputBEEF": [
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          1,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "inputs": [
+          {
+            "outpoint": "65df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b.0",
+            "unlockingScriptLength": 1,
+            "inputDescription": "flag tests"
+          }
+        ],
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 400,
+            "outputDescription": "flag tests"
+          }
+        ]
+      }
+    },
+    {
+      "name": "createAction_input_unlocking_script",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "inputBEEF": [
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          1,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "inputs": [
+          {
+            "outpoint": "65df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b.0",
+            "unlockingScript": "51",
+            "inputDescription": "flag tests",
+            "sequenceNumber": 5
+          }
+        ],
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 400,
+            "outputDescription": "flag tests",
+            "basket": "flags",
+            "customInstructions": "keep",
+            "tags": [
+              "alpha"
+            ]
+          }
+        ]
+      },
+      "request_hex": "01000a666c61672074657374736f0100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650101000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e80300000000000001510000000001000165df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b0001510a666c616720746573747305010151fd90010a666c616720746573747305666c616773046b6565700105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffffffff00",
+      "observed": {
+        "description": "flag tests",
+        "inputBEEF": [
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          1,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "inputs": [
+          {
+            "outpoint": "65df5a64d4c9021d2045bf69467e62820e9e2b13c1a2672b0ae464b69cb2b04b.0",
+            "unlockingScript": "51",
+            "inputDescription": "flag tests",
+            "sequenceNumber": 5
+          }
+        ],
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 400,
+            "outputDescription": "flag tests",
+            "basket": "flags",
+            "customInstructions": "keep",
+            "tags": [
+              "alpha"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "request_flag_rows": [
+    {
+      "group": "listActions labelQueryMode",
+      "state": "absent",
+      "call": "listActions",
+      "field": "labelQueryMode",
+      "offset": 9,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listActions labelQueryMode",
+      "state": "any",
+      "call": "listActions",
+      "field": "labelQueryMode",
+      "offset": 9,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listActions labelQueryMode",
+      "state": "all",
+      "call": "listActions",
+      "field": "labelQueryMode",
+      "offset": 9,
+      "byte_hex": "02"
+    },
+    {
+      "group": "listActions includeLabels",
+      "state": "absent",
+      "call": "listActions",
+      "field": "includeLabels",
+      "offset": 10,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listActions includeLabels",
+      "state": "false",
+      "call": "listActions",
+      "field": "includeLabels",
+      "offset": 10,
+      "byte_hex": "00"
+    },
+    {
+      "group": "listActions includeLabels",
+      "state": "true",
+      "call": "listActions",
+      "field": "includeLabels",
+      "offset": 10,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listActions seekPermission",
+      "state": "absent",
+      "call": "listActions",
+      "field": "seekPermission",
+      "offset": 34,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listActions seekPermission",
+      "state": "false",
+      "call": "listActions",
+      "field": "seekPermission",
+      "offset": 34,
+      "byte_hex": "00"
+    },
+    {
+      "group": "listActions seekPermission",
+      "state": "true",
+      "call": "listActions",
+      "field": "seekPermission",
+      "offset": 34,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listOutputs tagQueryMode",
+      "state": "absent",
+      "call": "listOutputs",
+      "field": "tagQueryMode",
+      "offset": 15,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listOutputs tagQueryMode",
+      "state": "all",
+      "call": "listOutputs",
+      "field": "tagQueryMode",
+      "offset": 15,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listOutputs tagQueryMode",
+      "state": "any",
+      "call": "listOutputs",
+      "field": "tagQueryMode",
+      "offset": 15,
+      "byte_hex": "02"
+    },
+    {
+      "group": "listOutputs include",
+      "state": "absent",
+      "call": "listOutputs",
+      "field": "include",
+      "offset": 16,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listOutputs include",
+      "state": "locking scripts",
+      "call": "listOutputs",
+      "field": "include",
+      "offset": 16,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listOutputs include",
+      "state": "entire transactions",
+      "call": "listOutputs",
+      "field": "include",
+      "offset": 16,
+      "byte_hex": "02"
+    },
+    {
+      "group": "listOutputs includeTags",
+      "state": "absent",
+      "call": "listOutputs",
+      "field": "includeTags",
+      "offset": 18,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "listOutputs includeTags",
+      "state": "false",
+      "call": "listOutputs",
+      "field": "includeTags",
+      "offset": 18,
+      "byte_hex": "00"
+    },
+    {
+      "group": "listOutputs includeTags",
+      "state": "true",
+      "call": "listOutputs",
+      "field": "includeTags",
+      "offset": 18,
+      "byte_hex": "01"
+    },
+    {
+      "group": "createAction trustSelf",
+      "state": "absent",
+      "call": "createAction",
+      "field": "options.trustSelf",
+      "offset": 70,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "createAction trustSelf",
+      "state": "known",
+      "call": "createAction",
+      "field": "options.trustSelf",
+      "offset": 70,
+      "byte_hex": "01"
+    },
+    {
+      "group": "createAction signAndProcess",
+      "state": "absent",
+      "call": "createAction",
+      "field": "options.signAndProcess",
+      "offset": 68,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "createAction signAndProcess",
+      "state": "false",
+      "call": "createAction",
+      "field": "options.signAndProcess",
+      "offset": 68,
+      "byte_hex": "00"
+    },
+    {
+      "group": "createAction signAndProcess",
+      "state": "true",
+      "call": "createAction",
+      "field": "options.signAndProcess",
+      "offset": 68,
+      "byte_hex": "01"
+    },
+    {
+      "group": "getPublicKey forSelf",
+      "state": "absent",
+      "call": "getPublicKey",
+      "field": "forSelf",
+      "offset": 20,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "getPublicKey forSelf",
+      "state": "false",
+      "call": "getPublicKey",
+      "field": "forSelf",
+      "offset": 20,
+      "byte_hex": "00"
+    },
+    {
+      "group": "getPublicKey forSelf",
+      "state": "true",
+      "call": "getPublicKey",
+      "field": "forSelf",
+      "offset": 20,
+      "byte_hex": "01"
+    },
+    {
+      "group": "getPublicKey privileged",
+      "state": "absent",
+      "call": "getPublicKey",
+      "field": "privileged",
+      "offset": 18,
+      "byte_hex": "ff"
+    },
+    {
+      "group": "getPublicKey privileged",
+      "state": "false",
+      "call": "getPublicKey",
+      "field": "privileged",
+      "offset": 18,
+      "byte_hex": "00"
+    },
+    {
+      "group": "getPublicKey privileged",
+      "state": "true",
+      "call": "getPublicKey",
+      "field": "privileged",
+      "offset": 18,
+      "byte_hex": "01"
+    }
+  ],
+  "crate_base_rows": [
+    {
+      "name": "listActions labelQueryMode: absent",
+      "state": "absent",
+      "call": "listActions",
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0000",
+      "observed": {
+        "labels": [
+          "alpha"
+        ]
+      }
+    },
+    {
+      "name": "listActions labelQueryMode: any",
+      "state": "any",
+      "call": "listActions",
+      "request_hex": "04000105616c70686100ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013d496e76616c6964206c6162656c51756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203000",
+      "observed": null
+    },
+    {
+      "name": "listActions labelQueryMode: all",
+      "state": "all",
+      "call": "listActions",
+      "request_hex": "04000105616c70686101ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0000",
+      "observed": {
+        "labels": [
+          "alpha"
+        ],
+        "labelQueryMode": "any"
+      }
+    }
+  ],
+  "processor_refusal_rows": [
+    {
+      "name": "listActions labelQueryMode = 0",
+      "call": "listActions",
+      "request_hex": "04000105616c70686100ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013d496e76616c6964206c6162656c51756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203000",
+      "wallet_called": false
+    },
+    {
+      "name": "listActions labelQueryMode = 3",
+      "call": "listActions",
+      "request_hex": "04000105616c70686103ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013d496e76616c6964206c6162656c51756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203300",
+      "wallet_called": false
+    },
+    {
+      "name": "listActions labelQueryMode = 128",
+      "call": "listActions",
+      "request_hex": "04000105616c70686180ffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0140496e76616c6964206c6162656c51756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564202d31323800",
+      "wallet_called": false
+    },
+    {
+      "name": "listActions includeLabels = 2",
+      "call": "listActions",
+      "request_hex": "04000105616c706861ff02ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013c496e76616c696420696e636c7564654c6162656c7320666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "listActions includeLabels = 128",
+      "call": "listActions",
+      "request_hex": "04000105616c706861ff80ffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013f496e76616c696420696e636c7564654c6162656c7320666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564202d31323800",
+      "wallet_called": false
+    },
+    {
+      "name": "listActions seekPermission = 2",
+      "call": "listActions",
+      "request_hex": "04000105616c706861ffffffffffffffffffffffffffffffffffffffffffffffffff02",
+      "response_hex": "013d496e76616c6964207365656b5065726d697373696f6e20666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "listOutputs tagQueryMode = 0",
+      "call": "listOutputs",
+      "request_hex": "060005666c6167730105616c70686100ffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013b496e76616c69642074616751756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203000",
+      "wallet_called": false
+    },
+    {
+      "name": "listOutputs tagQueryMode = 3",
+      "call": "listOutputs",
+      "request_hex": "060005666c6167730105616c70686103ffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013b496e76616c69642074616751756572794d6f646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203300",
+      "wallet_called": false
+    },
+    {
+      "name": "listOutputs include = 0",
+      "call": "listOutputs",
+      "request_hex": "060005666c6167730105616c706861ff00ffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0136496e76616c696420696e636c75646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203000",
+      "wallet_called": false
+    },
+    {
+      "name": "listOutputs include = 3",
+      "call": "listOutputs",
+      "request_hex": "060005666c6167730105616c706861ff03ffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0136496e76616c696420696e636c75646520666c61673a206578706563746564202d312c20312c206f7220322c207265636569766564203300",
+      "wallet_called": false
+    },
+    {
+      "name": "createAction trustSelf = 0",
+      "call": "createAction",
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffff00ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0134496e76616c696420747275737453656c6620666c61673a206578706563746564202d31206f7220312c207265636569766564203000",
+      "wallet_called": false
+    },
+    {
+      "name": "createAction trustSelf = 2",
+      "call": "createAction",
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff01ffff02ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0134496e76616c696420747275737453656c6620666c61673a206578706563746564202d31206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "createAction signAndProcess = 2",
+      "call": "createAction",
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "013d496e76616c6964207369676e416e6450726f6365737320666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey forSelf = 2",
+      "call": "getPublicKey",
+      "request_hex": "080000010a666c6167207465737473013100ffff02ff",
+      "response_hex": "0136496e76616c696420666f7253656c6620666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey privileged = 2",
+      "call": "getPublicKey",
+      "request_hex": "080000010a666c616720746573747301310002086120726561736f6effff",
+      "response_hex": "0139496e76616c69642070726976696c6567656420666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey identityKey = 2",
+      "call": "getPublicKey",
+      "request_hex": "080002ffffff",
+      "response_hex": "0135496e76616c6964206964656e746974794b657920666c61673a2065787065637465642030206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey identityKey = 255",
+      "call": "getPublicKey",
+      "request_hex": "0800ffffffff",
+      "response_hex": "0136496e76616c6964206964656e746974794b657920666c61673a2065787065637465642030206f7220312c207265636569766564202d3100",
+      "wallet_called": false
+    },
+    {
+      "name": "createAction optionsPresent = 2",
+      "call": "createAction",
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff02",
+      "response_hex": "0138496e76616c6964206f7074696f6e7350726573656e7420666c61673a2065787065637465642030206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "createAction optionsPresent = 255",
+      "call": "createAction",
+      "request_hex": "01000a666c6167207465737473ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "response_hex": "0139496e76616c6964206f7074696f6e7350726573656e7420666c61673a2065787065637465642030206f7220312c207265636569766564202d3100",
+      "wallet_called": false
+    },
+    {
+      "name": "signAction optionsPresent = 2",
+      "call": "signAction",
+      "request_hex": "020001000151ffffffffffffffffff010102",
+      "response_hex": "0138496e76616c6964206f7074696f6e7350726573656e7420666c61673a2065787065637465642030206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey privilegedReason length = -2",
+      "call": "getPublicKey",
+      "request_hex": "080000010a666c6167207465737473013100fffe6120726561736f6effff",
+      "response_hex": "0144496e76616c69642070726976696c65676564526561736f6e206c656e6774683a206578706563746564202d31206f722030e280933132372c207265636569766564202d3200",
+      "wallet_called": false
+    },
+    {
+      "name": "createSignature data type = 3",
+      "call": "createSignature",
+      "request_hex": "0f00010a666c6167207465737473013100ffff0303010203ff",
+      "response_hex": "0143496e76616c6964206372656174655369676e61747572652064617461207479706520666c61673a2065787065637465642031206f7220322c207265636569766564203300",
+      "wallet_called": false
+    },
+    {
+      "name": "internalizeAction protocol = 3",
+      "call": "internalizeAction",
+      "request_hex": "0500dc01010101d64bfafd4c9073ac636eba10446630cd23457dfda7b953e486c74eed06231f790100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650201000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e803000000000000015100000000010001000000014bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf65000000000151ffffffff0290010000000000000151f401000000000000015100000000000200030279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179801010102010205666c616773ffffffffffffffffff00ffffffffffffffffff0a666c616720746573747300",
+      "response_hex": "0144496e76616c696420696e7465726e616c697a65416374696f6e2070726f746f636f6c20666c61673a2065787065637465642031206f7220322c207265636569766564203300",
+      "wallet_called": false
+    },
+    {
+      "name": "getPublicKey seekPermission = 2",
+      "call": "getPublicKey",
+      "request_hex": "080000010a666c6167207465737473013100ffffff02",
+      "response_hex": "013d496e76616c6964207365656b5065726d697373696f6e20666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "encrypt seekPermission = 2",
+      "call": "encrypt",
+      "request_hex": "0b00010a666c616720746573747301310bffff010102",
+      "response_hex": "013d496e76616c6964207365656b5065726d697373696f6e20666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    },
+    {
+      "name": "verifySignature forSelf = 2",
+      "call": "verifySignature",
+      "request_hex": "1000010a666c6167207465737473013100ffff020830060201010201010103010203ff",
+      "response_hex": "0136496e76616c696420666f7253656c6620666c61673a206578706563746564202d312c20302c206f7220312c207265636569766564203200",
+      "wallet_called": false
+    }
+  ],
+  "response_rows": [
+    {
+      "name": "listActions status: completed",
+      "group": "listActions status",
+      "state": "completed",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: unprocessed",
+      "group": "listActions status",
+      "state": "unprocessed",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unprocessed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80302010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unprocessed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: sending",
+      "group": "listActions status",
+      "state": "sending",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "sending",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80303010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "sending",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: unproven",
+      "group": "listActions status",
+      "state": "unproven",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unproven",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80304010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unproven",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: unsigned",
+      "group": "listActions status",
+      "state": "unsigned",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unsigned",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80305010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "unsigned",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: nosend",
+      "group": "listActions status",
+      "state": "nosend",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "nosend",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80306010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "nosend",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: nonfinal",
+      "group": "listActions status",
+      "state": "nonfinal",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "nonfinal",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80307010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "nonfinal",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions status: failed",
+      "group": "listActions status",
+      "state": "failed",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "failed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80308010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "failed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions isOutgoing: false",
+      "group": "listActions isOutgoing",
+      "state": "false",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301000a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": false,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions isOutgoing: true",
+      "group": "listActions isOutgoing",
+      "state": "true",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions output spendable: false",
+      "group": "listActions output spendable",
+      "state": "false",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": false,
+                "outputDescription": "flag tests",
+                "basket": "flags",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde803ffffffffffffffffff000a666c616720746573747305666c61677300ffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": false,
+                "outputDescription": "flag tests",
+                "basket": "flags",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions output spendable: true",
+      "group": "listActions output spendable",
+      "state": "true",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "flags",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde803ffffffffffffffffff010a666c616720746573747305666c61677300ffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "flags",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "isAuthenticated: false",
+      "group": "isAuthenticated",
+      "state": "false",
+      "call": "isAuthenticated",
+      "args": {},
+      "answered": {
+        "authenticated": false
+      },
+      "response_hex": "0000",
+      "value": {
+        "authenticated": false
+      },
+      "message": null
+    },
+    {
+      "name": "isAuthenticated: true",
+      "group": "isAuthenticated",
+      "state": "true",
+      "call": "isAuthenticated",
+      "args": {},
+      "answered": {
+        "authenticated": true
+      },
+      "response_hex": "0001",
+      "value": {
+        "authenticated": true
+      },
+      "message": null
+    },
+    {
+      "name": "getNetwork: mainnet",
+      "group": "getNetwork",
+      "state": "mainnet",
+      "call": "getNetwork",
+      "args": {},
+      "answered": {
+        "network": "mainnet"
+      },
+      "response_hex": "0000",
+      "value": {
+        "network": "mainnet"
+      },
+      "message": null
+    },
+    {
+      "name": "getNetwork: testnet",
+      "group": "getNetwork",
+      "state": "testnet",
+      "call": "getNetwork",
+      "args": {},
+      "answered": {
+        "network": "testnet"
+      },
+      "response_hex": "0001",
+      "value": {
+        "network": "testnet"
+      },
+      "message": null
+    },
+    {
+      "name": "createAction_txid",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "answered": {
+        "txid": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffffffffffffffffffffff00",
+      "value": {
+        "txid": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "message": null
+    },
+    {
+      "name": "createAction_signable",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "signAndProcess": false
+        }
+      },
+      "answered": {
+        "signableTransaction": {
+          "tx": [
+            1,
+            1,
+            1,
+            1,
+            214,
+            75,
+            250,
+            253,
+            76,
+            144,
+            115,
+            172,
+            99,
+            110,
+            186,
+            16,
+            68,
+            102,
+            48,
+            205,
+            35,
+            69,
+            125,
+            253,
+            167,
+            185,
+            83,
+            228,
+            134,
+            199,
+            78,
+            237,
+            6,
+            35,
+            31,
+            121,
+            1,
+            0,
+            190,
+            239,
+            1,
+            254,
+            0,
+            53,
+            12,
+            0,
+            1,
+            1,
+            0,
+            2,
+            75,
+            176,
+            178,
+            156,
+            182,
+            100,
+            228,
+            10,
+            43,
+            103,
+            162,
+            193,
+            19,
+            43,
+            158,
+            14,
+            130,
+            98,
+            126,
+            70,
+            105,
+            191,
+            69,
+            32,
+            29,
+            2,
+            201,
+            212,
+            100,
+            90,
+            223,
+            101,
+            2,
+            1,
+            0,
+            0,
+            0,
+            1,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            255,
+            255,
+            255,
+            255,
+            1,
+            232,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            75,
+            176,
+            178,
+            156,
+            182,
+            100,
+            228,
+            10,
+            43,
+            103,
+            162,
+            193,
+            19,
+            43,
+            158,
+            14,
+            130,
+            98,
+            126,
+            70,
+            105,
+            191,
+            69,
+            32,
+            29,
+            2,
+            201,
+            212,
+            100,
+            90,
+            223,
+            101,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            255,
+            255,
+            255,
+            255,
+            2,
+            144,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            244,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference": "AQ=="
+        }
+      },
+      "response_hex": "000000ffffffffffffffffffffffffffffffffffff01dc01010101d64bfafd4c9073ac636eba10446630cd23457dfda7b953e486c74eed06231f790100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650201000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e803000000000000015100000000010001000000014bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf65000000000151ffffffff0290010000000000000151f401000000000000015100000000000101",
+      "value": {
+        "signableTransaction": {
+          "tx": [
+            1,
+            1,
+            1,
+            1,
+            214,
+            75,
+            250,
+            253,
+            76,
+            144,
+            115,
+            172,
+            99,
+            110,
+            186,
+            16,
+            68,
+            102,
+            48,
+            205,
+            35,
+            69,
+            125,
+            253,
+            167,
+            185,
+            83,
+            228,
+            134,
+            199,
+            78,
+            237,
+            6,
+            35,
+            31,
+            121,
+            1,
+            0,
+            190,
+            239,
+            1,
+            254,
+            0,
+            53,
+            12,
+            0,
+            1,
+            1,
+            0,
+            2,
+            75,
+            176,
+            178,
+            156,
+            182,
+            100,
+            228,
+            10,
+            43,
+            103,
+            162,
+            193,
+            19,
+            43,
+            158,
+            14,
+            130,
+            98,
+            126,
+            70,
+            105,
+            191,
+            69,
+            32,
+            29,
+            2,
+            201,
+            212,
+            100,
+            90,
+            223,
+            101,
+            2,
+            1,
+            0,
+            0,
+            0,
+            1,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            51,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            255,
+            255,
+            255,
+            255,
+            1,
+            232,
+            3,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            75,
+            176,
+            178,
+            156,
+            182,
+            100,
+            228,
+            10,
+            43,
+            103,
+            162,
+            193,
+            19,
+            43,
+            158,
+            14,
+            130,
+            98,
+            126,
+            70,
+            105,
+            191,
+            69,
+            32,
+            29,
+            2,
+            201,
+            212,
+            100,
+            90,
+            223,
+            101,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            255,
+            255,
+            255,
+            255,
+            2,
+            144,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            244,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            81,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "reference": "AQ=="
+        }
+      },
+      "message": null
+    },
+    {
+      "name": "createAction_txid_tx",
+      "group": null,
+      "state": null,
+      "call": "createAction",
+      "args": {
+        "description": "flag tests"
+      },
+      "answered": {
+        "txid": "791f2306ed4ec786e453b9a7fd7d4523cd30664410ba6e63ac73904cfdfa4bd6",
+        "tx": [
+          1,
+          1,
+          1,
+          1,
+          214,
+          75,
+          250,
+          253,
+          76,
+          144,
+          115,
+          172,
+          99,
+          110,
+          186,
+          16,
+          68,
+          102,
+          48,
+          205,
+          35,
+          69,
+          125,
+          253,
+          167,
+          185,
+          83,
+          228,
+          134,
+          199,
+          78,
+          237,
+          6,
+          35,
+          31,
+          121,
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          2,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          2,
+          144,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          244,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "response_hex": "0001791f2306ed4ec786e453b9a7fd7d4523cd30664410ba6e63ac73904cfdfa4bd601dc01010101d64bfafd4c9073ac636eba10446630cd23457dfda7b953e486c74eed06231f790100beef01fe00350c00010100024bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf650201000000013333333333333333333333333333333333333333333333333333333333333333000000000151ffffffff01e803000000000000015100000000010001000000014bb0b29cb664e40a2b67a2c1132b9e0e82627e4669bf45201d02c9d4645adf65000000000151ffffffff0290010000000000000151f40100000000000001510000000000ffffffffffffffffffffffffffffffffffff00",
+      "value": {
+        "txid": "791f2306ed4ec786e453b9a7fd7d4523cd30664410ba6e63ac73904cfdfa4bd6",
+        "tx": [
+          1,
+          1,
+          1,
+          1,
+          214,
+          75,
+          250,
+          253,
+          76,
+          144,
+          115,
+          172,
+          99,
+          110,
+          186,
+          16,
+          68,
+          102,
+          48,
+          205,
+          35,
+          69,
+          125,
+          253,
+          167,
+          185,
+          83,
+          228,
+          134,
+          199,
+          78,
+          237,
+          6,
+          35,
+          31,
+          121,
+          1,
+          0,
+          190,
+          239,
+          1,
+          254,
+          0,
+          53,
+          12,
+          0,
+          1,
+          1,
+          0,
+          2,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          2,
+          1,
+          0,
+          0,
+          0,
+          1,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          51,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          1,
+          232,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          75,
+          176,
+          178,
+          156,
+          182,
+          100,
+          228,
+          10,
+          43,
+          103,
+          162,
+          193,
+          19,
+          43,
+          158,
+          14,
+          130,
+          98,
+          126,
+          70,
+          105,
+          191,
+          69,
+          32,
+          29,
+          2,
+          201,
+          212,
+          100,
+          90,
+          223,
+          101,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          255,
+          255,
+          255,
+          255,
+          2,
+          144,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          244,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          81,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "signAction_txid",
+      "group": null,
+      "state": null,
+      "call": "signAction",
+      "args": {
+        "spends": {},
+        "reference": "AQ==",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "answered": {
+        "txid": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffff",
+      "value": {
+        "txid": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_labels_absent",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_labels_empty",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "labels": []
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473000100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "labels": []
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_labels_one",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "labels": [
+              "alpha"
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c61672074657374730105616c7068610100ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "labels": [
+              "alpha"
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_inputs_outputs_empty",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "inputs": [],
+            "outputs": []
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff01000000",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "inputs": [],
+            "outputs": []
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_input_scripts_absent",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "inputs": [
+              {
+                "sourceOutpoint": "2222222222222222222222222222222222222222222222222222222222222222.0",
+                "sourceSatoshis": 5,
+                "inputDescription": "flag tests",
+                "sequenceNumber": 0
+              }
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff01000122222222222222222222222222222222222222222222222222222222222222220005ffffffffffffffffffffffffffffffffffff0a666c616720746573747300ffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "inputs": [
+              {
+                "sourceOutpoint": "2222222222222222222222222222222222222222222222222222222222222222.0",
+                "sourceSatoshis": 5,
+                "inputDescription": "flag tests",
+                "sequenceNumber": 0
+              }
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_output_optionals_absent",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "flags"
+              }
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde803ffffffffffffffffff010a666c616720746573747305666c616773ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "flags",
+                "tags": []
+              }
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listActions_output_empty_strings",
+      "group": null,
+      "state": null,
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "answered": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "",
+                "tags": [],
+                "lockingScript": "",
+                "customInstructions": ""
+              }
+            ]
+          }
+        ]
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde80300010a666c6167207465737473000000",
+      "value": {
+        "totalActions": 1,
+        "actions": [
+          {
+            "txid": "1111111111111111111111111111111111111111111111111111111111111111",
+            "satoshis": 1000,
+            "status": "completed",
+            "isOutgoing": true,
+            "description": "flag tests",
+            "version": 1,
+            "lockTime": 0,
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "satoshis": 1000,
+                "lockingScript": "",
+                "spendable": true,
+                "outputDescription": "flag tests",
+                "basket": "",
+                "tags": [],
+                "customInstructions": ""
+              }
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listOutputs_optionals_absent",
+      "group": null,
+      "state": null,
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags"
+      },
+      "answered": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "spendable": true
+          }
+        ]
+      },
+      "response_hex": "0001ffffffffffffffffff111111111111111111111111111111111111111111111111111111111111111100fde803ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listOutputs_empty_strings",
+      "group": null,
+      "state": null,
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags"
+      },
+      "answered": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "spendable": true,
+            "lockingScript": "",
+            "customInstructions": ""
+          }
+        ]
+      },
+      "response_hex": "0001ffffffffffffffffff111111111111111111111111111111111111111111111111111111111111111100fde8030000ffffffffffffffffffffffffffffffffffff",
+      "value": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "lockingScript": "",
+            "customInstructions": ""
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listOutputs_tags_labels_empty",
+      "group": null,
+      "state": null,
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "includeTags": true,
+        "includeLabels": true
+      },
+      "answered": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "spendable": true,
+            "tags": [],
+            "labels": []
+          }
+        ]
+      },
+      "response_hex": "0001ffffffffffffffffff111111111111111111111111111111111111111111111111111111111111111100fde803ffffffffffffffffffffffffffffffffffff0000",
+      "value": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "tags": [],
+            "labels": []
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listOutputs_tags_labels_one",
+      "group": null,
+      "state": null,
+      "call": "listOutputs",
+      "args": {
+        "basket": "flags",
+        "includeTags": true,
+        "includeLabels": true
+      },
+      "answered": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "spendable": true,
+            "tags": [
+              "alpha"
+            ],
+            "labels": [
+              "omega"
+            ]
+          }
+        ]
+      },
+      "response_hex": "0001ffffffffffffffffff111111111111111111111111111111111111111111111111111111111111111100fde803ffffffffffffffffffffffffffffffffffff0105616c70686101056f6d656761",
+      "value": {
+        "totalOutputs": 1,
+        "outputs": [
+          {
+            "spendable": true,
+            "outpoint": "1111111111111111111111111111111111111111111111111111111111111111.0",
+            "satoshis": 1000,
+            "tags": [
+              "alpha"
+            ],
+            "labels": [
+              "omega"
+            ]
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listCertificates_keyring_absent",
+      "group": null,
+      "state": null,
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ]
+      },
+      "answered": {
+        "totalCertificates": 1,
+        "certificates": [
+          {
+            "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+            "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+            "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+            "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+            "fields": {
+              "name": "YQ=="
+            },
+            "signature": "3006020101020101"
+          }
+        ]
+      },
+      "response_hex": "0001b60101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110101046e616d650459513d3d30060201010201010000",
+      "value": {
+        "totalCertificates": 1,
+        "certificates": [
+          {
+            "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+            "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+            "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+            "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+            "fields": {
+              "name": "YQ=="
+            },
+            "signature": "3006020101020101",
+            "keyring": {}
+          }
+        ]
+      },
+      "message": null
+    },
+    {
+      "name": "listCertificates_keyring_verifier",
+      "group": null,
+      "state": null,
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ]
+      },
+      "answered": {
+        "totalCertificates": 1,
+        "certificates": [
+          {
+            "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+            "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+            "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+            "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+            "fields": {
+              "name": "YQ=="
+            },
+            "signature": "3006020101020101",
+            "keyring": {
+              "name": "YQ=="
+            },
+            "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+          }
+        ]
+      },
+      "response_hex": "0001b60101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110101046e616d650459513d3d30060201010201010101046e616d65016121022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4",
+      "value": {
+        "totalCertificates": 1,
+        "certificates": [
+          {
+            "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+            "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+            "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+            "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+            "revocationOutpoint": "1111111111111111111111111111111111111111111111111111111111111111.1",
+            "fields": {
+              "name": "YQ=="
+            },
+            "signature": "3006020101020101",
+            "keyring": {
+              "name": "YQ=="
+            },
+            "verifier": "022f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4"
+          }
+        ]
+      },
+      "message": null
+    }
+  ],
+  "response_flag_rows": [
+    {
+      "group": "listActions status",
+      "state": "completed",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listActions status",
+      "state": "unprocessed",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "02"
+    },
+    {
+      "group": "listActions status",
+      "state": "sending",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "03"
+    },
+    {
+      "group": "listActions status",
+      "state": "unproven",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "04"
+    },
+    {
+      "group": "listActions status",
+      "state": "unsigned",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "05"
+    },
+    {
+      "group": "listActions status",
+      "state": "nosend",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "06"
+    },
+    {
+      "group": "listActions status",
+      "state": "nonfinal",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "07"
+    },
+    {
+      "group": "listActions status",
+      "state": "failed",
+      "call": "listActions",
+      "field": "actions[0].status",
+      "offset": 37,
+      "byte_hex": "08"
+    },
+    {
+      "group": "listActions isOutgoing",
+      "state": "false",
+      "call": "listActions",
+      "field": "actions[0].isOutgoing",
+      "offset": 38,
+      "byte_hex": "00"
+    },
+    {
+      "group": "listActions isOutgoing",
+      "state": "true",
+      "call": "listActions",
+      "field": "actions[0].isOutgoing",
+      "offset": 38,
+      "byte_hex": "01"
+    },
+    {
+      "group": "listActions output spendable",
+      "state": "false",
+      "call": "listActions",
+      "field": "actions[0].outputs[0].spendable",
+      "offset": 84,
+      "byte_hex": "00"
+    },
+    {
+      "group": "listActions output spendable",
+      "state": "true",
+      "call": "listActions",
+      "field": "actions[0].outputs[0].spendable",
+      "offset": 84,
+      "byte_hex": "01"
+    },
+    {
+      "group": "isAuthenticated",
+      "state": "false",
+      "call": "isAuthenticated",
+      "field": "authenticated",
+      "offset": 1,
+      "byte_hex": "00"
+    },
+    {
+      "group": "isAuthenticated",
+      "state": "true",
+      "call": "isAuthenticated",
+      "field": "authenticated",
+      "offset": 1,
+      "byte_hex": "01"
+    },
+    {
+      "group": "getNetwork",
+      "state": "mainnet",
+      "call": "getNetwork",
+      "field": "network",
+      "offset": 1,
+      "byte_hex": "00"
+    },
+    {
+      "group": "getNetwork",
+      "state": "testnet",
+      "call": "getNetwork",
+      "field": "network",
+      "offset": 1,
+      "byte_hex": "01"
+    }
+  ],
+  "transceiver_refusal_rows": [
+    {
+      "name": "listActions status = 0",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80300010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Unknown status code: 0"
+    },
+    {
+      "name": "listActions status = 9",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80309010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Unknown status code: 9"
+    },
+    {
+      "name": "listActions status = 255",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde803ff010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Unknown status code: -1"
+    },
+    {
+      "name": "listActions isOutgoing = 2",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301020a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Invalid listActions isOutgoing flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "listActions isOutgoing = 255",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301ff0a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Invalid listActions isOutgoing flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "listActions output spendable = 2",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde803ffffffffffffffffff020a666c616720746573747305666c61677300ffffffffffffffffff",
+      "value": null,
+      "message": "Invalid listOutputs spendable flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "listActions output spendable = 255",
+      "call": "listActions",
+      "args": {
+        "labels": []
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111fde80301010a666c6167207465737473ffffffffffffffffff0100ffffffffffffffffff0100fde803ffffffffffffffffffff0a666c616720746573747305666c61677300ffffffffffffffffff",
+      "value": null,
+      "message": "Invalid listOutputs spendable flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "isAuthenticated = 2",
+      "call": "isAuthenticated",
+      "args": {},
+      "response_hex": "0002",
+      "value": null,
+      "message": "Wallet returned an invalid authentication verdict"
+    },
+    {
+      "name": "isAuthenticated = 255",
+      "call": "isAuthenticated",
+      "args": {},
+      "response_hex": "00ff",
+      "value": null,
+      "message": "Wallet returned an invalid authentication verdict"
+    },
+    {
+      "name": "getNetwork = 2",
+      "call": "getNetwork",
+      "args": {},
+      "response_hex": "0002",
+      "value": null,
+      "message": "Wallet returned an invalid network"
+    },
+    {
+      "name": "getNetwork = 255",
+      "call": "getNetwork",
+      "args": {},
+      "response_hex": "00ff",
+      "value": null,
+      "message": "Wallet returned an invalid network"
+    },
+    {
+      "name": "createAction txid present = 2",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0002111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffffffffffffffffffffff00",
+      "value": null,
+      "message": "Invalid createAction txid present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "createAction txid present = 255",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "00ff111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffffffffffffffffffffff00",
+      "value": null,
+      "message": "Invalid createAction txid present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "createAction tx present = 2",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111102ffffffffffffffffffffffffffffffffffff00",
+      "value": null,
+      "message": "Invalid createAction tx present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "createAction tx present = 255",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111ffffffffffffffffffffffffffffffffffffff00",
+      "value": null,
+      "message": "Invalid createAction tx present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "createAction signableTransaction present = 2",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffffffffffffffffffffff02",
+      "value": null,
+      "message": "Invalid createAction signableTransaction present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "createAction signableTransaction present = 255",
+      "call": "createAction",
+      "args": {
+        "description": "flag tests",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffffffffffffffffffffffff",
+      "value": null,
+      "message": "Invalid createAction signableTransaction present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "signAction txid present = 2",
+      "call": "signAction",
+      "args": {
+        "spends": {},
+        "reference": "AQ==",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0002111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffff",
+      "value": null,
+      "message": "Invalid signAction txid present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "signAction txid present = 255",
+      "call": "signAction",
+      "args": {
+        "spends": {},
+        "reference": "AQ==",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "00ff111111111111111111111111111111111111111111111111111111111111111100ffffffffffffffffff",
+      "value": null,
+      "message": "Invalid signAction txid present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "signAction tx present = 2",
+      "call": "signAction",
+      "args": {
+        "spends": {},
+        "reference": "AQ==",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "0001111111111111111111111111111111111111111111111111111111111111111102ffffffffffffffffff",
+      "value": null,
+      "message": "Invalid signAction tx present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "signAction tx present = 255",
+      "call": "signAction",
+      "args": {
+        "spends": {},
+        "reference": "AQ==",
+        "options": {
+          "returnTXIDOnly": true
+        }
+      },
+      "response_hex": "00011111111111111111111111111111111111111111111111111111111111111111ffffffffffffffffffff",
+      "value": null,
+      "message": "Invalid signAction tx present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "isAuthenticated empty",
+      "call": "isAuthenticated",
+      "args": {},
+      "response_hex": "00",
+      "value": null,
+      "message": "Wallet Wire isAuthenticated response has an invalid length"
+    },
+    {
+      "name": "isAuthenticated two bytes",
+      "call": "isAuthenticated",
+      "args": {},
+      "response_hex": "000100",
+      "value": null,
+      "message": "Wallet Wire isAuthenticated response has an invalid length"
+    },
+    {
+      "name": "getNetwork empty",
+      "call": "getNetwork",
+      "args": {},
+      "response_hex": "00",
+      "value": null,
+      "message": "Wallet Wire getNetwork response has an invalid length"
+    },
+    {
+      "name": "getNetwork two bytes",
+      "call": "getNetwork",
+      "args": {},
+      "response_hex": "000000",
+      "value": null,
+      "message": "Wallet Wire getNetwork response has an invalid length"
+    },
+    {
+      "name": "listCertificates keyring present = 2",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ]
+      },
+      "response_hex": "0001b60101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110101046e616d650459513d3d30060201010201010200",
+      "value": null,
+      "message": "Invalid listCertificates keyring present flag: expected 0 or 1, received 2"
+    },
+    {
+      "name": "listCertificates keyring present = 255",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ]
+      },
+      "response_hex": "0001b60101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110101046e616d650459513d3d3006020101020101ff00",
+      "value": null,
+      "message": "Invalid listCertificates keyring present flag: expected 0 or 1, received -1"
+    },
+    {
+      "name": "listCertificates verifier length = 32",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc"
+        ],
+        "types": [
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        ]
+      },
+      "response_hex": "0001b60101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc11111111111111111111111111111111111111111111111111111111111111110101046e616d650459513d3d30060201010201010020",
+      "value": null,
+      "message": "Invalid listCertificates verifier length: expected 33 bytes, received 32"
+    }
+  ]
+}

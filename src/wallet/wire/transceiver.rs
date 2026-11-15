@@ -402,8 +402,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::IsAuthenticated, originator, &[])
             .await?;
 
-        let mut reader = WireReader::new(&response);
-        Ok(reader.read_optional_bool()?.unwrap_or(false))
+        // Exactly one byte, 0 or 1 (`WalletWireTransceiver.ts:1855-1858`; #1002)
+        super::flags::single_flag(
+            &response,
+            "isAuthenticated",
+            "Wallet returned an invalid authentication verdict",
+        )
     }
 
     /// Gets the current block height.
@@ -424,17 +428,15 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::GetNetwork, originator, &[])
             .await?;
 
-        let mut reader = WireReader::new(&response);
-        let code = reader.read_u8()?;
-
-        match code {
-            0 => Ok(Network::Mainnet),
-            1 => Ok(Network::Testnet),
-            _ => Err(Error::WalletError(format!(
-                "unknown network code: {}",
-                code
-            ))),
-        }
+        // Exactly one byte, 0 mainnet or 1 testnet
+        // (`WalletWireTransceiver.ts:1915-1919`; #1002)
+        let invalid = "Wallet returned an invalid network";
+        let testnet = super::flags::single_flag(&response, "getNetwork", invalid)?;
+        Ok(if testnet {
+            Network::Testnet
+        } else {
+            Network::Mainnet
+        })
     }
 
     /// Gets the wallet version.
@@ -589,25 +591,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        // Parse txid
-        let txid_flag = reader.read_i8()?;
-        let txid = if txid_flag == 1 {
-            let bytes = reader.read_bytes(32)?;
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(bytes);
-            Some(arr)
-        } else {
-            None
-        };
-
-        // Parse tx
-        let tx_flag = reader.read_i8()?;
-        let tx = if tx_flag == 1 {
-            let len = reader.read_length()?;
-            Some(reader.read_bytes(len)?.to_vec())
-        } else {
-            None
-        };
+        // The txid and the tx behind their presence flags, 0 or 1
+        // (`WalletWireTransceiver.ts:238-244`; #1002)
+        let (txid, tx) = reader.read_flagged_txid_and_tx("createAction")?;
 
         // Parse no_send_change (Go uses VarInt(MaxUint64) for nil)
         let no_send_change_len =
@@ -629,9 +615,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse send_with_results
         let send_with_results = reader.read_send_with_result_array()?;
 
-        // Parse signable_transaction
-        let signable_flag = reader.read_i8()?;
-        let signable_transaction = if signable_flag == 1 {
+        // Parse signable_transaction, its presence flag 0 or 1 (`:263`; #1002)
+        let signable = reader.read_boolean_flag("createAction signableTransaction present")?;
+        let signable_transaction = if signable {
             let tx_len = reader.read_length()?;
             let tx_bytes = reader.read_bytes(tx_len)?.to_vec();
             let ref_len = reader.read_length()?;
@@ -700,25 +686,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        // Parse txid
-        let txid_flag = reader.read_i8()?;
-        let txid = if txid_flag == 1 {
-            let bytes = reader.read_bytes(32)?;
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(bytes);
-            Some(arr)
-        } else {
-            None
-        };
-
-        // Parse tx
-        let tx_flag = reader.read_i8()?;
-        let tx = if tx_flag == 1 {
-            let len = reader.read_length()?;
-            Some(reader.read_bytes(len)?.to_vec())
-        } else {
-            None
-        };
+        // The txid and the tx behind their presence flags, 0 or 1
+        // (`WalletWireTransceiver.ts:310-315`; #1002)
+        let (txid, tx) = reader.read_flagged_txid_and_tx("signAction")?;
 
         // Parse send_with_results
         let send_with_results = reader.read_send_with_result_array()?;
@@ -1130,7 +1100,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 33 => Some(reader.read_compressed_key("listCertificates verifier")?),
                 n => {
                     return Err(Error::WalletError(format!(
-                        "invalid listCertificates verifier length: expected 33 bytes, received {n}"
+                        "Invalid listCertificates verifier length: expected 33 bytes, received {n}"
                     )))
                 }
             };

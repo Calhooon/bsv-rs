@@ -67,21 +67,17 @@ fn read_key_related_params(reader: &mut WireReader<'_>) -> Result<KeyRelated, Er
 /// Reads the privileged flag and reason as the reference's
 /// `#decodePrivilegedParams` does (`ts-stack@edf6e03`
 /// `WalletWireProcessor.ts:2465-2476`): the flag an `i8` (-1 absent, 0, 1),
-/// then the reason's length an `i8` (-1 absent, 0 to 127) and its UTF-8 bytes.
+/// then the reason's length an `i8` (-1 absent, 0 to 127) and its UTF-8 bytes,
+/// a flag or a length outside those refused in its words (`:46-61`; #1002).
 fn read_privileged_params(
     reader: &mut WireReader<'_>,
 ) -> Result<(Option<bool>, Option<String>), Error> {
-    let privileged = reader.read_optional_bool()?;
+    let privileged = reader.read_optional_boolean_flag("privileged")?;
     let privileged_reason =
-        match reader.read_i8()? {
-            -1 => None,
-            length if length < 0 => {
-                return Err(Error::WalletError(format!(
-                    "invalid privilegedReason length: expected -1 or 0 to 127, got {length}"
-                )))
-            }
-            length => {
-                let bytes = reader.read_bytes(length.unsigned_abs().into())?;
+        match reader.read_optional_int8_length("privilegedReason")? {
+            None => None,
+            Some(length) => {
+                let bytes = reader.read_bytes(length)?;
                 Some(String::from_utf8(bytes.to_vec()).map_err(|e| {
                     Error::WalletError(format!("invalid privilegedReason UTF-8: {e}"))
                 })?)
@@ -214,9 +210,9 @@ pub(super) fn read_get_public_key_args(
         args.counterparty = key.counterparty;
         args.privileged = key.privileged;
         args.privileged_reason = key.privileged_reason;
-        args.for_self = reader.read_optional_bool()?;
+        args.for_self = reader.read_optional_boolean_flag("forSelf")?;
     }
-    args.seek_permission = reader.read_optional_bool()?;
+    args.seek_permission = reader.read_seek_permission()?;
     Ok(args)
 }
 
@@ -229,7 +225,7 @@ fn read_key_bytes_args(
 ) -> Result<(KeyRelated, Vec<u8>, Option<bool>), Error> {
     let key = read_key_related_params(reader)?;
     let bytes = read_length_prefixed(reader)?;
-    Ok((key, bytes, reader.read_optional_bool()?))
+    Ok((key, bytes, reader.read_seek_permission()?))
 }
 
 /// encrypt's parameters ([`read_key_bytes_args`]).
@@ -259,7 +255,7 @@ pub(super) fn read_verify_hmac_args(reader: &mut WireReader<'_>) -> Result<Verif
     let key = read_key_related_params(reader)?;
     let hmac = read_32(reader)?;
     let data = read_length_prefixed(reader)?;
-    let seek = reader.read_optional_bool()?;
+    let seek = reader.read_seek_permission()?;
     Ok(from_key_related!(VerifyHmacArgs { data, hmac }, key, seek))
 }
 
@@ -271,7 +267,7 @@ pub(super) fn read_create_signature_args(
 ) -> Result<CreateSignatureArgs, Error> {
     let key = read_key_related_params(reader)?;
     let (data, hash_to_directly_sign) = read_data_or_hash(reader, "createSignature")?;
-    let seek = reader.read_optional_bool()?;
+    let seek = reader.read_seek_permission()?;
     Ok(from_key_related!(
         CreateSignatureArgs {
             data,
@@ -291,10 +287,10 @@ pub(super) fn read_verify_signature_args(
     reader: &mut WireReader<'_>,
 ) -> Result<VerifySignatureArgs, Error> {
     let key = read_key_related_params(reader)?;
-    let for_self = reader.read_optional_bool()?;
+    let for_self = reader.read_optional_boolean_flag("forSelf")?;
     let signature = read_length_prefixed(reader)?;
     let (data, hash_to_directly_verify) = read_data_or_hash(reader, "verifySignature")?;
-    let seek = reader.read_optional_bool()?;
+    let seek = reader.read_seek_permission()?;
     Ok(from_key_related!(
         VerifySignatureArgs {
             data,
