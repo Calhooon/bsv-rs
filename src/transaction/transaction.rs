@@ -1671,9 +1671,11 @@ impl Transaction {
         fee_model: Option<&dyn super::FeeModel>,
     ) -> Result<bool> {
         use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
+        use crate::script::spend::PreGenesis;
         use crate::script::{p2sh_redeem::Redeem, Spend, TxSpendParams};
 
         let by_txid = self.reachable_by_txid();
+        let genesis_height = genesis_height(chain_tracker, &by_txid).await;
         let overflow = || crate::Error::TransactionError("Input satoshis overflow".to_string());
 
         let mut verified_txids: HashSet<String> = HashSet::new();
@@ -1712,7 +1714,7 @@ impl Transaction {
             // inputs. The txid is the one the input names, falling back to the
             // id of whatever source object it holds (TS `Transaction.verify`
             // fills `sourceTXID` in the same way).
-            let mut sources: Vec<(String, &TransactionOutput)> =
+            let mut sources: Vec<(String, &TransactionOutput, Option<u64>)> =
                 Vec::with_capacity(tx.inputs.len());
             let mut input_total: u64 = 0;
             for (vin, input) in tx.inputs.iter().enumerate() {
@@ -1739,7 +1741,11 @@ impl Transaction {
                 input_total = input_total
                     .checked_add(source_output.satoshis.unwrap_or(0))
                     .ok_or_else(overflow)?;
-                sources.push((source_txid, source_output));
+                let height = source
+                    .merkle_path
+                    .as_ref()
+                    .map(|p| u64::from(p.block_height));
+                sources.push((source_txid, source_output, height));
             }
             let mut output_total: u64 = 0;
             for output in &tx.outputs {
@@ -1793,7 +1799,7 @@ impl Transaction {
             ));
 
             // Verify each input's script
-            for ((vin, input), (source_txid, source_output)) in
+            for ((vin, input), (source_txid, source_output, height)) in
                 tx.inputs.iter().enumerate().zip(sources)
             {
                 let source_satoshis = source_output.satoshis.unwrap_or(0);
@@ -1816,8 +1822,10 @@ impl Transaction {
                     work_limit: None,
                 };
                 let step = Redeem::of(&lock, &unlock, &params, true);
+                let again = PreGenesis::of(&lock, &unlock, &params, height, genesis_height);
                 let spend = Spend::with_transaction(params)?;
-                Redeem::judge(step, spend, |_| {}).0.map_err(|e| {
+                let judged = PreGenesis::after(again, Redeem::judge(step, spend, |_| {}));
+                judged.0.map_err(|e| {
                     crate::Error::TransactionError(format!(
                         "Script validation failed for input {}: {}",
                         vin, e.message
@@ -1853,6 +1861,25 @@ fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> {
             reason.kind()
         ))),
         None => Ok(()),
+    }
+}
+
+/// The chain's Genesis height for [`Transaction::verify`]: the tracker's
+/// [`ChainTip::genesis_height`](super::beef_stream::ChainTip::genesis_height)
+/// when its [`mining_tip`](super::ChainTracker::mining_tip) names one,
+/// mainnet's otherwise (also when it fails). Asked once, and only when a
+/// reachable transaction carries a merkle path (GHSA-h4m7-c6p8-725m).
+async fn genesis_height(
+    tracker: &dyn super::ChainTracker,
+    reachable: &HashMap<String, &Transaction>,
+) -> u64 {
+    let mainnet = u64::from(crate::script::ProtocolEra::MAINNET_GENESIS_HEIGHT);
+    if !reachable.values().any(|tx| tx.merkle_path.is_some()) {
+        return mainnet;
+    }
+    match tracker.mining_tip().await {
+        Ok(Some(tip)) => u64::from(tip.genesis_height),
+        _ => mainnet,
     }
 }
 

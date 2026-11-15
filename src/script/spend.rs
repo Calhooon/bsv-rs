@@ -111,6 +111,11 @@ use std::sync::Arc;
 /// The interpreter's one reading of a signature (#842's fold, #847).
 mod signature_read;
 
+mod num;
+mod pre_genesis;
+#[cfg(feature = "transaction")]
+pub(crate) use pre_genesis::PreGenesis;
+
 // ============================================================================
 // Configuration Constants
 // ============================================================================
@@ -258,6 +263,8 @@ pub struct Spend {
     work_limit: Option<u64>,
     work_spent: u64,
     work_declined: Option<u64>,
+    /// A coin from before Genesis: its opcodes counted (`pre_genesis.rs`).
+    pre_genesis: Option<u64>,
     stack_mem: usize,
     alt_stack_mem: usize,
     /// Under a word, the node's stack memory count: ONE budget over the main
@@ -419,6 +426,7 @@ impl Spend {
             work_limit,
             work_spent: 0,
             work_declined: None,
+            pre_genesis: None,
             stack_mem: 0,
             alt_stack_mem: 0,
             node_mem: 0,
@@ -555,6 +563,9 @@ impl Spend {
     /// `301-315`), at `OP_BIN2NUM`'s result (`interpreter.cpp:1789-1790`), and
     /// as 4 bytes on `OP_CHECKMULTISIG`'s counts (`1519-1525`, `1550-1552`).
     pub fn max_script_num_length(&self) -> Option<usize> {
+        if self.pre_genesis() {
+            return Some(pre_genesis::NUMBER);
+        }
         self.flags.map(|word| {
             word.max_script_num_length(self.utxo_after_chronicle, self.script_num_length_policy)
         })
@@ -777,6 +788,7 @@ impl Spend {
             )));
         }
 
+        self.pre_genesis_before(current_opcode, operation.data.as_deref())?;
         // Check for oversized data push
         if let Some(ref data) = operation.data {
             if data.len() > MAX_SCRIPT_ELEMENT_SIZE {
@@ -815,6 +827,7 @@ impl Spend {
             self.execute_opcode(current_opcode, operation)?;
         }
 
+        self.pre_genesis_after()?;
         self.program_counter += 1;
         Ok(true)
     }
@@ -855,6 +868,7 @@ impl Spend {
             // CHECKSEQUENCEVERIFY, NOPs for a post-Genesis UTXO; 606-700 for
             // NOP4-NOP8 before their Chronicle meanings). ts-sdk: "is
             // discouraged by verification flags".
+            OP_NOP2 | OP_NOP3 if self.pre_genesis() => self.pre_genesis_lock_time(opcode)?,
             OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP9 | OP_NOP10 => {
                 if self.discourage_upgradable_nops {
                     return Err(self.error(&format!(
@@ -988,6 +1002,7 @@ impl Spend {
                 self.pop_stack()?;
             }
             OP_RETURN => {
+                self.pre_genesis_return()?;
                 // After Genesis (interpreter.cpp:856-871): at the top level the
                 // script ends successfully, whatever follows; inside a conditional,
                 // execution stops but the walk continues, so the conditionals must
@@ -1245,6 +1260,9 @@ impl Spend {
                 }
                 let buf2 = self.pop_stack()?;
                 let buf1 = self.pop_stack()?;
+                self.pre_genesis_element(
+                    i64::try_from(buf1.len() + buf2.len()).unwrap_or(i64::MAX),
+                )?;
                 let mut result = buf1;
                 result.extend(buf2);
                 // The default mode's 1 GiB element bound; under a word an element
@@ -1283,7 +1301,7 @@ impl Spend {
                 let size_bytes = self.pop_stack()?;
                 let size_bn = self.read_number(&size_bytes)?;
                 let size = size_bn.to_i64().unwrap_or(-1);
-
+                self.pre_genesis_element(size)?;
                 let size = if self.flags.is_some() {
                     // Under a word the reference's bound: a size below 0 or above
                     // INT32_MAX is SCRIPT_ERR_PUSH_SIZE before anything is
@@ -1862,6 +1880,7 @@ impl Spend {
                 MAX_MULTISIG_KEY_COUNT
             )));
         }
+        self.pre_genesis_keys(n_keys)?;
         let n_keys = n_keys as usize;
 
         // Get public keys
@@ -2565,62 +2584,6 @@ impl Spend {
                 attempted: attempted as u64,
                 work_spent: None,
             })
-    }
-
-    // ========================================================================
-    // Script numbers under the length limit
-    // ========================================================================
-
-    /// Decodes a stack element as a script number under `limit`: the length
-    /// test precedes the decode and the minimal-encoding check, as on the
-    /// reference (`script_num.cpp:62-68`; `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`,
-    /// `interpreter.cpp:1807-1810`).
-    fn read_number_within(
-        &self,
-        bytes: &[u8],
-        limit: Option<usize>,
-    ) -> Result<BigNumber, ScriptEvaluationError> {
-        if let Some(max) = limit {
-            if bytes.len() > max {
-                return Err(self.overflow_error(bytes.len(), max));
-            }
-        }
-        ScriptNum::from_bytes(bytes, self.require_minimal)
-            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
-    }
-
-    /// A script number read under the limit in force
-    /// ([`max_script_num_length`](Self::max_script_num_length)).
-    fn read_number(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
-        self.read_number_within(bytes, self.max_script_num_length())
-    }
-
-    /// `OP_CHECKMULTISIG`'s two counts: 4-byte numbers in every era
-    /// (`CScriptNum::MAXIMUM_ELEMENT_SIZE`, `interpreter.cpp:1519-1525`,
-    /// `1550-1552`) under a word; the default mode reads them as the
-    /// TypeScript SDK does.
-    fn read_count(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
-        self.read_number_within(bytes, self.flags.map(|_| 4))
-    }
-
-    /// Pushes a computed number, refusing one longer than the limit in force
-    /// before it reaches the stack (the reference bounds the results of `+`,
-    /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
-    /// `301-315`).
-    fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
-        let bytes = ScriptNum::to_bytes(value);
-        if let Some(max) = self.max_script_num_length() {
-            if bytes.len() > max {
-                return Err(self.overflow_error(bytes.len(), max));
-            }
-        }
-        self.push_stack(bytes)
-    }
-
-    fn overflow_error(&self, len: usize, max: usize) -> ScriptEvaluationError {
-        self.error(&format!(
-            "Script number overflow: {len} bytes, the limit is {max} bytes."
-        ))
     }
 
     /// Work charged in this evaluation when a work budget is configured.
