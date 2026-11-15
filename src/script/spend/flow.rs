@@ -3,7 +3,9 @@
 //! `OP_ENDIF`), `OP_VERIFY` and `OP_RETURN`; the disabled-opcode rule.
 
 use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
-use crate::script::op::{opcode_to_name, OP_2DIV, OP_2MUL, OP_NOTIF, OP_VERNOTIF};
+use crate::script::op::{
+    opcode_to_name, OP_2DIV, OP_2MUL, OP_NOP2, OP_NOP3, OP_NOTIF, OP_VERNOTIF,
+};
 use crate::script::script_num::ScriptNum;
 
 use super::Spend;
@@ -24,6 +26,9 @@ impl Spend {
     // NOP4-NOP8 before their Chronicle meanings). ts-sdk: "is
     // discouraged by verification flags".
     pub(super) fn op_upgradable_nop(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
+        if matches!(opcode, OP_NOP2 | OP_NOP3) && self.pre_genesis() {
+            return self.pre_genesis_lock_time(opcode);
+        }
         if self.discourage_upgradable_nops {
             return Err(self.error(&format!(
                 "{} is discouraged by verification flags.",
@@ -171,7 +176,8 @@ impl Spend {
         Ok(())
     }
 
-    pub(super) fn op_return(&mut self) {
+    pub(super) fn op_return(&mut self) -> Result<(), ScriptEvaluationError> {
+        self.pre_genesis_return()?;
         // After Genesis (interpreter.cpp:856-871): at the top level the
         // script ends successfully, whatever follows; inside a conditional,
         // execution stops but the walk continues, so the conditionals must
@@ -189,5 +195,6 @@ impl Spend {
         } else {
             self.returning = true;
         }
+        Ok(())
     }
 }

@@ -21,6 +21,9 @@ impl Spend {
     /// `301-315`), at `OP_BIN2NUM`'s result (`interpreter.cpp:1789-1790`), and
     /// as 4 bytes on `OP_CHECKMULTISIG`'s counts (`1519-1525`, `1550-1552`).
     pub fn max_script_num_length(&self) -> Option<usize> {
+        if self.pre_genesis() {
+            return Some(super::pre_genesis::NUMBER);
+        }
         self.flags.map(|word| {
             word.max_script_num_length(self.utxo_after_chronicle, self.script_num_length_policy)
         })
@@ -122,17 +125,20 @@ impl Spend {
 
     /// `OP_CHECKMULTISIG`'s two counts: 4-byte numbers in every era
     /// (`CScriptNum::MAXIMUM_ELEMENT_SIZE`, `interpreter.cpp:1519-1525`,
-    /// `1550-1552`) under a word; the default mode reads them as the
-    /// TypeScript SDK does.
+    /// `1550-1552`) under a word and for a coin from before Genesis; the
+    /// default mode reads them as the TypeScript SDK does.
     pub(super) fn read_count(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
-        self.read_number_within(bytes, 0, self.flags.map(|_| 4))
+        let four = self.flags.is_some() || self.pre_genesis();
+        self.read_number_within(bytes, 0, four.then_some(4))
     }
 
     /// Pushes a computed number, refusing one longer than the limit in force
     /// before it reaches the stack (the reference bounds the results of `+`,
     /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
     /// `301-315`). The number is freed once encoded, before its bytes join
-    /// the stack (bsv-rs#348).
+    /// the stack (bsv-rs#348). A coin from before Genesis bounds its operands,
+    /// not its results: the node computes them as `int64` and pushes them at
+    /// any length (`interpreter.cpp:1300-1301`, `CScriptNum`'s `int64` arm).
     pub(super) fn push_number(&mut self, value: BigNumber) -> Result<(), ScriptEvaluationError> {
         let len = value.byte_length() + 1;
         let bytes = ScriptNum::try_to_bytes(&value)
@@ -146,7 +152,7 @@ impl Spend {
         &mut self,
         bytes: Vec<u8>,
     ) -> Result<(), ScriptEvaluationError> {
-        if let Some(max) = self.max_script_num_length() {
+        if let Some(max) = self.max_script_num_length().filter(|_| !self.pre_genesis()) {
             if bytes.len() > max {
                 return Err(self.overflow_error(bytes.len(), max));
             }

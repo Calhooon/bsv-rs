@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::script::NotJudgedCause;
+use crate::script::{NotJudgedCause, Spend};
 use crate::transaction::spending::{judge_input, InputRefusal, InputRules, InputVerified};
 
 use super::budget::WorkSpent;
@@ -184,7 +184,36 @@ impl<T: TxFields> InputCheck<'_, T> {
             .evaluation
             .work
             .charge(&mut work.total, vin as u32, judged.work_spent);
-        self.execution_result(vin, judged.result, charged)
+        let mut result = judged.result;
+        if result.is_ok() && self.before_genesis(source_height) {
+            let refused = Spend::pre_genesis_refusal(
+                &shared,
+                vin,
+                &source.script,
+                self.body.unlocking(vin),
+                source.satoshis,
+                self.evaluation.memory,
+            );
+            if let Some(error) = refused {
+                result = Err(InputRefusal::Invalid(Box::new(error)));
+            }
+        }
+        self.execution_result(vin, result, charged)
+    }
+
+    /// GHSA-h4m7-c6p8-725m: in the default mode a coin the BUMP of its parent
+    /// proves below the tip's Genesis height (mainnet's without a tip) is
+    /// judged again as one created before Genesis; chain parameters judge
+    /// the era themselves.
+    #[allow(deprecated)] // ChainTip's copy serves the default path until the api-break.
+    fn before_genesis(&self, coin_height: Option<u64>) -> bool {
+        let genesis = self
+            .tip
+            .map_or(crate::block::ChainParams::mainnet().genesis_height, |t| {
+                t.genesis_height
+            });
+        self.evaluation.chain.is_none()
+            && coin_height.is_some_and(|height| height < u64::from(genesis))
     }
 
     fn execution_result(

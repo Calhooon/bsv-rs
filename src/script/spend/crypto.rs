@@ -209,6 +209,7 @@ impl Spend {
                 MAX_MULTISIG_KEY_COUNT
             )));
         }
+        self.pre_genesis_keys(n_keys)?;
         let n_keys = n_keys as usize;
 
         // Get public keys

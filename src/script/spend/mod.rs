@@ -97,7 +97,6 @@ use super::flags::{
 use super::op::*;
 use super::{script_num::ScriptNum, LockingScript, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::primitives::to_hex;
 use std::sync::Arc;
 
 mod arithmetic;
@@ -109,6 +108,7 @@ mod hash_type;
 mod key_point;
 mod limits;
 mod num;
+mod pre_genesis;
 mod push;
 mod reference_read;
 mod script_code;
@@ -236,6 +236,7 @@ pub struct Spend {
     work_limit: Option<u64>,
     work_spent: u64,
     work_declined: Option<u64>,
+    pre_genesis: Option<u64>,
     stack_mem: usize,
     alt_stack_mem: usize,
     /// Under a word, the node's stack memory count: ONE budget over the main
@@ -401,6 +402,7 @@ impl Spend {
             work_limit,
             work_spent: 0,
             work_declined: None,
+            pre_genesis: None,
             stack_mem: 0,
             alt_stack_mem: 0,
             node_mem: 0,
@@ -594,6 +596,7 @@ impl Spend {
             )));
         }
 
+        self.pre_genesis_before(current_opcode, operation.data.as_deref())?;
         // Check for oversized data push
         if let Some(ref data) = operation.data {
             if data.len() > MAX_SCRIPT_ELEMENT_SIZE {
@@ -632,6 +635,7 @@ impl Spend {
             self.execute_opcode(current_opcode, operation)?;
         }
 
+        self.pre_genesis_after()?;
         self.program_counter += 1;
         Ok(true)
     }
@@ -667,10 +671,7 @@ impl Spend {
             OP_ELSE => self.op_else(),
             OP_ENDIF => self.op_endif(),
             OP_VERIFY => self.op_verify(),
-            OP_RETURN => {
-                self.op_return();
-                Ok(())
-            }
+            OP_RETURN => self.op_return(),
 
             // stack_ops.rs
             OP_TOALTSTACK => self.op_toaltstack(),
@@ -750,25 +751,6 @@ impl Spend {
                 opcode, self.program_counter
             ))),
         }
-    }
-
-    // ========================================================================
-    // Error Helpers
-    // ========================================================================
-
-    fn error(&self, message: &str) -> ScriptEvaluationError {
-        ScriptEvaluationError::new(
-            message,
-            to_hex(&self.source_txid),
-            self.source_output_index,
-            self.context,
-            self.program_counter,
-            stack::snapshot(&self.stack),
-            stack::snapshot(&self.alt_stack),
-            self.if_stack.clone(),
-            self.stack_mem,
-            self.alt_stack_mem,
-        )
     }
 }
 
