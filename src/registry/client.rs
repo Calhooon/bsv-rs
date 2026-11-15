@@ -12,8 +12,8 @@
 //! - `revoke_own_registry_entry(record)` - takes RegistryRecord
 
 use crate::overlay::{
-    LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
-    OutputListItem, TopicBroadcaster, TopicBroadcasterConfig,
+    LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset, TopicBroadcaster,
+    TopicBroadcasterConfig,
 };
 use crate::primitives::{from_hex, to_hex, PublicKey};
 use crate::registry::types::{
@@ -330,27 +330,10 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching basket definitions.
+    /// The basket definitions this release can authenticate from the
+    /// lookup's answer: none on the 0.8 line (see `authenticated`).
     pub async fn resolve_basket(&self, query: BasketQuery) -> Result<Vec<BasketDefinitionData>> {
-        let service = DefinitionType::Basket.lookup_service();
-        let query_json = serde_json::to_value(&query)
-            .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_basket_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
-            _ => Ok(Vec::new()),
-        }
+        self.authenticated(DefinitionType::Basket, &query).await
     }
 
     /// Resolves protocol definitions matching the query.
@@ -361,30 +344,13 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching protocol definitions.
+    /// The protocol definitions this release can authenticate from the
+    /// lookup's answer: none on the 0.8 line (see `authenticated`).
     pub async fn resolve_protocol(
         &self,
         query: ProtocolQuery,
     ) -> Result<Vec<ProtocolDefinitionData>> {
-        let service = DefinitionType::Protocol.lookup_service();
-        let query_json = serde_json::to_value(&query)
-            .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_protocol_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
-            _ => Ok(Vec::new()),
-        }
+        self.authenticated(DefinitionType::Protocol, &query).await
     }
 
     /// Resolves certificate definitions matching the query.
@@ -395,99 +361,33 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching certificate definitions.
+    /// The certificate definitions this release can authenticate from the
+    /// lookup's answer: none on the 0.8 line (see `authenticated`).
     pub async fn resolve_certificate(
         &self,
         query: CertificateQuery,
     ) -> Result<Vec<CertificateDefinitionData>> {
-        let service = DefinitionType::Certificate.lookup_service();
-        let query_json = serde_json::to_value(&query)
+        self.authenticated(DefinitionType::Certificate, &query)
+            .await
+    }
+
+    /// Asks the definition type's lookup service and returns the definitions
+    /// in its answer that this release can authenticate. A resolved
+    /// definition is returned only when the registry operator it names has
+    /// signed it; the 0.8 line reads no operator-signed definition token
+    /// (0.9.0 reads the signed form), so it returns none. A lookup that fails
+    /// fails as before. The caller's own entries are listed, unchanged, by
+    /// `list_own_registry_entries`.
+    async fn authenticated<T>(
+        &self,
+        definition_type: DefinitionType,
+        query: &impl serde::Serialize,
+    ) -> Result<Vec<T>> {
+        let query_json = serde_json::to_value(query)
             .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_certificate_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
-            _ => Ok(Vec::new()),
-        }
-    }
-
-    /// Parses a basket definition from an overlay output.
-    fn parse_basket_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<BasketDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 6 {
-            return Ok(None);
-        }
-
-        BasketDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
-    }
-
-    /// Parses a protocol definition from an overlay output.
-    fn parse_protocol_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<ProtocolDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 6 {
-            return Ok(None);
-        }
-
-        ProtocolDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
-    }
-
-    /// Parses a certificate definition from an overlay output.
-    fn parse_certificate_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<CertificateDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let pushdrop = PushDrop::decode(&tx_output.locking_script)
-            .map_err(|e| Error::RegistryError(format!("Failed to decode PushDrop: {}", e)))?;
-
-        if pushdrop.fields.len() != 7 {
-            return Ok(None);
-        }
-
-        CertificateDefinitionData::from_pushdrop_fields(&pushdrop.fields).map(Some)
+        let question = LookupQuestion::new(definition_type.lookup_service(), query_json);
+        self.resolver.query(&question, None).await?;
+        Ok(Vec::new())
     }
 
     // =========================================================================

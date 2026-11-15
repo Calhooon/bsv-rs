@@ -15,7 +15,7 @@ Registry entries are stored as PushDrop tokens on-chain, allowing decentralized 
 |------|---------|
 | `mod.rs` | Module root; re-exports and constants |
 | `types.rs` | Definition types, queries, tokens, result types |
-| `client.rs` | RegistryClient implementation |
+| `client.rs` | RegistryClient implementation; the three resolves ask the lookup service and return only the definitions they can authenticate as their named operator's (`authenticated`): this line reads no operator-signed definition token, so none (`tests/registry_resolve_authenticated.rs`); `list_own_registry_entries` lists the caller's own outputs as before |
 
 ## Key Exports
 
@@ -297,7 +297,8 @@ impl<W: WalletInterface> RegistryClient<W> {
     // Single registration method (Go SDK: RegisterDefinition)
     pub async fn register_definition(&self, data: DefinitionData) -> Result<RegisterDefinitionResult>
 
-    // Resolution methods (typed returns)
+    // Resolution methods (typed returns): a definition only when authenticated as its
+    // named operator's; this line reads no operator-signed token, so none
     pub async fn resolve_basket(&self, query: BasketQuery) -> Result<Vec<BasketDefinitionData>>
     pub async fn resolve_protocol(&self, query: ProtocolQuery) -> Result<Vec<ProtocolDefinitionData>>
     pub async fn resolve_certificate(&self, query: CertificateQuery) -> Result<Vec<CertificateDefinitionData>>

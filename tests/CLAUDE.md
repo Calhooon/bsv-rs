@@ -53,6 +53,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `overlay_mock_tests.rs` | 20 | `full` | Mock facilitator tests for LookupResolver/TopicBroadcaster |
 | `readme_examples.rs` | 1 | default | Every ```rust block of `README.md` that names an `examples/<name>.rs` file equals that file byte for byte, and every example appears in the README |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
+| `registry_resolve_authenticated.rs` | 3 | `registry` | The registry resolves return a definition only when they can authenticate it as its named operator's, and this line reads no operator-signed definition token: `resolve_basket`, `resolve_protocol` and `resolve_certificate` return none for a definition written as this line's `register_definition` writes one (locked by its operator's key or by another's) and none for an operator-signed one, as before; the lookup is still asked (its service and query as before) and a failing host's answer is the resolver's, as before. Injected `.invalid` resolvers, one host per cell. 2 of 3 RED on `ebc9b338` (`0.8.9`; the operator-signed cell green there by design) |
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `script_flags_witnesses.rs` | 9 | default | The flag words (`ScriptFlags::block` / `standard`, the default mode) on seven witness transactions: policy-as-consensus at version 1 (five), the NULLDUMMY version gate, NULLFAIL (Calhooon/bsv-rs#10) |
 | `script_low_s_order_witness.rs` | 3 | default | A signature with `s` at the curve order is the zero signature for the low-S check and NULLFAIL under version 1, as on the reference (0.3.28, Calhooon/bsv-rs#14) |
@@ -191,6 +192,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 
 ### Registry (`registry` feature)
 - **`registry_integration_tests.rs`** — DefinitionType (string conversion, lookup services, topics, baskets, field counts), BasketDefinitionData (builder, PushDrop encode/decode), ProtocolDefinitionData (security levels), CertificateDefinitionData (field descriptors), DefinitionData enum, TokenData, RegistryRecord, query builders, result types, RegistryClientConfig, cross-SDK PushDrop field order, constants
+- **`registry_resolve_authenticated.rs`** — The three resolves return no definition this line cannot authenticate as its named operator's (none: this line reads no operator-signed token); the lookup is asked as before
 
 ### Documentation (default features)
 - **`readme_examples.rs`** — The README's ```rust blocks that name an `examples/<name>.rs` file are those files byte for byte, and every example file appears in the README
@@ -254,7 +256,7 @@ Tests are organized by feature area:
 | **storage HTTP** | `storage_http_tests` |
 | **identity** | `identity_tests` |
 | **kvstore** | `kvstore_integration_tests`, `kvstore_global_tests`, `kvstore_legacy_signature_verdict`, `kvstore_interpreter_envelope_544`, `kvstore_key_bound_signature` |
-| **registry** | `registry_integration_tests` |
+| **registry** | `registry_integration_tests`, `registry_resolve_authenticated` |
 | **profiling** | `memory_profiling` |
 | **documentation** | `readme_examples` |
 
