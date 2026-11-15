@@ -19,6 +19,7 @@ These implementations require the `http` feature flag to enable actual network r
 | `arc.rs` | ARC broadcaster implementation for TAAL's service |
 | `teranode.rs` | Teranode broadcaster using Extended Format binary data |
 | `whatsonchain.rs` | WhatsOnChain API broadcaster implementation |
+| `acknowledged.rs` | The id a success answers: the submitted transaction's (`acknowledged_txid`, asked by WhatsOnChain and ARC's verdict) |
 
 ## Feature Requirements
 
@@ -33,14 +34,15 @@ Without the `http` feature, calling `broadcast()` returns an error with code `NO
 
 ## The ARC verdict on a 2xx
 
-ARC answers `POST /v1/tx` with an HTTP 2xx whenever it processed the request and puts the transaction's fate in the body's `txStatus` (`arc@e7efc5b internal/api/handler/default.go:489-500`). `ArcBroadcaster` reads `txStatus` and applies the reference's rule (`ts-stack@edf6e03 packages/sdk/src/transaction/broadcasters/ARC.ts:110-180`), in `arc_success_verdict`:
+ARC answers `POST /v1/tx` with an HTTP 2xx whenever it processed the request and puts the transaction's fate in the body's `txStatus` (`arc@e7efc5b internal/api/handler/default.go:489-500`). `ArcBroadcaster` reads `txStatus` by the reference's status words (`ts-stack@edf6e03 packages/sdk/src/transaction/broadcasters/ARC.ts:110-180`), in `arc_success_verdict`:
 
 | the body says | the verdict |
 |---|---|
 | `DOUBLE_SPEND_ATTEMPTED`, `REJECTED`, `INVALID`, `MALFORMED`, `MINED_IN_STALE_BLOCK`, or `ORPHAN` anywhere in the status or `extraInfo` | `Err(BroadcastFailure)`: `code` the status word, `description` the word and the `extraInfo`, `more` = `{extraInfo, competingTxs}` when sent |
 | the failure names another transaction's `txid` | `Err`, `ERR_TXID_MISMATCH` |
+| an accepted word whose `txid` is not the submitted transaction's id (another id, text that is no id) | `Err`, `ERR_TXID_MISMATCH`, the submitted id in `txid` (`acknowledged.rs`) |
 | no `txStatus`, or one outside the reference's accepted set, or a `competingTxs` that is not a list of distinct txids | `Err`, `ERR_INVALID_RESPONSE` |
-| `SUCCESS`, `RECEIVED`, `SENT_TO_NETWORK`, `ANNOUNCED_TO_NETWORK`, `ACCEPTED_BY_NETWORK`, `SEEN_ON_NETWORK`, `STORED`, `MINED`, `IMMUTABLE` | `Ok(BroadcastResponse)`: `message` the status word, `competing_txs` ARC's, lower-cased |
+| `SUCCESS`, `RECEIVED`, `SENT_TO_NETWORK`, `ANNOUNCED_TO_NETWORK`, `ACCEPTED_BY_NETWORK`, `SEEN_ON_NETWORK`, `STORED`, `MINED`, `IMMUTABLE` | `Ok(BroadcastResponse)`: `txid` the submitted id (as ARC wrote it, or the submitted id when ARC names none), `message` the status word, `competing_txs` ARC's, lower-cased |
 
 The HTTP code never decides a 2xx. The vector is `tests/vectors/arc_tx_status_verdicts.json`; the parity notes are in `CHANGELOG.md` (0.3.34). Before 0.3.34 every 2xx was a success (bsv-stack-lean #35, P0-2).
 
@@ -241,7 +243,7 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 - `Content-Type: application/json`
 - `Authorization: {api_key}` (if configured, no "Bearer" prefix)
 
-**Success Response** (HTTP 2xx): Returns TXID as plain text
+**Success Response** (HTTP 2xx): Returns TXID as plain text. The success's `txid` is the submitted transaction's id: the body, trimmed and unquoted, must be that id (either case; it is answered as written) or empty (the submitted id answered); any other body is `ERR_TXID_MISMATCH` with the submitted id in `txid` (`acknowledged.rs`, the one rule ARC's verdict asks too; `tests/broadcaster_acknowledged_txid.rs`)
 
 **Error Response** (HTTP 4xx/5xx): Returns error description
 
@@ -253,6 +255,7 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 | `PARSE_ERROR` | Failed to parse response body |
 | `NO_HTTP` | HTTP feature not enabled |
 | `EF_SERIALIZATION_ERROR` | Failed to serialize to EF format (Teranode only) |
+| `ERR_TXID_MISMATCH` | A 2xx that names a transaction other than the submitted one (WhatsOnChain's body, ARC's `txid`): never a success; `txid` the submitted id |
 | `{status}` | HTTP status code from service (e.g., "400", "500") |
 
 ## Usage Examples
