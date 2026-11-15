@@ -161,7 +161,11 @@ fn signature(tx: &Transaction, script_code: &[u8]) -> Vec<u8> {
 
 /// The child of `cell` spending a coin proven at `height`.
 fn spend_at(cell: &Cell, height: u32) -> Transaction {
-    let coin = parent(&cell.lock, height);
+    spend_of(cell, parent(&cell.lock, height))
+}
+
+/// The child of `cell` spending output 0 of `coin`.
+fn spend_of(cell: &Cell, coin: Transaction) -> Transaction {
     let code = cell.redeem.clone().unwrap_or_else(|| cell.lock.clone());
     let mut unlocking = cell.below.clone();
     if cell.signed {
@@ -218,6 +222,10 @@ fn refused_by_the_rules_of_the_era() -> Vec<Cell> {
     let two_mul = vec![0x52, 0x8d, 0x54, 0x87];
     vec![
         signed("a push above 520 bytes", p2pkh(), 2, push(&[7u8; 521])),
+        // 997 below the signature and key: 1,001 elements once the lock
+        // pushes its hash, one past the bound.
+        signed("exactly 1,001 stack elements", p2pkh(), 2, vec![0x00; 997]),
+        unlocking_of(10_001),
         signed("more than 1,000 stack elements", p2pkh(), 2, deep),
         signed("an unlocking script above 10,000 bytes", p2pkh(), 2, big),
         cell("more than 500 opcodes", many_ops, 2),
@@ -343,7 +351,34 @@ fn accepted_by_the_rules_of_the_era() -> Vec<Cell> {
         cell("a product of 8 bytes from operands of 4", wide_result, 2),
         cell("OP_NOP4 at version 1", vec![0x51, 0xb3], 1),
         cell("OP_MUL executed", vec![0x52, 0x53, 0x95, 0x56, 0x87], 2),
+        unlocking_of(10_000),
     ]
+}
+
+/// A spend whose unlocking script is exactly `size` bytes (10,000 or
+/// 10,001): twenty pushes of 497 bytes (500 bytes each), and for 10,001 an
+/// `OP_0` after them; the lock drops every element and leaves `OP_1`.
+fn unlocking_of(size: usize) -> Cell {
+    let mut below = Vec::new();
+    for _ in 0..20 {
+        below.extend(push(&[9u8; 497]));
+    }
+    let mut lock = vec![0x6d; 10];
+    if size == 10_001 {
+        below.push(0x00);
+        lock.push(0x75);
+    }
+    lock.push(0x51);
+    assert_eq!(below.len(), size);
+    let name = if size == 10_001 {
+        "an unlocking script of exactly 10,001 bytes"
+    } else {
+        "an unlocking script of exactly 10,000 bytes"
+    };
+    Cell {
+        below,
+        ..cell(name, lock, 2)
+    }
 }
 
 /// The tip, its network named by its Genesis height.
@@ -397,14 +432,23 @@ impl ChainTracker for NamedChain {
     }
 }
 
+/// The first transaction up the chain of first inputs that carries a proof.
+fn proven(tx: &Transaction) -> &Transaction {
+    let mut parent = tx.inputs[0].source_transaction.as_ref().unwrap();
+    while parent.merkle_path.is_none() {
+        parent = parent.inputs[0].source_transaction.as_ref().unwrap();
+    }
+    parent
+}
+
 fn root_hex(tx: &Transaction) -> String {
-    let parent = tx.inputs[0].source_transaction.as_ref().unwrap();
+    let parent = proven(tx);
     let proof = parent.merkle_path.as_ref().unwrap();
     proof.compute_root(Some(&parent.id())).unwrap()
 }
 
 fn facts(tx: &Transaction, tip: Option<ChainTip>) -> Facts {
-    let parent = tx.inputs[0].source_transaction.as_ref().unwrap();
+    let parent = proven(tx);
     let mut root: Hash32 = bsv_rs::primitives::from_hex(&root_hex(tx))
         .unwrap()
         .try_into()
@@ -418,7 +462,7 @@ fn facts(tx: &Transaction, tip: Option<ChainTip>) -> Facts {
 }
 
 fn tracker(tx: &Transaction, tip: Option<ChainTip>) -> NamedChain {
-    let parent = tx.inputs[0].source_transaction.as_ref().unwrap();
+    let parent = proven(tx);
     let mut roots = MockChainTracker::new(NEXT_BLOCK - 1);
     roots.add_root(
         parent.merkle_path.as_ref().unwrap().block_height,
@@ -645,6 +689,40 @@ async fn a_test_chain_names_its_genesis_height_by_its_tip_h4m7() {
             let got = answer(door, &tx, named).await;
             if got != expected {
                 wrong.push(format!("{door:?} ({named:?}): {got:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// The close reaches a coin whose creating transaction is proven: a coin
+/// created by a transaction presented unproven (its own ancestor proven
+/// below Genesis) carries no era, and every door judges its spend by the
+/// post-Genesis rules, as before the fix. A verifier of outside BEEFs that
+/// must hold such a coin to the older rules asks for the coin's own proof
+/// (the advisory's workaround). The same spend of the same coin, proven, is
+/// refused.
+#[tokio::test]
+async fn a_coin_whose_creating_transaction_is_unproven_is_judged_by_the_post_genesis_rules_h4m7() {
+    let cell = signed("a push above 520 bytes", p2pkh(), 2, push(&[7u8; 521]));
+    let ancestor = parent(&[0x51], COIN_HEIGHT);
+    let mut coin = Transaction::new();
+    let mut input = TransactionInput::with_source_transaction(ancestor, 0);
+    input.set_unlocking_script(UnlockingScript::new());
+    coin.add_input(input).unwrap();
+    coin.add_output(TransactionOutput::new(
+        COIN_VALUE,
+        LockingScript::from_binary(&p2pkh()).unwrap(),
+    ))
+    .unwrap();
+    let unproven = spend_of(&cell, coin);
+    let proven = spend(&cell);
+    let mut wrong = Vec::new();
+    for door in DOORS {
+        for (tx, expected) in [(&unproven, Answer::Valid), (&proven, Answer::Refused)] {
+            let got = answer(door, tx, Some(tip(MAINNET_GENESIS))).await;
+            if got != expected {
+                wrong.push(format!("{door:?} (expected {expected:?}): {got:?}"));
             }
         }
     }
