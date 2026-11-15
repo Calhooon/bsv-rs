@@ -573,6 +573,8 @@ it after completion.
 
 The form `GlobalKVStore::set` wrote before this release (the protocol as raw text, key ID `"kvstore-token"`, the controller's own key as the lock) authenticates at no door (GHSA-4mcm-g5xq-jv3r): its signature does not bind the key. `set` writes the key-bound form: field 0 `[1, <protocol>]` for the protocol it signs under (the option, else the configuration), the key as key ID, the lock from the wallet's derived key.
 
+The asked protocol is compared trimmed and lowercase at `verify_signature`; `interpret_script`'s context compares the field's text exactly. The store asks both, so a token whose protocol field is a case or space variant of the configured name is refused there (it fails safe; no cell exposes the difference: the strength read's S4, a note). The store's own `verify_signature` gate before `interpret` refuses no token the interpreter's authentication accepts (removing it is an equivalent mutation; `tests/kvstore_key_bound_signature.rs` pins the store's answer instead).
+
 ### History Building
 
 `GlobalKVStore` uses the overlay module's `SyncHistorian` to traverse transaction input ancestry
