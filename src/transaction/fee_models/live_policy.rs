@@ -274,10 +274,11 @@ impl LivePolicy {
                 crate::Error::FeeModelError("No mining fee found in policy response".to_string())
             })?;
 
-        // Convert satoshis/bytes to satoshis/kilobyte
+        // Convert satoshis/bytes to satoshis/kilobyte; a policy no service
+        // could hold is refused and the cache keeps what it held
         let satoshis = mining_fee.satoshis.unwrap_or(1);
         let bytes = mining_fee.bytes.unwrap_or(1);
-        let rate_per_kb = (satoshis * 1000) / bytes;
+        let rate_per_kb = policy_rate(satoshis, bytes)?;
 
         // Update the cache
         if let Ok(mut cache) = self.cached_rate.write() {
@@ -297,6 +298,37 @@ impl LivePolicy {
             "HTTP feature not enabled. Add 'http' feature to Cargo.toml".to_string(),
         ))
     }
+}
+
+/// The largest `satoshis` a policy may name: every satoshi there is
+/// (21 million BSV).
+const MAX_POLICY_SATOSHIS: u64 = 2_100_000_000_000_000;
+
+/// The largest `bytes` a policy may name.
+const MAX_POLICY_BYTES: u64 = 1_000_000_000;
+
+/// The highest rate a policy may set, in satoshis per kilobyte.
+const MAX_POLICY_RATE: u64 = 1_000_000_000;
+
+/// A policy's `satoshis` per `bytes` as satoshis per kilobyte, floored, or
+/// the refusal of a policy no service could hold: `bytes` outside
+/// `1..=1_000_000_000`, `satoshis` above 21 million BSV, or a rate above
+/// 1,000,000,000 sat/kB, judged before the floor.
+#[cfg_attr(not(feature = "http"), allow(dead_code))]
+fn policy_rate(satoshis: u64, bytes: u64) -> Result<u64> {
+    if bytes == 0 || bytes > MAX_POLICY_BYTES || satoshis > MAX_POLICY_SATOSHIS {
+        return Err(crate::Error::FeeModelError(
+            "Invalid policy response format".to_string(),
+        ));
+    }
+    // The exact rate against the ceiling, in u128: no product overflows
+    if u128::from(satoshis) * 1000 > u128::from(MAX_POLICY_RATE) * u128::from(bytes) {
+        return Err(crate::Error::FeeModelError(
+            "Invalid policy fee rate".to_string(),
+        ));
+    }
+    // At most 2.1e18 before the division: no overflow
+    Ok(satoshis * 1000 / bytes)
 }
 
 impl FeeModel for LivePolicy {
