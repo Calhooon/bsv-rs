@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 4. List your own registry definitions with `list_own_registry_entries`: the resolves return none on this line (GHSA-w6jf-m9c7-6599).
 5. Treat a broadcaster's `BroadcastFailure` with code `ERR_TXID_MISMATCH` as a refusal: a 2xx that named another transaction was a success before (GHSA-qhj8-j8mj-9cgc).
 6. Read Extended Format bytes from a party you do not trust through `from_ef_bounded` or `from_hex_ef_bounded`, with a figure your memory allows (GHSA-82g9-h6jw-r99f).
+7. A caller that bounds the streaming reader's work (`set_work_limit`) and spends coins locked by `OP_HASH160 <20 bytes> OP_EQUAL` sets a bound that covers the first evaluation's work and the pay-to-script-hash step's together (GHSA-fr33-7jw7-mwwh).
 
 Entries this release's store writer creates with a repeated tag, an empty tag, or a value larger than one mebibyte read back only on the stable line; the 0.9 prerelease line and the reference refuse those three shapes, as they already refused every entry 0.8.9 wrote.
 
