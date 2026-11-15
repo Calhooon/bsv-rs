@@ -889,6 +889,12 @@ fn parser_corpora(base: &Path) {
             script.add(&format!("script-valid-{i}"), &bytes);
         }
     }
+    // A P2PKH whose hash is framed by OP_PUSHDATA1: the template classifiers'
+    // invariant (each push by the opcode that is its length) reads it.
+    let mut framed = vec![0x76, 0xa9, 0x4c, 0x14];
+    framed.extend_from_slice(&[0x5a; 20]);
+    framed.extend_from_slice(&[0x88, 0xac]);
+    script.add("template-framed-p2pkh", &framed);
     script.report("fuzz_script_parser");
 
     let mut wire = Corpus::new(base, "fuzz_wire_protocol");
