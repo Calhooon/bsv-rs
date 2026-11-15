@@ -7,7 +7,8 @@
 //! caller's figure before it builds it (`from_ef_bounded`,
 //! `from_hex_ef_bounded`; `tests/transaction_ef_bounded.rs` pins the
 //! answers). A new EF door, a second site that builds a run of default
-//! outputs, or the count moved after the build is a finding. Read from the
+//! outputs, a second run of outputs in the reader or a door in any spelling,
+//! or the count moved after the build is a finding. Read from the
 //! source, lexically.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
@@ -180,4 +181,73 @@ fn an_ef_inputs_source_is_built_in_one_place_after_its_count() {
         .map(|(_, code)| code.matches("source_for(").count())
         .sum();
     assert_eq!(callers, 2, "`source_for` is defined once and called once");
+}
+
+/// The places in `code` that build a run of outputs in any spelling: a
+/// repeat `vec![TransactionOutput::..; n]` (a `;` inside the brackets) or a
+/// `resize` with an output.
+fn output_runs(code: &str) -> Vec<usize> {
+    let mut lines = Vec::new();
+    for (line, text) in code.lines().enumerate() {
+        let squeezed: String = text.split_whitespace().collect();
+        let repeat = squeezed
+            .match_indices("vec![TransactionOutput::")
+            .any(|(at, _)| {
+                let mut depth = 0i32;
+                for c in squeezed[at + 5..].chars() {
+                    match c {
+                        '(' | '[' | '{' => depth += 1,
+                        ')' | '}' => depth -= 1,
+                        ']' if depth == 0 => return false,
+                        ']' => depth -= 1,
+                        ';' if depth == 0 => return true,
+                        _ => {}
+                    }
+                }
+                false
+            });
+        let resized = squeezed.contains("resize") && squeezed.contains("TransactionOutput::");
+        if repeat || resized {
+            lines.push(line + 1);
+        }
+    }
+    lines
+}
+
+/// In the reader and in every listed door, the counted run of `source_for`
+/// is the only run of outputs, whatever its spelling (an empty output written
+/// `TransactionOutput::new(0, LockingScript::new())` builds the same run as
+/// `TransactionOutput::default()`; the strength read's plant B).
+#[test]
+fn the_reader_and_its_doors_build_no_other_run_of_outputs_in_any_spelling() {
+    let sources = production();
+    let file = |name: &str| {
+        sources
+            .iter()
+            .find(|(path, _)| path == name)
+            .map(|(_, code)| code.as_str())
+            .expect("a listed file")
+    };
+    let mut sites: Vec<String> = output_runs(file(READER))
+        .into_iter()
+        .map(|line| format!("{READER}:{line}"))
+        .collect();
+    for (path, door, _) in DOORS.iter().filter(|(path, _, _)| *path != READER) {
+        let body = body(file(path), door).expect("the door's body");
+        sites.extend(
+            output_runs(body)
+                .into_iter()
+                .map(|line| format!("{path} `{door}`:{line}")),
+        );
+    }
+    assert_eq!(
+        sites.len(),
+        1,
+        "the reader and its doors build one run of outputs, `source_for`'s: {sites:?}"
+    );
+    assert!(
+        body(file(READER), "source_for")
+            .is_some_and(|source_for| output_runs(source_for).len() == 1),
+        "the one run is in `source_for`"
+    );
 }
