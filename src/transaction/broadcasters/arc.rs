@@ -31,7 +31,9 @@
 //! - a 2xx with no `txStatus` is a failure (`ERR_INVALID_RESPONSE`), never a
 //!   success; so is a status word the reference does not accept, and a
 //!   `competingTxs` list that is not a list of distinct transaction ids;
-//! - a failure that names another transaction's id is `ERR_TXID_MISMATCH`;
+//! - a failure that names another transaction's id is `ERR_TXID_MISMATCH`,
+//!   and so is a success whose `txid` is not the submitted transaction's id
+//!   (a success with no `txid` answers the submitted id);
 //! - `SUCCESS`, `RECEIVED`, `SENT_TO_NETWORK`, `ANNOUNCED_TO_NETWORK`,
 //!   `ACCEPTED_BY_NETWORK`, `SEEN_ON_NETWORK`, `STORED`, `MINED` and
 //!   `IMMUTABLE` are a [`BroadcastResponse`] whose `message` is the status word
@@ -86,6 +88,7 @@ mod verdict {
     use serde::Deserialize;
     use serde_json::Value;
 
+    use crate::transaction::broadcasters::acknowledged::{acknowledged_txid, is_txid};
     use crate::transaction::{
         BroadcastFailure, BroadcastResponse, BroadcastResult, BroadcastStatus,
     };
@@ -155,11 +158,6 @@ mod verdict {
             && !value
                 .chars()
                 .any(|c| matches!(c as u32, 0x00..=0x1f | 0x7f..=0x9f))
-    }
-
-    /// 64 hexadecimal digits, either case.
-    fn is_txid(value: &str) -> bool {
-        value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
     }
 
     /// The reference's `snapshotCompetingTxs` (`ARC.ts:64-93`): a list of at most
@@ -275,9 +273,15 @@ mod verdict {
             return Err(invalid("ARC returned an unknown transaction status."));
         }
 
+        // A success answers the submitted transaction's id (`acknowledged`).
+        let txid = acknowledged_txid(
+            body.txid.as_deref(),
+            expected_txid,
+            "ARC acknowledged a transaction other than the submitted transaction.",
+        )?;
         Ok(BroadcastResponse {
             status: BroadcastStatus::Success,
-            txid: body.txid.unwrap_or_else(|| expected_txid.to_string()),
+            txid,
             message: tx_status,
             competing_txs,
         })
