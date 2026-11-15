@@ -285,7 +285,7 @@ The `validation` module (`validation.rs`) provides 40+ validation functions for 
 | Actions | `validate_create_action_args`, `validate_create_action_input` (`validation/create_action_input.rs`), `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend`; an input's empty `unlockingScript` refused in the reference's words (`The unlockingScript parameter must be hexadecimal string.`, `validationHelpers.ts:595` at `ts-stack@edf6e03`) and an `unlockingScriptLength` of 0 as BRC-100's positive integer (`0100.md:649`; the reference permits it, `:598`), both `WalletRefusal` of class `InvalidParameter` (#282) |
 | Internalize | `validate_internalize_action_args` (`validation/internalize.rs`): per output in the reference's `validateInternalizeOutput` order (`validationHelpers.ts:966-984`, #384), the protocol `wallet payment` or `basket insertion`, then its one remittance and no other (`WERR_INVALID_PARAMETER` in the reference's words, `The output remittance parameter must be only paymentRemittance for wallet payment` and the twin), then the insertion's `customInstructions` at most 1,000 UTF-8 bytes (BRC-100 at `5119a9b`, TS's `validateBasketInsertion`; #117), called by `ProtoWallet`, `WalletClient`, `HttpWalletJson` and `WalletWireTransceiver` before they act or send; the createAction output's copy stays unbounded |
 | Certificates | `validate_certificate_fields` (1-50 byte field names, walked in the map's order: the first bad name given refused, #385), `validate_keyring_revealer` ("certifier" or 66-char hex pubkey) |
-| Protocol | `validate_protocol_tuple`, `validate_query_mode` |
+| Protocol | `validate_protocol_tuple`, `validate_query_mode` (answers the wallet's one `QueryMode`, the type of `types.rs` re-exported at `validation::QueryMode` since #843, so the answer goes into `ListOutputsArgs`/`ListActionsArgs` as it is; `tests/wallet_query_mode_one_type_843.rs`) |
 
 Validated structs (used after validation):
 - `ValidCreateActionInput`, `ValidCreateActionOutput`, `ValidCreateActionOptions`, `ValidCreateActionArgs`
@@ -319,7 +319,7 @@ The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWa
 
 **ActionStatus** - Transaction status: `Completed`, `Unprocessed`, `Sending`, `Unproven`, `Unsigned`, `NoSend`, `NonFinal`, `Failed`.
 
-**QueryMode** - Filter mode for lists: `Any` (default) or `All`.
+**QueryMode** - Filter mode for lists: `Any` (default) or `All`. Declared once, in `types.rs`; `validation::QueryMode` is a re-export of it (#843), never a second enum.
 
 **OutputInclude** - What to include in output listings: `LockingScripts` or `EntireTransactions`.
 
