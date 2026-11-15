@@ -1,0 +1,831 @@
+{
+  "description": "The registry client definition checks on a resolved definition its operator signed: whether RegistryClient.resolve returned it.",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/registry/RegistryClient.ts:36-198,370-397,729-783",
+  "node": "v22.18.0",
+  "recorder": "tests/support/registry_definition_checks.mjs",
+  "operator": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+  "cases": [
+    {
+      "type": "basket",
+      "label": "honest",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "http icon",
+      "fields": [
+        "payments",
+        "Payments",
+        "http://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "http://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "empty urls",
+      "fields": [
+        "payments",
+        "Payments",
+        "",
+        "Payments basket",
+        ""
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "relative icon",
+      "fields": [
+        "payments",
+        "Payments",
+        "//icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "//icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "path icon",
+      "fields": [
+        "payments",
+        "Payments",
+        "icon.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "icon.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "upper-case scheme",
+      "fields": [
+        "payments",
+        "Payments",
+        "HTTPS://Icon.Example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "query in url",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d?x=1&y=2"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d?x=1&y=2"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "empty userinfo",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://@icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "empty fragment",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png#",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png#",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "unicode name",
+      "fields": [
+        "payments",
+        "Paiements été €",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "tab and newline in description",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "line one\n\tline two\r\n",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "name of 300 bytes",
+      "fields": [
+        "payments",
+        "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "description of 4096 bytes",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "basket",
+      "label": "empty description",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "icon of another scheme",
+      "fields": [
+        "payments",
+        "Payments",
+        "ftp://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "uhrp icon",
+      "fields": [
+        "payments",
+        "Payments",
+        "uhrp://abcdef",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "data icon",
+      "fields": [
+        "payments",
+        "Payments",
+        "data:,x",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "documentation with a user",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://user@docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "documentation with a password",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://u:p@docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "icon with a fragment",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png#top",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "url of 2049 bytes",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "empty name",
+      "fields": [
+        "payments",
+        "",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "name of 301 bytes",
+      "fields": [
+        "payments",
+        "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "empty basket id",
+      "fields": [
+        "",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "basket id of 301 bytes",
+      "fields": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "description of 4097 bytes",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "control byte in name",
+      "fields": [
+        "payments",
+        "Pay\u0001ments",
+        "https://icon.example/i.png",
+        "Payments basket",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "basket",
+      "label": "delete byte in description",
+      "fields": [
+        "payments",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "protocol",
+      "label": "honest",
+      "fields": [
+        "[1,\"payments\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "protocol",
+      "label": "silent level",
+      "fields": [
+        "[0,\"payments\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "protocol",
+      "label": "counterparty level",
+      "fields": [
+        "[2,\"payments protocol\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "protocol",
+      "label": "protocol name of 4 bytes",
+      "fields": [
+        "[1,\"paym\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "protocol",
+      "label": "protocol name of 401 bytes",
+      "fields": [
+        "[1,\"ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "protocol",
+      "label": "control byte in protocol name",
+      "fields": [
+        "[1,\"pay\\u0001ments\"]",
+        "Payments",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "protocol",
+      "label": "icon of another scheme",
+      "fields": [
+        "[1,\"payments\"]",
+        "Payments",
+        "ftp://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "protocol",
+      "label": "empty name",
+      "fields": [
+        "[1,\"payments\"]",
+        "",
+        "https://icon.example/i.png",
+        "Payments protocol",
+        "https://docs.example/d"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "honest",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "certificate",
+      "label": "no fields",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{}"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "certificate",
+      "label": "sixty-four fields",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"f0\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f1\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f2\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f3\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f4\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f5\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f6\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f7\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f8\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f9\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f10\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f11\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f12\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f13\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f14\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f15\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f16\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f17\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f18\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f19\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f20\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f21\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f22\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f23\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f24\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f25\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f26\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f27\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f28\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f29\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f30\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f31\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f32\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f33\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f34\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f35\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f36\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f37\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f38\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f39\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f40\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f41\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f42\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f43\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f44\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f45\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f46\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f47\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f48\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f49\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f50\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f51\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f52\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f53\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f54\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f55\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f56\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f57\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f58\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f59\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f60\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f61\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f62\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f63\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "certificate",
+      "label": "empty field icon and description",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"\",\"type\":\"text\",\"fieldIcon\":\"\"}}"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "certificate",
+      "label": "image field",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"photo\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"imageURL\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": true,
+      "returned_urls": [
+        "https://icon.example/i.png",
+        "https://docs.example/d"
+      ]
+    },
+    {
+      "type": "certificate",
+      "label": "fields not json",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "fields an array",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "[]"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "fields a string",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "\"name\""
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "sixty-five fields",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"f0\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f1\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f2\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f3\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f4\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f5\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f6\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f7\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f8\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f9\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f10\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f11\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f12\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f13\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f14\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f15\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f16\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f17\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f18\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f19\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f20\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f21\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f22\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f23\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f24\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f25\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f26\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f27\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f28\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f29\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f30\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f31\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f32\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f33\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f34\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f35\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f36\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f37\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f38\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f39\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f40\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f41\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f42\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f43\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f44\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f45\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f46\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f47\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f48\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f49\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f50\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f51\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f52\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f53\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f54\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f55\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f56\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f57\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f58\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f59\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f60\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f61\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f62\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f63\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"},\"f64\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "descriptor not an object",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":\"text\"}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "descriptor without its icon",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"d\",\"type\":\"text\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "descriptor with another key",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\",\"extra\":\"x\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "descriptor of another type",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"number\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "empty friendly name",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "field name of 51 bytes",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"fffffffffffffffffffffffffffffffffffffffffffffffffff\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "empty field name",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "unsafe field name",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"__proto__\":{\"friendlyName\":\"Name\",\"description\":\"d\",\"type\":\"text\",\"fieldIcon\":\"\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "constructor field name",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"constructor\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "field icon of another scheme",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"ftp://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "empty certificate type",
+      "fields": [
+        "",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    },
+    {
+      "type": "certificate",
+      "label": "documentation with a fragment",
+      "fields": [
+        "dHlwZQ==",
+        "Identity",
+        "https://icon.example/i.png",
+        "An identity certificate",
+        "https://docs.example/d#x",
+        "{\"name\":{\"friendlyName\":\"Name\",\"description\":\"The holder name\",\"type\":\"text\",\"fieldIcon\":\"https://icon.example/f.png\"}}"
+      ],
+      "returned": false,
+      "returned_urls": null
+    }
+  ]
+}

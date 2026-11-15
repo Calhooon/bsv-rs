@@ -22,7 +22,7 @@ use crate::registry::types::{
     ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult, RegistryRecord,
     RevokeDefinitionResult, TokenData, UpdateDefinitionResult,
 };
-use crate::registry::{token, unlock, REGISTRANT_TOKEN_AMOUNT};
+use crate::registry::{definition_checks, token, unlock, REGISTRANT_TOKEN_AMOUNT};
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
 use crate::wallet::interface::WalletInterface;
@@ -315,27 +315,16 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching basket definitions.
+    /// The basket definitions the lookup answered that pass the registry
+    /// reader's checks and match the query.
     pub async fn resolve_basket(&self, query: BasketQuery) -> Result<Vec<BasketDefinitionData>> {
-        let service = DefinitionType::Basket.lookup_service();
-        let query_json = serde_json::to_value(&query)
-            .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_basket_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
-            _ => Ok(Vec::new()),
-        }
+        let outputs = self.lookup(DefinitionType::Basket, &query).await?;
+        Ok(read_definitions(
+            outputs,
+            DefinitionType::Basket,
+            BasketDefinitionData::from_pushdrop_fields,
+            |data| definition_checks::basket_answers(&query, data),
+        ))
     }
 
     /// Resolves protocol definitions matching the query.
@@ -346,30 +335,19 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching protocol definitions.
+    /// The protocol definitions the lookup answered that pass the registry
+    /// reader's checks and match the query.
     pub async fn resolve_protocol(
         &self,
         query: ProtocolQuery,
     ) -> Result<Vec<ProtocolDefinitionData>> {
-        let service = DefinitionType::Protocol.lookup_service();
-        let query_json = serde_json::to_value(&query)
-            .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_protocol_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
-            _ => Ok(Vec::new()),
-        }
+        let outputs = self.lookup(DefinitionType::Protocol, &query).await?;
+        Ok(read_definitions(
+            outputs,
+            DefinitionType::Protocol,
+            ProtocolDefinitionData::from_pushdrop_fields,
+            |data| definition_checks::protocol_answers(&query, data),
+        ))
     }
 
     /// Resolves certificate definitions matching the query.
@@ -380,81 +358,35 @@ impl<W: WalletInterface> RegistryClient<W> {
     ///
     /// # Returns
     ///
-    /// List of matching certificate definitions.
+    /// The certificate definitions the lookup answered that pass the registry
+    /// reader's checks and match the query.
     pub async fn resolve_certificate(
         &self,
         query: CertificateQuery,
     ) -> Result<Vec<CertificateDefinitionData>> {
-        let service = DefinitionType::Certificate.lookup_service();
-        let query_json = serde_json::to_value(&query)
+        let outputs = self.lookup(DefinitionType::Certificate, &query).await?;
+        Ok(read_definitions(
+            outputs,
+            DefinitionType::Certificate,
+            CertificateDefinitionData::from_pushdrop_fields,
+            |data| definition_checks::certificate_answers(&query, data),
+        ))
+    }
+
+    /// The outputs the definition type's lookup service answers the query
+    /// with; an answer of another kind is none.
+    async fn lookup(
+        &self,
+        definition_type: DefinitionType,
+        query: &impl serde::Serialize,
+    ) -> Result<Vec<OutputListItem>> {
+        let query_json = serde_json::to_value(query)
             .map_err(|e| Error::RegistryError(format!("Failed to serialize query: {}", e)))?;
-
-        let question = LookupQuestion::new(service, query_json);
-        let answer = self.resolver.query(&question, None).await?;
-
-        match answer {
-            LookupAnswer::OutputList { outputs } => {
-                let mut results = Vec::new();
-                for output in outputs {
-                    if let Ok(Some(data)) = self.parse_certificate_from_output(&output) {
-                        results.push(data);
-                    }
-                }
-                Ok(results)
-            }
+        let question = LookupQuestion::new(definition_type.lookup_service(), query_json);
+        match self.resolver.query(&question, None).await? {
+            LookupAnswer::OutputList { outputs } => Ok(outputs),
             _ => Ok(Vec::new()),
         }
-    }
-
-    /// Parses a basket definition from an overlay output.
-    fn parse_basket_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<BasketDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs()
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let fields = token::data_fields(DefinitionType::Basket, &tx_output.locking_script)?;
-        BasketDefinitionData::from_pushdrop_fields(&fields).map(Some)
-    }
-
-    /// Parses a protocol definition from an overlay output.
-    fn parse_protocol_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<ProtocolDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs()
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let fields = token::data_fields(DefinitionType::Protocol, &tx_output.locking_script)?;
-        ProtocolDefinitionData::from_pushdrop_fields(&fields).map(Some)
-    }
-
-    /// Parses a certificate definition from an overlay output.
-    fn parse_certificate_from_output(
-        &self,
-        output: &OutputListItem,
-    ) -> Result<Option<CertificateDefinitionData>> {
-        let tx = Transaction::from_beef(&output.beef, None)
-            .map_err(|e| Error::RegistryError(format!("Failed to parse BEEF: {}", e)))?;
-
-        let tx_output = tx
-            .outputs()
-            .get(output.output_index as usize)
-            .ok_or_else(|| Error::RegistryError("Output index out of bounds".into()))?;
-
-        let fields = token::data_fields(DefinitionType::Certificate, &tx_output.locking_script)?;
-        CertificateDefinitionData::from_pushdrop_fields(&fields).map(Some)
     }
 
     // =========================================================================
@@ -950,6 +882,28 @@ impl<W: WalletInterface> RegistryClient<W> {
     pub fn set_network(&mut self, network: NetworkPreset) {
         self.config.network_preset = network;
     }
+}
+
+/// The definitions a lookup answered, in its order: each output's token read
+/// and verified (`token::data_fields`), its fields passing the registry
+/// reader's checks (`definition_checks`), parsed, and kept when `answers`
+/// says the query asked for it; any other output skipped.
+fn read_definitions<T>(
+    outputs: Vec<OutputListItem>,
+    definition_type: DefinitionType,
+    parse: fn(&[Vec<u8>]) -> Result<T>,
+    answers: impl Fn(&T) -> bool,
+) -> Vec<T> {
+    let read = |output: &OutputListItem| {
+        let tx = Transaction::from_beef(&output.beef, None).ok()?;
+        let tx_output = tx.outputs().get(output.output_index as usize)?;
+        let fields = token::data_fields(definition_type, &tx_output.locking_script).ok()?;
+        definition_checks::fields_admitted(definition_type, &fields)
+            .then(|| parse(&fields).ok())
+            .flatten()
+            .filter(&answers)
+    };
+    outputs.iter().filter_map(read).collect()
 }
 
 // =============================================================================
