@@ -61,19 +61,22 @@
 // cache lacks (`update_contact` is this crate's door, refused
 // `ContactNotFound`), and a member value the validator rewrites (a
 // `badgeClickURL` the URL parser serializes otherwise, an empty `metadata`
-// object).
+// object): those are the two directed sequences
+// `save_caches_the_validated_record_959` and its cold twin.
 //
-// The stated cells of #959 (`STATED_959`, recorded as `stated_959`, beside
+// The cells of #991's fold (`STATED_959`, recorded as `stated_959`, beside
 // the sequences and never among them: `tests/contacts_replay.rs`'s replay
-// does not run them): three sequences, each a save of exactly such a value
+// does not run them; the name is the fold's, kept so the recorded line is
+// the one beta held): three sequences, each a save of exactly such a value
 // (a `badgeClickURL` of `https://example.com`, which `safeNavigation`
 // returns as `https://example.com/`, `:104-122`; an empty `metadata`
-// object; tags and notes given inside `metadata`) read from the warm cache
+// object; tags and notes given inside `metadata`), and since #959's fold
+// two more after them (notes alone inside `metadata`; tags alone), read from the warm cache
 // (a plain read and a read by key) and after a forced refresh. The
 // reference caches the record `validateContact` returned (`:527-534`,
-// `:566`), so its warm answer is its refreshed one; this crate's warm
-// answer is the caller's own form, held as it stands by
-// `a_save_answers_the_callers_form_until_a_refresh_stated_959`.
+// `:566`), so its warm answer is its refreshed one, and so is this crate's
+// since #959's conforming lane, held cell by cell by
+// `a_save_caches_the_validated_record_959`.
 import { createHash } from 'crypto'
 
 const SEED = 'bsv-rs#904 fold7'
@@ -296,6 +299,12 @@ const save = (contact, name, at, faults, members) => ({ op: 'save', contact, nam
 const update = (contact, name, at, members, faults) => ({ ...save(contact, name, at, faults, members), op: 'update' })
 const FULL = { avatar_url: 'https://example.com/avatar.png', abbreviated_key: 'bob...', badge_icon_url: 'https://example.com/badge.svg', badge_label: 'Friend', badge_click_url: 'https://example.com/', metadata: { notes: 'met at a conference', tags: ['work', 'Friend'], alias: 'b' } }
 const OTHER = { avatar_url: 'ipfs://avatar', abbreviated_key: 'abbreviated', badge_icon_url: '', badge_label: 'Work contact', badge_click_url: 'https://example.com/badge?of=contact', metadata: { rank: 2 } }
+// Member values the validator rewrites or keeps in a form of its own
+// (`safeNavigation`'s `parsed.toString()`, `:104-122`; `sanitizeMetadata` on
+// an empty object and on empty `tags`, `:161-169`).
+const REWRITTEN = { avatar_url: '', abbreviated_key: 'bob...', badge_icon_url: '', badge_label: '', badge_click_url: 'https://example.com', metadata: {} }
+const REWRITTEN_AGAIN = { avatar_url: '', abbreviated_key: '', badge_icon_url: '', badge_label: 'Friend', badge_click_url: 'HTTPS://EXAMPLE.com:443/a b?q=1#f', metadata: { tags: [] } }
+const TAGGED = { avatar_url: '', abbreviated_key: 'carol...', badge_icon_url: '', badge_label: '', badge_click_url: 'http://localhost', metadata: { notes: '', tags: ['Work'], alias: 'c' } }
 const f = (call, mode = 'throw', turn = 1) => ({ call, turn, mode })
 const DIRECTED = {
   // fold: the removal path's bound input taken as 0 (`contacts_actions.rs`, P1).
@@ -361,11 +370,24 @@ const DIRECTED = {
   four_contacts_959: [{ op: 'forced' }, save(0, 'Bob Example', 1), save(1, 'Carol Example', 2),
     save(2, 'Dave Example', 3), save(3, 'Erin Example', 4), { op: 'plain' },
     update(2, 'Dave v2', 5, OTHER), { op: 'plain' }, { op: 'remove', contact: 0 }, { op: 'plain' },
-    save(0, 'Bob Example', 6), { op: 'plain' }, { op: 'forced' }, { op: 'remove', contact: 2 }, { op: 'plain' }]
+    save(0, 'Bob Example', 6), { op: 'plain' }, { op: 'forced' }, { op: 'remove', contact: 2 }, { op: 'plain' }],
+  // #959 (the conforming lane): a save caches the record the validator
+  // returned (`:527`, `:566`), so a read answered from the cache equals the
+  // read after a refresh: a `badgeClickURL` the URL parser serializes
+  // otherwise, an empty `metadata`, tags and notes given through it.
+  save_caches_the_validated_record_959: [{ op: 'forced' }, save(0, 'Bob Example', 1, undefined, REWRITTEN),
+    { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' },
+    update(0, 'Bob v2', 2, REWRITTEN_AGAIN), { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' },
+    save(1, 'Carol Example', 3, undefined, TAGGED), { op: 'plain' }, { op: 'forced' }],
+  // #959 (the conforming lane): the same over a cold cache, the save loading the basket ahead of it.
+  cold_save_caches_the_validated_record_959: [save(0, 'Bob Example', 1, undefined, REWRITTEN), { op: 'plain' },
+    { op: 'by_key', contact: 0 }, { op: 'clear' }, update(0, 'Bob v2', 2, REWRITTEN_AGAIN), { op: 'plain' },
+    { op: 'clear' }, { op: 'by_key', contact: 0 }, { op: 'forced' }]
 }
 
-// #959's stated cells: a save of a value the validator rewrites, read warm
-// and after a forced refresh (steps alone: every answer is the reference's).
+// The cells of #991's fold: a save of a value the validator rewrites, read
+// warm and after a forced refresh (steps alone: every answer is the
+// reference's).
 const EMPTY = { avatar_url: '', abbreviated_key: '', badge_icon_url: '', badge_label: '', badge_click_url: '' }
 const STATED_959 = {
   click_url_the_validator_rewrites: [{ op: 'forced' },
@@ -376,6 +398,13 @@ const STATED_959 = {
     { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' }, { op: 'plain' }],
   tags_and_notes_inside_metadata: [{ op: 'forced' },
     save(0, 'Bob Example', 1, undefined, { ...EMPTY, metadata: { tags: ['work'], notes: 'met at a conference' } }),
+    { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' }, { op: 'plain' }],
+  // #959's fold (the strength read's minor): one of the two members alone.
+  notes_alone_inside_metadata: [{ op: 'forced' },
+    save(0, 'Bob Example', 1, undefined, { ...EMPTY, metadata: { notes: 'met at a conference' } }),
+    { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' }, { op: 'plain' }],
+  tags_alone_inside_metadata: [{ op: 'forced' },
+    save(0, 'Bob Example', 1, undefined, { ...EMPTY, metadata: { tags: ['work'] } }),
     { op: 'plain' }, { op: 'by_key', contact: 0 }, { op: 'forced' }, { op: 'plain' }]
 }
 

@@ -145,7 +145,12 @@ async fn the_identity_tag_is_the_reference_hmac_542() {
     let v = vector();
     let (created, wallet) = written_token(&v).await;
     let tag = v["write"]["tag"].as_str().unwrap();
-    let asked = wallet.list_args.lock().unwrap()[0].tags.clone().unwrap();
+    // The cold save's load of the basket (no tag) ahead of the tagged
+    // lookup (`ContactsManager.ts:529-531`; #959).
+    let listings = wallet.list_args.lock().unwrap().clone();
+    assert_eq!(listings.len(), 2);
+    assert_eq!(listings[0].tags, None, "the load asks the whole basket");
+    let asked = listings[1].tags.clone().unwrap();
     assert_eq!(asked, vec![tag.to_string()], "the lookup's tag");
     let output = &created.outputs.unwrap()[0];
     assert_eq!(
