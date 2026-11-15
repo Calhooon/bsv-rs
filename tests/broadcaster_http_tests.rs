@@ -238,7 +238,7 @@ async fn test_arc_broadcast_sends_raw_tx_in_body() {
         .and(path("/v1/tx"))
         .and(body_string_contains(&expected_hex))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "txid": "abc123",
+            "txid": "4d76b00f29e480e0a933cef9d9ffe303d6ab919e2cdb265dd2cea41089baa85a",
             "txStatus": "SEEN_ON_NETWORK"
         })))
         .expect(1)
@@ -294,7 +294,7 @@ async fn test_arc_broadcast_many() {
     Mock::given(method("POST"))
         .and(path("/v1/tx"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-            "txid": "abc123",
+            "txid": "4d76b00f29e480e0a933cef9d9ffe303d6ab919e2cdb265dd2cea41089baa85a",
             "txStatus": "SEEN_ON_NETWORK"
         })))
         .expect(3)
