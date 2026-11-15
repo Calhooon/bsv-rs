@@ -880,6 +880,7 @@ fn parser_corpora(base: &Path) {
     tx.add("tx-simple", &from_hex(tx_valid::TX_SIMPLE).unwrap());
     tx.add("multi-io", &from_hex(bigtx::MULTI_IO_TX_HEX).unwrap());
     tx.add("large", &from_hex(bigtx::LARGE_TX_HEX).unwrap());
+    tx.add("ef-two-sources", &ef_two_sources());
     tx.report("fuzz_transaction_parser");
 
     let mut script = Corpus::new(base, "fuzz_script_parser");
@@ -1161,4 +1162,26 @@ fn door_corpus(base: &Path) {
         &door_input(1, no_genesis, 0, &[0x61], &tx),
     );
     door.report("fuzz_verify_input");
+}
+
+/// An EF transaction of version 1 whose two inputs spend outputs 40 and 30
+/// of one source (`from_ef` gives them sources of 72 outputs together), for
+/// the bounded EF doors' figure of `fuzz_transaction_parser` (64 at version
+/// 1): written by this crate's `to_ef`.
+fn ef_two_sources() -> Vec<u8> {
+    let mut source = Transaction::new();
+    for i in 0..41 {
+        source
+            .add_output(TransactionOutput::new(1_000 + i, LockingScript::new()))
+            .unwrap();
+    }
+    let mut tx = Transaction::new();
+    for vout in [40, 30] {
+        let mut input = TransactionInput::with_source_transaction(source.clone(), vout);
+        input.unlocking_script = Some(UnlockingScript::new());
+        tx.add_input(input).unwrap();
+    }
+    tx.add_output(TransactionOutput::new(500, LockingScript::new()))
+        .unwrap();
+    tx.to_ef().unwrap()
 }

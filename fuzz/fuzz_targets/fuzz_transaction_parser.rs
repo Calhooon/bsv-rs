@@ -123,6 +123,40 @@ fuzz_target!(|data: &[u8]| {
         by_ef.is_ok(),
         "from_hex_ef agrees with from_ef"
     );
+    // The bounded doors: under a figure read from the buffer's first byte,
+    // `from_ef_bounded` and `from_hex_ef_bounded` answer `from_ef`'s
+    // transaction when its inputs' source transactions hold no more outputs
+    // than the figure together, refuse it otherwise, and refuse whatever
+    // `from_ef` refuses.
+    let figure = data.first().map_or(0, |&b| usize::from(b) * 64);
+    let bounded = bsv_rs::transaction::Transaction::from_ef_bounded(data, figure);
+    let bounded_hex = bsv_rs::transaction::Transaction::from_hex_ef_bounded(&hex, figure);
+    assert_eq!(
+        bounded.is_ok(),
+        bounded_hex.is_ok(),
+        "the bounded doors agree"
+    );
+    match (&by_ef, &bounded) {
+        (Ok(tx), Ok(read)) => {
+            assert!(
+                source_outputs(tx) <= figure,
+                "a bounded door read past its figure"
+            );
+            assert_eq!(
+                read.to_ef().ok().as_deref(),
+                Some(data),
+                "the bounded answer is from_ef's"
+            );
+        }
+        (Ok(tx), Err(_)) => {
+            assert!(
+                source_outputs(tx) > figure,
+                "a bounded door refused under its figure"
+            );
+        }
+        (Err(_), Ok(_)) => panic!("a bounded door read what from_ef refuses"),
+        (Err(_), Err(_)) => {}
+    }
     if let Ok(tx) = by_ef {
         assert_safe_amounts(&tx);
         for input in tx.inputs() {
@@ -155,3 +189,12 @@ fuzz_target!(|data: &[u8]| {
         let _ = bsv_rs::transaction::Cursor::from_binary(&cursor.to_binary());
     }
 });
+
+/// The outputs an EF transaction's inputs' source transactions hold together.
+fn source_outputs(tx: &bsv_rs::transaction::Transaction) -> usize {
+    tx.inputs()
+        .iter()
+        .filter_map(|input| input.source_transaction.as_ref())
+        .map(|source| source.outputs().len())
+        .sum()
+}
