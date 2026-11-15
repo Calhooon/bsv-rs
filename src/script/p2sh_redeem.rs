@@ -18,7 +18,8 @@
 //! as their scriptCode, as the node's do. It only refuses: an input it is
 //! asked of has already been judged valid by the first evaluation. It judges
 //! the redeem script by the default mode's post-Genesis rules (the Chronicle
-//! opcodes off), not by the node's pre-Genesis rule set.
+//! opcodes off); a door that proves the coin below the chain's Genesis height
+//! runs it again inside the evaluation of that era (`spend/pre_genesis.rs`).
 //!
 //! [`ScriptFlags::check`]: super::ScriptFlags::check
 
