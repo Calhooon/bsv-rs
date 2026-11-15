@@ -13,8 +13,8 @@ This module provides concrete implementations of the `FeeModel` trait for comput
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; exports all fee models |
-| `sats_per_kb.rs` | Size-based fee model computing satoshis per kilobyte |
-| `live_policy.rs` | Live fee rate fetched from ARC policy API |
+| `sats_per_kb.rs` | Size-based fee model computing satoshis per kilobyte; a fee past `u64::MAX` is an `Err` (`tests/live_policy_implausible_policy.rs`) |
+| `live_policy.rs` | Live fee rate fetched from ARC policy API; `policy_rate` refuses a policy outside the bounds a service can hold, the rate judged before its floor, the cache kept (`tests/live_policy_implausible_policy.rs`) |
 
 ## Key Exports
 
