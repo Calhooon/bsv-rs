@@ -212,7 +212,7 @@ beta `6b09e265` (beta moved from `006a8e58` during the gate; no conflict).
 | Item | The change | The reference | RED (a scratch copy of the tip, the line put back) |
 |---|---|---|---|
 | The by-key door drops a failed cold listing (the rule read) | `src/identity/client.rs`: `get_contact(..).await?` in `resolve_by_identity_key` with contacts | `IdentityClient.ts:331-334` (a boolean option is `contactErrorMode: 'throw'`), `:398` (`throw error`), `:575` | `the_by_key_door_answers_a_failed_cold_listing_with_the_wallets_error_959`: `unwrap_err()` on `Ok` |
-| The cold update's validation has no test (the strength read) | no source change: `a_cold_update_the_validator_refuses_asks_the_wallet_nothing_959` | `ContactsManager.ts:527` (`validateContact`) before `:528-531` (the cache, then `getContacts()`): validate before the load, as `update_contact` already did | `record::record_of(&updates)?;` deleted: `(ContactNotFound(..), ["listOutputs"])` |
+| The cold update's validation has no test (the strength read) | no source change: `a_cold_update_the_validator_refuses_asks_the_wallet_nothing_959` | `ContactsManager.ts:528` (`validateContact`) before `:529-531` (the cache, then `getContacts()`): validate before the load, as `update_contact` already did | `record::record_of(&updates)?;` deleted: `(ContactNotFound(..), ["listOutputs"])` |
 | Notes alone, tags alone (the same read's minor) | no source change: two cells added to the recorder's `STATED_959` and `a_metadata_of_notes_alone_or_tags_alone_reads_as_no_metadata_959` | the recorded record: `metadata` `{"notes": ..}` and `{"tags": [..]}` at the four reads | `before != 0` changed to `before > 1`: `Some(Object {})` where `None` |
 
 The vector: the recorder reproduced the committed file byte for byte before
