@@ -67,6 +67,10 @@ pub mod locking_script;
 #[cfg(feature = "block")]
 mod not_judged;
 pub mod op;
+// Compiled under `transaction`, every caller's feature: a slice without it would carry
+// dead code (`ci.yml`'s clippy on each slice alone).
+#[cfg(feature = "transaction")]
+pub(crate) mod p2sh_redeem;
 #[allow(clippy::module_inception)]
 pub mod script;
 #[cfg(test)]

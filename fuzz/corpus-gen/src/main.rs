@@ -1140,6 +1140,16 @@ fn door_corpus(base: &Path) {
             &door_input(1, block, 0, &lock, &spend(&unlock, 2)),
         );
     }
+    // A coin of the P2SH shape (of `OP_1`) spent at version 2 by `OP_NOP
+    // <51>`: valid before the default mode ran the node's pay-to-script-hash
+    // step, refused by its push-only rule since (GHSA-fr33-7jw7-mwwh).
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend(bsv_rs::primitives::hash160(&[0x51]));
+    p2sh.push(0x87);
+    door.add(
+        "p2sh-step-not-push-only",
+        &door_input(0, 0, 0, &p2sh, &spend(&[0x61, 0x01, 0x51], 2)),
+    );
     let tx = spend(&[0x51], 2);
     door.add("refused-index-past", &door_input(0, 0, 1, &[0x61], &tx));
     door.add(

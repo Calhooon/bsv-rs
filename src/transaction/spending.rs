@@ -34,8 +34,8 @@ use std::sync::Arc;
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::script::flags::{DEFAULT_SCRIPT_NUM_LENGTH_POLICY, DEFAULT_STACK_MEMORY_USAGE_POLICY};
 use crate::script::{
-    ExecutionContext, LockingScript, ScriptEvaluationError, ScriptFlags, ScriptFlagsError,
-    ScriptResourceLimit, Spend, TxSpendParams, UnlockingScript,
+    p2sh_redeem::Redeem, ExecutionContext, LockingScript, ScriptEvaluationError, ScriptFlags,
+    ScriptFlagsError, ScriptResourceLimit, Spend, TxSpendParams, UnlockingScript,
 };
 
 use super::Transaction;
@@ -673,11 +673,12 @@ pub(crate) struct Judged {
 /// THE core: one input of `transaction` judged under `rules`, the only
 /// construction of a [`Spend`] for an input outside `src/script/`. The door,
 /// [`Transaction::verify`] and the streaming reader all call it.
+/// A coin of the P2SH shape takes the redeem step ([`Redeem`]) by default.
 pub(crate) fn judge_input(
     transaction: &Arc<TxSighashCache>,
     input_index: usize,
-    locking_script: &[u8],
-    unlocking_script: &[u8],
+    locking: &[u8],
+    unlocking: &[u8],
     source_satoshis: u64,
     rules: &InputRules,
 ) -> Judged {
@@ -685,15 +686,13 @@ pub(crate) fn judge_input(
         result: Err(refusal),
         work_spent: 0,
     };
-    let scripts = LockingScript::from_binary(locking_script).and_then(|locking| {
-        UnlockingScript::from_binary(unlocking_script).map(|unlocking| (locking, unlocking))
-    });
+    let scripts = LockingScript::from_binary(locking)
+        .and_then(|lock| UnlockingScript::from_binary(unlocking).map(|unlock| (lock, unlock)));
     let (locking_script, unlocking_script) = match scripts {
         Ok(scripts) => scripts,
         Err(error) => return refused(InputRefusal::Transaction(error)),
     };
-    let inputs = transaction.inputs().len();
-    let Ok(mut spend) = Spend::with_transaction(TxSpendParams {
+    let params = TxSpendParams {
         transaction: Arc::clone(transaction),
         input_index,
         source_satoshis,
@@ -701,15 +700,16 @@ pub(crate) fn judge_input(
         unlocking_script,
         memory_limit: rules.memory_limit,
         work_limit: rules.work_limit,
-    }) else {
+    };
+    let step = Redeem::of(locking, unlocking, &params, rules.word().is_none());
+    let Ok(mut spend) = Spend::with_transaction(params) else {
         return refused(InputRefusal::InputIndex {
             index: input_index,
-            inputs,
+            inputs: transaction.inputs().len(),
         });
     };
     apply_mode(&mut spend, rules.mode);
-    let verdict = spend.validate();
-    let work_spent = spend.work_spent();
+    let (verdict, work_spent) = Redeem::judge(step, spend, |s| apply_mode(s, rules.mode));
     Judged {
         result: classify(verdict, work_spent),
         work_spent,
