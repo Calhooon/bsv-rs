@@ -2,15 +2,17 @@
 //! KVStore token whose controller field is the key checked and whose last
 //! field is that key's signature over the others.
 //!
-//! Every token is built by this crate's own writers' derivations (the plain
-//! protocol name with the key ID `kvstore-token` and the controller's lock;
-//! the `[1, "kvstore"]` namespace with the key as the key ID and the
-//! controller-derived lock), signed by a `ProtoWallet` of a seeded key,
-//! locked by `PushDrop::lock` and read back by `PushDrop::decode`, as a
-//! caller of the door holds it. A token no controller signed, a token with
-//! no fields, a signed token checked against another key and every
-//! one-change copy of a signed token answer `false`; a signed token, tagged
-//! or not, in either derivation, answers `true`.
+//! Every token is built by this crate's own writers' derivations (the
+//! `[1, "kvstore"]` namespace with the key as the key ID and the
+//! controller-derived lock; and the earlier form, the plain protocol name
+//! with the key ID `kvstore-token` and the controller's lock), signed by a
+//! `ProtoWallet` of a seeded key, locked by `PushDrop::lock` and read back
+//! by `PushDrop::decode`, as a caller of the door holds it. A token no
+//! controller signed, a token with no fields, a signed token checked against
+//! another key and every one-change copy of a signed token answer `false`; a
+//! signed namespace token, tagged or not, answers `true`; a token of the
+//! earlier form answers `false` however it is signed or locked (its
+//! signature does not bind its key).
 #![cfg(feature = "kvstore")]
 #![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -87,14 +89,14 @@ fn verdict(token: &PushDrop, controller: &PublicKey) -> bool {
     KVStoreInterpreter::verify_signature_legacy(token, controller)
 }
 
-/// The four shapes: two derivations, each with and without tags.
-fn shapes() -> [(&'static str, Option<&'static str>); 4] {
-    [
-        ("kvstore", None),
-        ("kvstore", Some(r#"["t"]"#)),
-        (NAMESPACE, None),
-        (NAMESPACE, Some(r#"["t"]"#)),
-    ]
+/// The two shapes the door reads: the namespace, with and without tags.
+fn shapes() -> [(&'static str, Option<&'static str>); 2] {
+    [(NAMESPACE, None), (NAMESPACE, Some(r#"["t"]"#))]
+}
+
+/// The earlier form's two shapes: a plain protocol name, with and without tags.
+fn earlier_shapes() -> [(&'static str, Option<&'static str>); 2] {
+    [("kvstore", None), ("kvstore", Some(r#"["t"]"#))]
 }
 
 #[test]
@@ -189,7 +191,8 @@ fn a_signed_token_answers_true_whatever_its_tags() {
     for protocol in ["kvstore", NAMESPACE] {
         for tags in [None, Some(r#"["a","b"]"#), Some(r#"["a","a"]"#), Some("[]")] {
             let token = signed_token(&controller, protocol, "key", "value", tags);
-            assert!(verdict(&token, &public), "{protocol} {tags:?}");
+            let read = protocol == NAMESPACE;
+            assert_eq!(verdict(&token, &public), read, "{protocol} {tags:?}");
         }
     }
 }
@@ -202,7 +205,8 @@ fn a_signed_token_with_an_empty_or_zero_field_answers_true() {
         for value in ["", "\0"] {
             let token = signed_token(&controller, protocol, "key", value, Some(r#"["t"]"#));
             assert_eq!(token.fields[2], vec![0], "OP_0 reads back as one zero byte");
-            assert!(verdict(&token, &public), "{protocol} {value:?}");
+            let read = protocol == NAMESPACE;
+            assert_eq!(verdict(&token, &public), read, "{protocol} {value:?}");
             let mut changed = token.clone();
             changed.fields[1] = b"other".to_vec();
             assert!(!verdict(&changed, &public), "{protocol} {value:?} changed");
@@ -216,9 +220,9 @@ fn a_signed_token_with_an_empty_or_zero_field_answers_true() {
 /// answers `false`.
 #[test]
 fn the_legacy_verdict_is_true_exactly_for_its_controllers_signature() {
-    let mut seen = [0usize; 4];
-    for index in 0..100u32 {
-        let shape = (index % 4) as usize;
+    let mut seen = [0usize; 2];
+    for index in 0..50u32 {
+        let shape = (index % 2) as usize;
         let (protocol, tags) = shapes()[shape];
         let controller = key("generated", index);
         let public = controller.public_key();
@@ -285,15 +289,15 @@ fn signed_fields(controller: &PrivateKey, mut fields: Vec<Vec<u8>>) -> PushDrop 
 fn a_signed_token_with_an_empty_key_or_tags_field_answers_true() {
     let controller = key("controller", 5);
     let public = controller.public_key();
-    let mut cases = vec![
+    let cases = vec![
         ("kvstore", "", "value", Some(r#"["t"]"#)),
         ("kvstore", "", "", None),
         ("kvstore", "", "", Some("")),
+        ("kvstore", "key", "value", Some("")),
+        ("kvstore", "key", "", Some("")),
+        (NAMESPACE, "key", "value", Some("")),
+        (NAMESPACE, "key", "", Some("")),
     ];
-    for protocol in ["kvstore", NAMESPACE] {
-        cases.push((protocol, "key", "value", Some("")));
-        cases.push((protocol, "key", "", Some("")));
-    }
     for (protocol, key_text, value, tags) in cases {
         let token = signed_token(&controller, protocol, key_text, value, tags);
         let zeros = token
@@ -309,8 +313,9 @@ fn a_signed_token_with_an_empty_key_or_tags_field_answers_true() {
             zeros, expected,
             "{protocol} {key_text:?} {value:?} {tags:?}"
         );
-        assert!(
+        assert_eq!(
             verdict(&token, &public),
+            protocol == NAMESPACE,
             "{protocol} {key_text:?} {value:?} {tags:?}"
         );
         let mut changed = token.clone();
@@ -322,20 +327,23 @@ fn a_signed_token_with_an_empty_key_or_tags_field_answers_true() {
     }
 }
 
-/// A plain-name token keeps `true` whatever key locks it: the door judges
-/// the signature, and a plain-name token's lock is not judged (as
-/// `verify_signature` does not judge it).
+/// A token of the earlier form (a plain protocol name, the key ID
+/// `kvstore-token`) answers `false` against its controller whatever key
+/// locks it: its signature does not bind its key, so it authenticates no
+/// key and value (GHSA-4mcm-g5xq-jv3r).
 #[test]
-fn a_signed_plain_name_token_answers_true_whatever_its_lock() {
+fn a_signed_plain_name_token_is_refused_by_the_legacy_verdict_whatever_its_lock() {
     let controller = key("controller", 6);
     let public = controller.public_key();
-    for tags in [None, Some(r#"["t"]"#)] {
-        let token = signed_token(&controller, "kvstore", "k", "v", tags);
+    for (protocol, tags) in earlier_shapes() {
+        let token = signed_token(&controller, protocol, "k", "v", tags);
+        assert_eq!(token.locking_public_key, public);
+        assert!(!verdict(&token, &public), "{tags:?}");
         let mut relocked = token.clone();
         relocked.locking_public_key = key("stranger", 6).public_key();
         let relocked = held(relocked);
         assert_ne!(relocked.locking_public_key, public);
-        assert!(verdict(&relocked, &public), "{tags:?}");
+        assert!(!verdict(&relocked, &public), "{tags:?} relocked");
     }
 }
 
@@ -368,7 +376,12 @@ fn a_token_of_four_or_seven_fields_the_controller_signed_is_refused() {
             &controller,
             vec![p, b"k".to_vec(), b"v".to_vec(), c.clone()],
         );
-        assert!(verdict(&five, &public), "the five-field control {protocol}");
+        let read = protocol == NAMESPACE;
+        assert_eq!(
+            verdict(&five, &public),
+            read,
+            "the five-field control {protocol}"
+        );
     }
 }
 

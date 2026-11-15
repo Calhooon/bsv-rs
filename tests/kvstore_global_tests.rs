@@ -46,7 +46,7 @@ use bsv_rs::wallet::{
     VerifySignatureResult, WalletCertificate, WalletInterface, WalletRevealCounterpartyArgs,
     WalletRevealSpecificArgs,
 };
-use bsv_rs::wallet::{Counterparty, ProtoWallet, Protocol, SecurityLevel};
+use bsv_rs::wallet::{Counterparty, KeyDeriverApi, ProtoWallet, Protocol, SecurityLevel};
 use bsv_rs::{Error, Result};
 use std::sync::Arc;
 
@@ -168,6 +168,10 @@ impl WalletInterface for MockWallet {
         self.get_public_key_count.fetch_add(1, Ordering::SeqCst);
         if self.get_public_key_error.load(Ordering::SeqCst) {
             return Err(Error::WalletError("get_public_key error".to_string()));
+        }
+        // A signing wallet derives a key asked for, as a wallet does
+        if let Some(signer) = self.signer.as_ref().filter(|_| !_args.identity_key) {
+            return ProtoWallet::new(Some(signer.clone())).get_public_key(_args);
         }
         Ok(GetPublicKeyResult {
             public_key: self.public_key_hex.clone(),
@@ -434,7 +438,7 @@ fn create_test_token(
     tags: Option<Vec<String>>,
 ) -> LockingScript {
     let mut fields = vec![
-        protocol_id.as_bytes().to_vec(),
+        serde_json::to_vec(&(1u8, protocol_id)).unwrap(),
         key.as_bytes().to_vec(),
         value.as_bytes().to_vec(),
         controller.public_key().to_compressed().to_vec(),
@@ -445,21 +449,27 @@ fn create_test_token(
         fields.push(tags_json.as_bytes().to_vec());
     }
 
-    // Signed as GlobalKVStore::set signs: the interpreter reads only a token
-    // its controller signed (#544's interpreter site)
-    let signature = ProtoWallet::new(Some(controller.clone()))
+    // Signed and locked as GlobalKVStore::set does, in the key-bound form:
+    // the interpreter reads only a token its controller signed so
+    let wallet = ProtoWallet::new(Some(controller.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+    let signature = wallet
         .create_signature(CreateSignatureArgs {
             data: Some(fields.concat()),
             hash_to_directly_sign: None,
-            protocol_id: Protocol::new(SecurityLevel::App, protocol_id),
-            key_id: "kvstore-token".to_string(),
+            protocol_id: protocol.clone(),
+            key_id: key.to_string(),
             counterparty: Some(Counterparty::Anyone),
         })
-        // a protocol name the wallet refuses to sign under: left unsigned
+        // a protocol name or key the wallet refuses to sign under: left unsigned
         .map_or_else(|_| vec![0u8; 64], |signed| signed.signature);
     fields.push(signature);
+    let lock = wallet
+        .key_deriver()
+        .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+        .unwrap_or_else(|_| controller.public_key());
 
-    PushDrop::new(controller.public_key(), fields).lock()
+    PushDrop::new(lock, fields).lock()
 }
 
 // =============================================================================
@@ -826,7 +836,7 @@ fn test_interpreter_global_token_basic() {
     let entry = entry.unwrap();
     assert_eq!(entry.key, "my_key");
     assert_eq!(entry.value, "my_value");
-    assert_eq!(entry.protocol_id, "kvstore");
+    assert_eq!(entry.protocol_id, r#"[1,"kvstore"]"#);
     // The value is stored in plaintext (not encrypted) for global tokens.
 }
 
@@ -991,7 +1001,10 @@ fn test_interpreter_extract_fields_complete() {
     assert!(fields.is_some());
 
     let fields = fields.unwrap();
-    assert_eq!(fields.protocol_id_string(), Some("my_protocol".to_string()));
+    assert_eq!(
+        fields.protocol_id_string(),
+        Some(r#"[1,"my_protocol"]"#.to_string())
+    );
     assert_eq!(fields.key_string(), Some("my_key".to_string()));
     assert_eq!(fields.value_string(), Some("my_value".to_string()));
     assert_eq!(fields.controller_hex(), to_hex(&pubkey.to_compressed()));
@@ -1365,7 +1378,10 @@ fn test_pushdrop_field_order_matches_global_kvstore_spec() {
     let fields = KVStoreInterpreter::extract_fields(&script).unwrap();
 
     // Field 0: Protocol ID
-    assert_eq!(fields.protocol_id_string(), Some("test_proto".to_string()));
+    assert_eq!(
+        fields.protocol_id_string(),
+        Some(r#"[1,"test_proto"]"#.to_string())
+    );
     // Field 1: Key
     assert_eq!(fields.key_string(), Some("test_key".to_string()));
     // Field 2: Value
@@ -1998,10 +2014,12 @@ async fn a_token_global_kvstore_set_writes_reads_through_the_interpreter_544() {
 }
 
 /// A token `set` writes under a `protocol_id` option other than the store's
-/// configured one is signed under the configured one, which the token does
-/// not carry: no reader can authenticate it, and the interpreter reads none.
+/// configured one names that protocol and is signed under it (it was signed
+/// under the configured one, which the token did not carry, before the
+/// writer moved to the key-bound form): it reads as that protocol's entry,
+/// and a read under the configured protocol finds none.
 #[tokio::test]
-async fn a_token_set_writes_under_another_protocol_option_is_no_entry_544() {
+async fn a_token_set_writes_under_another_protocol_option_reads_under_that_protocol() {
     let controller = PrivateKey::random();
     let options = KVStoreSetOptions {
         protocol_id: Some("other store".to_string()),
@@ -2009,10 +2027,19 @@ async fn a_token_set_writes_under_another_protocol_option_is_no_entry_544() {
     };
     let script = written_by_set(&controller, options).await;
     let fields = KVStoreInterpreter::extract_fields(&script).unwrap();
-    assert_eq!(fields.protocol_id_string().as_deref(), Some("other store"));
-    assert!(KVStoreInterpreter::interpret_script(&script, None).is_none());
+    let named = r#"[1,"other store"]"#;
+    assert_eq!(fields.protocol_id_string().as_deref(), Some(named));
+    assert!(KVStoreInterpreter::verify_signature(&fields, "other store"));
+    assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    let entry = KVStoreInterpreter::interpret_script(&script, None).unwrap();
+    assert_eq!(
+        (entry.value.as_str(), entry.protocol_id.as_str()),
+        ("v", named)
+    );
+    let other = KVStoreContext::new("k", "other store");
+    assert!(KVStoreInterpreter::interpret_script(&script, Some(&other)).is_some());
 
-    // The store's own reader refuses it too, as it did before the port
+    // The store configured for its own protocol reads none of it
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
@@ -2061,6 +2088,7 @@ async fn a_token_signed_over_an_empty_value_is_no_entry_544() {
     };
     let zero = written_by_set_value(&controller, "\0", options).await;
     let decoded = PushDrop::decode(&zero).unwrap();
+    let lock = decoded.locking_public_key.clone();
     let mut fields = decoded.fields;
     assert_eq!(
         fields[2],
@@ -2082,7 +2110,7 @@ async fn a_token_signed_over_an_empty_value_is_no_entry_544() {
                 data: Some(data),
                 hash_to_directly_sign: None,
                 protocol_id: Protocol::new(SecurityLevel::App, "kvstore"),
-                key_id: "kvstore-token".to_string(),
+                key_id: "k".to_string(),
                 counterparty: Some(Counterparty::Anyone),
             })
             .unwrap()
@@ -2090,10 +2118,10 @@ async fn a_token_signed_over_an_empty_value_is_no_entry_544() {
     };
     let last = fields.len() - 1;
     fields[last] = signed(&[0]);
-    let control = PushDrop::new(controller.public_key(), fields.clone()).lock();
+    let control = PushDrop::new(lock.clone(), fields.clone()).lock();
     assert_eq!(control, zero, "the signer is the writer's");
     fields[last] = signed(&[]);
-    let empty = PushDrop::new(controller.public_key(), fields).lock();
+    let empty = PushDrop::new(lock, fields).lock();
     let ctx = KVStoreContext::new("k", KVStoreConfig::default().protocol_id);
     let mut tx = Transaction::new();
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
@@ -2169,5 +2197,62 @@ impl OverlayLookupFacilitator for AnsweringLookupFacilitator {
         Ok(LookupAnswer::OutputList {
             outputs: self.0.clone(),
         })
+    }
+}
+
+/// What `set` writes, every door reads (GHSA-4mcm-g5xq-jv3r): the token is
+/// in the key-bound form (the protocol field `[1, name]`, signed with the
+/// key as key ID, locked with the controller's key linked to `anyone` under
+/// that protocol and key), so the signature check, the deprecated verdict,
+/// the interpreter and the store's keyed read each read it, tagged or not.
+#[tokio::test]
+#[allow(deprecated)]
+async fn what_set_writes_is_the_key_bound_form_and_every_door_reads_it() {
+    for tags in [None, Some(vec!["a".to_string()])] {
+        let controller = PrivateKey::random();
+        let options = KVStoreSetOptions {
+            tags,
+            ..Default::default()
+        };
+        let script = written_by_set(&controller, options).await;
+        let token = PushDrop::decode(&script).unwrap();
+        let protocol = Protocol::new(SecurityLevel::App, "kvstore");
+        let linked = ProtoWallet::new(Some(controller.clone()))
+            .key_deriver()
+            .derive_public_key(&protocol, "k", &Counterparty::Anyone, true)
+            .unwrap();
+        assert_eq!(token.fields[0], br#"[1,"kvstore"]"#.to_vec());
+        assert_eq!(token.locking_public_key, linked);
+        let fields = KVStoreInterpreter::extract_fields(&script).unwrap();
+        assert!(KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+        let public = controller.public_key();
+        assert!(KVStoreInterpreter::verify_signature_legacy(&token, &public));
+        let ctx = KVStoreContext::new("k", "kvstore");
+        assert!(KVStoreInterpreter::interpret_script(&script, Some(&ctx)).is_some());
+
+        let mut tx = Transaction::new();
+        tx.add_input(TransactionInput::new("11".repeat(32), 0))
+            .unwrap();
+        tx.add_output(TransactionOutput::new(1, script)).unwrap();
+        let item = OutputListItem {
+            beef: tx.to_beef(true).unwrap(),
+            output_index: 0,
+            context: None,
+        };
+        let config = KVStoreConfig::default();
+        let resolver = LookupResolver::new(LookupResolverConfig {
+            network_preset: NetworkPreset::Local,
+            facilitator: Some(Arc::new(AnsweringLookupFacilitator(vec![item]))),
+            slap_trackers: Some(Vec::new()),
+            host_overrides: Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec![format!("https://set-get-4mcm-{}.invalid", key_hosts())],
+            )])),
+            ..Default::default()
+        });
+        let store =
+            GlobalKVStore::with_resolver(MockWallet::new(), config, NetworkPreset::Local, resolver);
+        let read = store.get("k", None).await.unwrap().map(|entry| entry.value);
+        assert_eq!(read.as_deref(), Some("v"));
     }
 }

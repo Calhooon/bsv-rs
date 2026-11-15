@@ -8,7 +8,7 @@ use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
-use crate::wallet::{Counterparty, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs};
+use crate::wallet::{Counterparty, ProtoWallet, SecurityLevel, VerifySignatureArgs};
 use std::sync::OnceLock;
 
 use super::types::{KVStoreEntry, KvProtocolFields};
@@ -82,12 +82,13 @@ impl KVStoreInterpreter {
     ///
     /// Extracts KVStoreEntry from a PushDrop locking script if valid: the
     /// controller (field 3, a 33-byte key) signed the bytes of the fields
-    /// before the signature (the last field) as its writer signs them, and
-    /// the token is locked with the key its writer locks it with. Two forms are read: `GlobalKVStore::set`'s (the
-    /// raw protocol ID, the key ID `kvstore-token`, locked with the
-    /// controller's key) and the canonical one (the protocol ID as JSON
-    /// `[level, name]`, the entry's key as key ID, locked with the
-    /// controller's key for `anyone`). Any other token is `None`.
+    /// before the signature (the last field) in the form whose signature
+    /// binds the key, the one `GlobalKVStore::set` writes: the protocol ID
+    /// as canonical JSON `[level, name]`, the entry's key as key ID, locked
+    /// with the controller's key linked to `anyone`. Any other token is
+    /// `None`, the form this crate's writer wrote before (the raw protocol
+    /// ID, the key ID `kvstore-token`) among them. A context's plain
+    /// protocol name matches a token's `[1, name]`.
     pub fn interpret_script(
         script: &LockingScript,
         ctx: Option<&KVStoreContext>,
@@ -108,9 +109,14 @@ impl KVStoreInterpreter {
         let key_bytes = pushdrop.fields.get(KvProtocolFields::KEY)?;
         let key = String::from_utf8(key_bytes.clone()).ok()?;
 
-        // If context provided, check for match
+        // If context provided, check for match: the store's string
+        // configuration denotes an App protocol, written as [1, name].
         if let Some(ctx) = ctx {
-            if ctx.key != key || ctx.protocol_id != protocol_id {
+            let protocol_matches = ctx.protocol_id == protocol_id
+                || serde_json::from_str::<(u8, String)>(&protocol_id).is_ok_and(|(level, name)| {
+                    level == SecurityLevel::App.as_u8() && name == ctx.protocol_id
+                });
+            if ctx.key != key || !protocol_matches {
                 return None;
             }
         }
@@ -128,8 +134,8 @@ impl KVStoreInterpreter {
             String::from_utf8(controller_bytes.clone()).ok()?
         };
 
-        // The controller signed the token and its writer locked it (#544's
-        // interpreter site): an unauthenticated token is no entry.
+        // The controller signed the token in the key-bound form and its
+        // writer locked it (#544's interpreter site): any other is no entry.
         if !super::token_validation::authenticated(&pushdrop) {
             return None;
         }
@@ -154,17 +160,23 @@ impl KVStoreInterpreter {
     /// Verify that a signature field is valid.
     ///
     /// Verifies that the signature was created by the controller public key
-    /// signing the concatenated fields (protocol_id + key + value + controller [+ tags]).
+    /// signing the concatenated fields (protocol_id + key + value + controller [+ tags])
+    /// in the form whose signature binds the key: the protocol field as
+    /// canonical JSON `[level, name]`, the key as key ID, the locking key the
+    /// controller's linked to `anyone` under that protocol and key. A token
+    /// of this crate's earlier form (the raw protocol text, the key ID
+    /// `kvstore-token`) answers `false`.
     ///
     /// # Arguments
     ///
     /// * `fields` - The extracted KVStore fields
-    /// * `protocol_id` - The protocol ID string for key derivation
+    /// * `protocol_id` - The protocol the token must name: `[level, name]`
+    ///   or a plain name at level 1, compared trimmed and lowercase
     ///
     /// # Returns
     ///
-    /// `Ok(true)` if signature is valid, `Ok(false)` if invalid or missing.
-    /// Errors are converted to `Ok(false)` for graceful degradation.
+    /// `true` if the signature is valid, `false` if invalid or missing.
+    /// Errors are converted to `false` for graceful degradation.
     pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool {
         // Get signature - if missing, verification fails
         let signature = match &fields.signature {
@@ -184,20 +196,34 @@ impl KVStoreInterpreter {
         data.extend_from_slice(&fields.key);
         data.extend_from_slice(&fields.value);
         data.extend_from_slice(&fields.controller);
-        if let Some(tags) = &fields.tags {
+        // A five-field token's field 4 is its signature, not tags.
+        if let Some(tags) = fields
+            .tags
+            .as_ref()
+            .filter(|t| fields.signature.as_ref() != Some(t))
+        {
             if !tags.is_empty() && tags != &[0u8] {
                 data.extend_from_slice(tags);
             }
         }
 
-        // Create verification args matching create_token_signature() in global.rs
-        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+        // The one derivation every judging door uses; the protocol field
+        // must name the protocol asked.
+        let Some((protocol, key_id)) = super::token_derivation::derivation(
+            &fields.protocol_id,
+            &fields.key,
+            &controller_pubkey,
+            &fields.locking_public_key,
+            Some(protocol_id),
+        ) else {
+            return false;
+        };
         let args = VerifySignatureArgs {
             data: Some(data),
             hash_to_directly_verify: None,
             signature,
             protocol_id: protocol,
-            key_id: "kvstore-token".to_string(),
+            key_id,
             counterparty: Some(Counterparty::Other(controller_pubkey)),
             for_self: Some(false), // Verify counterparty's signature
         };
@@ -213,7 +239,7 @@ impl KVStoreInterpreter {
     /// fields whose controller field is `controller` and whose signature
     /// field is `controller`'s signature over the other fields; `false` for
     /// anything else.
-    #[deprecated(note = "Use verify_signature with KVStoreFields instead")]
+    #[deprecated(note = "A signature verdict alone, for a token in the key-bound form only")]
     pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool {
         super::legacy_signature::signed_by(pushdrop, controller, get_anyone_wallet())
     }
@@ -357,6 +383,7 @@ mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::script::templates::PushDrop;
+    use crate::wallet::{KeyDeriverApi, Protocol};
 
     fn create_test_token(
         protocol_id: &str,
@@ -366,7 +393,7 @@ mod tests {
         tags: Option<Vec<String>>,
     ) -> LockingScript {
         let mut fields = vec![
-            protocol_id.as_bytes().to_vec(),
+            serde_json::to_vec(&(1u8, protocol_id)).unwrap(),
             key.as_bytes().to_vec(),
             value.as_bytes().to_vec(),
             controller.public_key().to_compressed().to_vec(),
@@ -377,27 +404,25 @@ mod tests {
             fields.push(tags_json.as_bytes().to_vec());
         }
 
-        // Signed as GlobalKVStore::set signs (#544's interpreter site)
-        fields.push(sign_as_the_store(controller, protocol_id, &fields));
-
-        PushDrop::new(controller.public_key(), fields).lock()
-    }
-
-    fn sign_as_the_store(
-        controller: &PrivateKey,
-        protocol_id: &str,
-        fields: &[Vec<u8>],
-    ) -> Vec<u8> {
-        ProtoWallet::new(Some(controller.clone()))
+        // Signed and locked as GlobalKVStore::set does (the key-bound form)
+        let wallet = ProtoWallet::new(Some(controller.clone()));
+        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+        let signature = wallet
             .create_signature(crate::wallet::CreateSignatureArgs {
                 data: Some(fields.concat()),
                 hash_to_directly_sign: None,
-                protocol_id: Protocol::new(SecurityLevel::App, protocol_id),
-                key_id: "kvstore-token".to_string(),
+                protocol_id: protocol.clone(),
+                key_id: key.to_string(),
                 counterparty: Some(Counterparty::Anyone),
             })
             .unwrap()
-            .signature
+            .signature;
+        fields.push(signature);
+        let lock = wallet
+            .key_deriver()
+            .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+            .unwrap();
+        PushDrop::new(lock, fields).lock()
     }
 
     #[test]
@@ -412,7 +437,7 @@ mod tests {
         let entry = entry.unwrap();
         assert_eq!(entry.key, "my_key");
         assert_eq!(entry.value, "my_value");
-        assert_eq!(entry.protocol_id, "kvstore");
+        assert_eq!(entry.protocol_id, r#"[1,"kvstore"]"#);
         assert!(entry.tags.is_empty());
     }
 
@@ -501,7 +526,10 @@ mod tests {
         assert!(fields.is_some());
 
         let fields = fields.unwrap();
-        assert_eq!(fields.protocol_id_string(), Some("kvstore".to_string()));
+        assert_eq!(
+            fields.protocol_id_string(),
+            Some(r#"[1,"kvstore"]"#.to_string())
+        );
         assert_eq!(fields.key_string(), Some("my_key".to_string()));
         assert_eq!(fields.value_string(), Some("my_value".to_string()));
         assert_eq!(

@@ -132,7 +132,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     /// Set a key-value pair: creates a token, broadcasts it to the overlay
     /// network and returns its outpoint string. An empty value is refused
     /// (`Error::KvStoreInvalidValue`) before the wallet is asked: its token
-    /// could not be verified (PushDrop reads `OP_0` back as one zero byte).
+    /// could not be verified (`PushDrop` reads `OP_0` back as one zero byte).
     ///
     /// # Arguments
     ///
@@ -194,7 +194,8 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         // Build PushDrop fields
         let tags = options.tags.clone().unwrap_or_default();
         let mut fields = vec![
-            protocol_id.as_bytes().to_vec(),
+            serde_json::to_vec(&(SecurityLevel::App.as_u8(), protocol_id))
+                .map_err(|e| Error::KvStoreError(e.to_string()))?,
             key.as_bytes().to_vec(),
             value.as_bytes().to_vec(),
             from_hex(controller)?,
@@ -206,12 +207,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             fields.push(tags_json.as_bytes().to_vec());
         }
 
-        // Create signature over fields
-        let signature = self.create_token_signature(&fields).await?;
+        // Sign the fields and lock under the key-bound derivation
+        let (signature, pubkey) = self.token_signature(&fields, protocol_id, key).await?;
         fields.push(signature);
-
-        // Get public key for PushDrop lock
-        let pubkey = PublicKey::from_hex(controller)?;
 
         // Create locking script
         let pushdrop = PushDrop::new(pubkey, fields);
@@ -593,31 +591,32 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         Ok(result.public_key)
     }
 
-    async fn create_token_signature(&self, fields: &[Vec<u8>]) -> Result<Vec<u8>> {
-        // Concatenate all fields for signing
-        let mut data = Vec::new();
-        for field in fields {
-            data.extend_from_slice(field);
-        }
-
-        let protocol = Protocol::new(SecurityLevel::App, &self.config.protocol_id);
-
-        let result = self
-            .wallet
-            .create_signature(
-                crate::wallet::CreateSignatureArgs {
-                    data: Some(data),
-                    hash_to_directly_sign: None,
-                    protocol_id: protocol,
-                    key_id: "kvstore-token".to_string(),
-                    counterparty: Some(Counterparty::Anyone),
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // signature is already DER-encoded Vec<u8>
-        Ok(result.signature)
+    /// The signature over `fields` and the lock, under the key-bound derivation.
+    async fn token_signature(
+        &self,
+        fields: &[Vec<u8>],
+        protocol_id: &str,
+        key: &str,
+    ) -> Result<(Vec<u8>, PublicKey)> {
+        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+        let args = crate::wallet::CreateSignatureArgs {
+            data: Some(fields.concat()),
+            hash_to_directly_sign: None,
+            protocol_id: protocol.clone(),
+            key_id: key.to_string(),
+            counterparty: Some(Counterparty::Anyone),
+        };
+        let signed = self.wallet.create_signature(args, self.originator());
+        let signature = signed.await?.signature;
+        let lock = GetPublicKeyArgs {
+            identity_key: false,
+            protocol_id: Some(protocol),
+            key_id: Some(key.to_string()),
+            counterparty: Some(Counterparty::Anyone),
+            for_self: Some(true),
+        };
+        let lock = self.wallet.get_public_key(lock, self.originator()).await?;
+        Ok((signature, PublicKey::from_hex(&lock.public_key)?))
     }
 
     async fn query_overlay(
