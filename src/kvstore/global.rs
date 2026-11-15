@@ -169,6 +169,14 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     /// # Returns
     ///
     /// The outpoint string of the new token.
+    ///
+    /// # Errors
+    ///
+    /// `Error::KvStoreInvalidValue` for an empty value, before the wallet is
+    /// asked anything: PushDrop writes an empty field as `OP_0`, which every
+    /// reader reads back as one zero byte, so no reader could verify the
+    /// token's signature (the reference refuses it at write too,
+    /// `validateKVStoreValue`).
     pub async fn set(
         &self,
         key: &str,
@@ -177,6 +185,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     ) -> Result<String> {
         if key.is_empty() {
             return Err(Error::KvStoreError("Key cannot be empty".to_string()));
+        }
+        if value.is_empty() {
+            return Err(Error::KvStoreInvalidValue);
         }
 
         let options = options.unwrap_or_default();
@@ -304,7 +315,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     ///
     /// # Errors
     ///
-    /// Returns an error if any key is empty, or if wallet/overlay operations fail.
+    /// Returns an error if any key or value is empty, or if wallet/overlay operations fail.
     /// If an error occurs partway through, earlier entries will already be set.
     pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()> {
         for (key, value) in entries {
