@@ -68,6 +68,7 @@ pub mod script;
 pub mod script_num;
 pub mod spend;
 pub mod template;
+mod template_push;
 pub mod templates;
 pub mod transaction;
 pub mod unlocking_script;
