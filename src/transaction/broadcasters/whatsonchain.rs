@@ -29,6 +29,8 @@
 use async_trait::async_trait;
 
 #[cfg(feature = "http")]
+use crate::transaction::broadcasters::acknowledged::acknowledged_txid;
+#[cfg(feature = "http")]
 use crate::transaction::BroadcastResponse;
 use crate::transaction::{
     BroadcastFailure, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
@@ -252,15 +254,17 @@ impl Broadcaster for WhatsOnChainBroadcaster {
         })?;
 
         if status_code.is_success() {
-            // WhatsOnChain returns the txid on success
-            let returned_txid = body.trim().trim_matches('"').to_string();
+            // WhatsOnChain names the txid it accepted; a success answers the
+            // submitted transaction's id (`acknowledged`).
+            let named = body.trim().trim_matches('"');
+            let txid = acknowledged_txid(
+                (!named.is_empty()).then_some(named),
+                &txid,
+                "Broadcaster acknowledged a transaction other than the submitted transaction",
+            )?;
             Ok(BroadcastResponse {
                 status: BroadcastStatus::Success,
-                txid: if returned_txid.is_empty() {
-                    txid
-                } else {
-                    returned_txid
-                },
+                txid,
                 message: "Transaction broadcast successfully".to_string(),
                 competing_txs: None,
             })
