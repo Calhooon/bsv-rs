@@ -37,4 +37,4 @@ mod whatsonchain;
 pub use block_headers_service::{
     BlockHeadersServiceConfig, BlockHeadersServiceTracker, DEFAULT_HEADERS_URL,
 };
-pub use whatsonchain::{WhatsOnChainTracker, WocNetwork};
+pub use whatsonchain::{WhatsOnChainTracker, WocNetwork, DEFAULT_WOC_TIMEOUT_MS};

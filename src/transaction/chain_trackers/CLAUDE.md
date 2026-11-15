@@ -33,6 +33,7 @@ Without the `http` feature, the tracker methods will return `ChainTrackerError::
 From `mod.rs`:
 - `WhatsOnChainTracker` - WhatsOnChain tracker implementation
 - `WocNetwork` - Network enum (Mainnet/Testnet)
+- `DEFAULT_WOC_TIMEOUT_MS` - `WhatsOnChainTracker`'s default per-request timeout (`30_000` ms); also `bsv_rs::transaction::DEFAULT_WOC_TIMEOUT_MS`
 - `BlockHeadersServiceTracker` - Block Headers Service tracker implementation
 - `BlockHeadersServiceConfig` - Configuration struct for Block Headers Service
 - `DEFAULT_HEADERS_URL` - Default URL constant (`"https://headers.spv.money"`)
@@ -66,6 +67,7 @@ impl WocNetwork {
 pub struct WhatsOnChainTracker {
     network: WocNetwork,
     base_url_override: Option<String>,
+    timeout_ms: u64,                 // Per-request timeout (default DEFAULT_WOC_TIMEOUT_MS = 30,000 ms)
     #[cfg(feature = "http")]
     client: reqwest::Client,
 }
@@ -75,7 +77,9 @@ impl WhatsOnChainTracker {
     pub fn testnet() -> Self                                      // Create testnet tracker
     pub fn new(network: WocNetwork) -> Self                       // Create with specific network
     pub fn with_base_url(base_url: &str, network: WocNetwork) -> Self  // Create with custom URL (for testing)
+    pub fn with_timeout_ms(self, timeout_ms: u64) -> Self        // Override the per-request timeout
     pub fn network(&self) -> WocNetwork                           // Get configured network
+    pub fn timeout_ms(&self) -> u64                              // Get configured per-request timeout
     fn base_url(&self) -> &str                                    // (http only) Resolve effective base URL
 }
 
@@ -84,7 +88,7 @@ impl Default for WhatsOnChainTracker {
 }
 
 impl Debug for WhatsOnChainTracker {
-    // Custom impl: shows network and base_url_override, omits reqwest::Client
+    // Custom impl: shows network, base_url_override and timeout_ms, omits reqwest::Client
 }
 ```
 
@@ -298,9 +302,9 @@ When the `http` feature is enabled, each tracker instance creates its own `reqwe
 
 The `BlockHeadersServiceTracker` supports optional Bearer token authentication via the `auth_token` config field. When set, requests include an `Authorization: Bearer <token>` header.
 
-### Request Timeout (BlockHeadersServiceTracker only)
+### Request Timeout
 
-The `BlockHeadersServiceTracker` supports configurable request timeouts via `timeout_ms` (default: 30 seconds).
+Both trackers bound every request they make. `BlockHeadersServiceTracker` carries `timeout_ms` in its config (default: 30 seconds). `WhatsOnChainTracker` bounds each request at `timeout_ms` too, `DEFAULT_WOC_TIMEOUT_MS` (30 s) by default, overridable with `.with_timeout_ms(ms)`, matching the sibling and the TypeScript reference's default HTTP client (`DEFAULT_HTTP_CLIENT_TIMEOUT_MS`, 30 s, `ts-stack@edf6e03` `transaction/http/HttpClientResponseUtils.ts:4`, which the reference's tracker takes when it is given no client, `transaction/chaintrackers/WhatsOnChain.ts:64`). A timeout of `0` is not "no bound": the bound is then the timer's next tick, so only an answer arriving inside it is read; `u64::MAX` is in effect no bound. Without a bound a response whose body never arrives would hold the call (and any `Transaction::verify` awaiting it) with no end; the regressions are `the_whatsonchain_door_bounds_a_stalled_response_98` (the whole answer late) and `the_whatsonchain_door_bounds_a_body_that_never_ends_98` (the head, then a body that stops) in `tests/transport_fault_trackers.rs`.
 
 ### Conditional Compilation
 

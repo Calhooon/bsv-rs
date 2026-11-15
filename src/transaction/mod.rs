@@ -138,7 +138,7 @@ pub use chain_tracker::{
 };
 pub use chain_trackers::{
     BlockHeadersServiceConfig, BlockHeadersServiceTracker, WhatsOnChainTracker, WocNetwork,
-    DEFAULT_HEADERS_URL,
+    DEFAULT_HEADERS_URL, DEFAULT_WOC_TIMEOUT_MS,
 };
 pub use fee_model::{FeeModel, FixedFee};
 #[allow(deprecated)] // the ARC items re-exported for the callers who name them (#350)
