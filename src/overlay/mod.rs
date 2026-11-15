@@ -51,6 +51,7 @@
 //!
 //! A global reputation tracker is shared across all operations.
 
+mod admin_token_validation;
 pub mod facilitators;
 pub mod historian;
 pub mod host_reputation_tracker;

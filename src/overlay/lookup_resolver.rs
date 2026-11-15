@@ -4,9 +4,9 @@
 //! and querying them in parallel with aggregation.
 
 use crate::overlay::{
+    admin_token_validation,
     facilitators::{HttpsOverlayLookupFacilitator, OverlayLookupFacilitator},
     host_reputation_tracker::{get_overlay_host_reputation_tracker, HostReputationTracker},
-    overlay_admin_token_template::decode_overlay_admin_token,
     types::{
         LookupAnswer, LookupQuestion, NetworkPreset, OutputListItem, Protocol,
         DEFAULT_HOSTS_CACHE_MAX_ENTRIES, DEFAULT_HOSTS_CACHE_TTL_MS, DEFAULT_TX_MEMO_MAX_ENTRIES,
@@ -531,8 +531,8 @@ impl LookupResolver {
             .locking_script
             .clone();
 
-        // Decode as admin token
-        let token = decode_overlay_admin_token(&script)?;
+        // Decoded and authenticated (#544's discovery site)
+        let token = admin_token_validation::decode_and_verify(&script, Protocol::Slap)?;
 
         // Validate protocol and service
         if token.protocol != Protocol::Slap {
