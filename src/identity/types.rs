@@ -174,20 +174,27 @@ pub struct DisplayableIdentity {
     pub badge_click_url: String,
 }
 
+/// A key's first 6 bytes, `...`, its last 4 (the key itself up to 10 bytes);
+/// a cut inside a character (a key not ASCII) moves out to the character's edge.
+fn abbreviate_key(key: &str) -> String {
+    let edge = |i: &usize| key.is_char_boundary(*i);
+    match (
+        (0..=6).rev().find(edge),
+        (key.len().saturating_sub(4)..).find(edge),
+    ) {
+        (Some(head), Some(tail)) if key.len() > 10 => {
+            format!("{}...{}", &key[..head], &key[tail..])
+        }
+        _ => key.to_string(),
+    }
+}
+
 impl DisplayableIdentity {
     /// Create a minimal identity from just an identity key.
     ///
     /// Uses default values for all display fields.
     pub fn from_key(identity_key: &str) -> Self {
-        let abbreviated = if identity_key.len() > 10 {
-            format!(
-                "{}...{}",
-                &identity_key[..6],
-                &identity_key[identity_key.len() - 4..]
-            )
-        } else {
-            identity_key.to_string()
-        };
+        let abbreviated = abbreviate_key(identity_key);
 
         Self {
             name: abbreviated.clone(),
@@ -413,17 +420,10 @@ impl Contact {
     /// `abbreviated_key` the stored one (#568); a contact built here with
     /// none takes this crate's form, the one its saved record carries.
     pub fn to_displayable_identity(&self) -> DisplayableIdentity {
-        let abbreviated = self.abbreviated_key.clone().unwrap_or_else(|| {
-            if self.identity_key.len() > 10 {
-                format!(
-                    "{}...{}",
-                    &self.identity_key[..6],
-                    &self.identity_key[self.identity_key.len() - 4..]
-                )
-            } else {
-                self.identity_key.clone()
-            }
-        });
+        let abbreviated = self
+            .abbreviated_key
+            .clone()
+            .unwrap_or_else(|| abbreviate_key(&self.identity_key));
 
         DisplayableIdentity {
             name: self.name.clone(),

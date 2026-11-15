@@ -47,7 +47,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) with `to_address()` |
 | `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig) |
 | `address.rs` | `Address` type for P2PKH address parsing, creation, and Base58Check encoding |
-| `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`) |
+| `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`); every cut taken with `str::get`, a string not ASCII at a cut refused (`tests/text_doors_any_string.rs`) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding (one buffer per encoding, exactly one byte reserved for the sign; fixed chunks written without per-limb Vec growth checks, #378; the decode reads the sign with the magnitude, no negated copy: #348) |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
