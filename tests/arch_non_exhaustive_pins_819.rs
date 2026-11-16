@@ -815,30 +815,67 @@ fn doc_name(key: &str) -> String {
     format!("{file} - {}::{name}", module.replace('/', "::"))
 }
 
+/// One passed doc test, as its line of the doc suite's log names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DocLine {
+    /// `<file> - <item path>`, the file with `/` whatever the platform wrote.
+    name: String,
+    /// The source line rustdoc names, as its text.
+    line: String,
+    compile_fail: bool,
+}
+
+/// A doc test's name with its file path in `/`: rustdoc writes the path with
+/// the platform's separator (`src\auth\peer.rs - auth::peer::PeerOptions` on
+/// Windows), and the pins are keyed by `/`. The path alone is rewritten, the
+/// text up to the name's ` -`; the item path after it is left as written.
+fn doc_test_name(name: &str) -> String {
+    match name.split_once(" -") {
+        Some((file, item)) => format!("{} -{item}", file.replace('\\', "/")),
+        None => name.to_string(),
+    }
+}
+
+/// What follows `test ` on a line of the log, a carriage return or other
+/// white space at its end aside (a log written or carried with CRLF).
+fn doc_test_text(line: &str) -> Option<&str> {
+    line.trim_end().strip_prefix("test ")
+}
+
+/// A `test <name> (line N)[ - compile fail] ... ok` line read, `None` for
+/// any other line.
+fn doc_line(line: &str) -> Option<DocLine> {
+    let rest = doc_test_text(line)?.strip_suffix(" ... ok")?;
+    let (name, tail) = rest.split_once(" (line ")?;
+    let (at, compile_fail) = match tail.strip_suffix(") - compile fail") {
+        Some(at) => (at, true),
+        None => (tail.strip_suffix(')')?, false),
+    };
+    Some(DocLine {
+        name: doc_test_name(name),
+        line: at.to_string(),
+        compile_fail,
+    })
+}
+
 /// What a doc suite's log lacks: for each name, its `compile fail ... ok`
 /// lines exactly and its plain `... ok` lines at least, no line `FAILED`, and
 /// the suite's result line `ok`.
 fn doc_log_refusals(log: &str, wanted: &[(String, usize, usize)]) -> Vec<String> {
     let mut refusals = Vec::new();
-    let mut counts: std::collections::BTreeMap<&str, (usize, usize)> = Default::default();
+    let mut counts: std::collections::BTreeMap<String, (usize, usize)> = Default::default();
     for line in log.lines() {
-        let Some(rest) = line.trim_end().strip_prefix("test ") else {
-            continue;
-        };
-        if rest.ends_with(" ... FAILED") {
+        if let Some(rest) = doc_test_text(line).filter(|rest| rest.ends_with(" ... FAILED")) {
             refusals.push(format!("a doc test failed: {rest}"));
             continue;
         }
-        let Some(rest) = rest.strip_suffix(" ... ok") else {
+        let Some(found) = doc_line(line) else {
             continue;
         };
-        let Some((name, tail)) = rest.split_once(" (line ") else {
-            continue;
-        };
-        let entry = counts.entry(name).or_default();
-        if tail.ends_with(") - compile fail") {
+        let entry = counts.entry(found.name).or_default();
+        if found.compile_fail {
             entry.0 += 1;
-        } else if tail.ends_with(')') {
+        } else {
             entry.1 += 1;
         }
     }
@@ -894,12 +931,12 @@ fn struct_fail_lines(files: &[(&str, &str)]) -> Vec<(String, usize)> {
 fn fail_line_refusals(log: &str, wanted: &[(String, usize)]) -> Vec<String> {
     let mut refusals = Vec::new();
     for (name, line) in wanted {
-        let prefix = format!("test {name} (line ");
-        for found in log.lines().filter_map(|l| {
-            l.trim_end()
-                .strip_prefix(&prefix)?
-                .strip_suffix(") - compile fail ... ok")
-        }) {
+        for found in log
+            .lines()
+            .filter_map(doc_line)
+            .filter(|found| found.compile_fail && &found.name == name)
+            .map(|found| found.line)
+        {
             if found != line.to_string() {
                 refusals.push(format!(
                     "{name}: its `compile fail` line is the block at line {found}, where its functional update is at line {line}"
@@ -1224,6 +1261,100 @@ fn a_doc_log_missing_a_pin_line_is_refused_naming_it_819() {
         doc_log_refusals(&log, &wanted),
         ["no `test result: ok.` line: not a passing doc suite's log"]
     );
+}
+
+/// The doc suite's log is read with either path separator and with a CR at
+/// a line's end: the Windows legs' own lines (run 43951484420,
+/// `test src\auth\peer.rs - auth::peer::PeerOptions (line 125) - compile fail ... ok`)
+/// matched no pin, every pin read `0 ... lines in the doc suite`. Runs on
+/// every platform, so the normalization cannot go unnoticed on Linux.
+#[test]
+fn a_doc_test_line_is_read_with_either_path_separator_and_a_cr_819() {
+    let name = "src/auth/peer.rs - auth::peer::PeerOptions";
+    assert!(DOC_PINS.contains(&name));
+    let forms = |tail: &str| {
+        [
+            format!("test src/auth/peer.rs - auth::peer::PeerOptions {tail}"),
+            format!("test src\\auth\\peer.rs - auth::peer::PeerOptions {tail}"),
+            format!("test src\\auth\\peer.rs - auth::peer::PeerOptions {tail}\r"),
+        ]
+    };
+    for (tail, compile_fail) in [
+        ("(line 125) - compile fail ... ok", true),
+        ("(line 131) ... ok", false),
+    ] {
+        let line = if compile_fail { "125" } else { "131" };
+        let expected = DocLine {
+            name: name.to_string(),
+            line: line.to_string(),
+            compile_fail,
+        };
+        for form in forms(tail) {
+            assert_eq!(doc_line(&form), Some(expected.clone()), "{form:?}");
+        }
+    }
+    // the path alone: a backslash after the name's ` -` is left as written,
+    // and a crate-level block's name (`src\lib.rs - (line 5)`) is read
+    assert_eq!(
+        doc_test_name("src\\a\\b.rs - a::b\\T"),
+        "src/a/b.rs - a::b\\T"
+    );
+    assert_eq!(doc_test_name("src\\lib.rs -"), "src/lib.rs -");
+    assert_eq!(
+        doc_line("test src\\lib.rs - (line 5) ... ok\r").map(|l| l.name),
+        Some("src/lib.rs -".to_string())
+    );
+    // not a passed doc test's line
+    for other in [
+        "test src\\auth\\peer.rs - auth::peer::PeerOptions (line 125) - compile fail ... FAILED\r",
+        "test src/auth/peer.rs - auth::peer::PeerOptions (line 140) ... ignored",
+        "running 518 tests\r",
+        "",
+    ] {
+        assert_eq!(doc_line(other), None, "{other:?}");
+    }
+    // the two readers of the log, on one pin's two lines in the three forms:
+    // the same answer, and a pin whose lines are absent still refused by name
+    let wanted = [(name.to_string(), 1, 1)];
+    let fail_at = [(name.to_string(), 125)];
+    let result = "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out";
+    let [fails, plains] = [
+        forms("(line 125) - compile fail ... ok"),
+        forms("(line 131) ... ok"),
+    ];
+    for (at, (fail, plain)) in fails.iter().zip(&plains).enumerate() {
+        let end = if at == 2 { "\r\n" } else { "\n" };
+        let log = format!("{fail}\n{plain}\n{result}{end}");
+        assert_eq!(
+            doc_log_refusals(&log, &wanted),
+            Vec::<String>::new(),
+            "{log:?}"
+        );
+        assert_eq!(
+            fail_line_refusals(&log, &fail_at),
+            Vec::<String>::new(),
+            "{log:?}"
+        );
+        assert_eq!(
+            fail_line_refusals(&log, &[(name.to_string(), 126)]),
+            [format!("{name}: its `compile fail` line is the block at line 125, where its functional update is at line 126")],
+            "{log:?}"
+        );
+        assert_eq!(
+            doc_log_refusals(&format!("{plain}\n{result}{end}"), &wanted),
+            [format!(
+                "{name}: 0 `compile fail ... ok` lines in the doc suite, where 1 must run"
+            )],
+            "{log:?}"
+        );
+        let failed = fail.replace(" ... ok", " ... FAILED");
+        assert!(
+            doc_log_refusals(&format!("{failed}\n{plain}\n{result}{end}"), &wanted)
+                .iter()
+                .any(|r| r.starts_with("a doc test failed: ")),
+            "{log:?}"
+        );
+    }
 }
 
 #[test]

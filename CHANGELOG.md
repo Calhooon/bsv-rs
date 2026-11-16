@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-beta.8] - 2026-11-16
 
-The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `98f1800a` after the stable line's 0.8.11 was synced in. 122 entries since beta.7.
+The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `98f1800a` after the stable line's 0.8.11 was synced in. 123 entries since beta.7.
 
 **Security carry.** This is the first 0.9.0 prerelease to carry the security fixes the stable line shipped in 0.8.6 through 0.8.11. It carries the fixes of sixteen published advisories: GHSA-4mcm-g5xq-jv3r, GHSA-67vc-6c8g-7x48, GHSA-84xq-3662-pvx5, GHSA-9c8r-76f3-m426, GHSA-cgp9-rj5h-jxw6, GHSA-crr5-gh8p-q2h2, GHSA-cwxv-4866-5gq2, GHSA-fr33-7jw7-mwwh, GHSA-gg5p-wgff-v3hr, GHSA-gvmh-f5gf-5vjj, GHSA-h4m7-c6p8-725m, GHSA-j8hr-pjhm-6h27, GHSA-mj2m-jxgv-r446, GHSA-qhj8-j8mj-9cgc, GHSA-vmgj-w2jr-c52x and GHSA-x3m6-jp5x-236c, each described on its advisory page and, where an entry below names it, in that entry. GHSA-82g9-h6jw-r99f, which two entries below name, has no patched version. A dependent pinned to `=0.9.0-beta.7` or earlier moves to this prerelease.
 
@@ -25,7 +25,7 @@ The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `
 - a `Transaction` owns its four serialized fields, now private (#843): a read is `tx.inputs()`, `tx.outputs()`, `tx.version()`, `tx.lock_time()`; a write is `tx.inputs_mut()`, `tx.outputs_mut()`, `tx.set_version(v)`, `tx.set_lock_time(n)`; delete every `invalidate_caches()` call.
 - the Shamir backup is BRC-140's (#854): a backup an earlier release wrote is read by `shamir::recover_private_key_from_legacy_backup`, and `split_private_key_with` takes six arguments (it adds `seed` and `draws`).
 
-**The rest, by kind.** The 122 entries since beta.7 are Fixed 44, Changed 24, Tests 17, Security 12, Added 12, Docs 7, CI 3, Performance 1, Migration 1, Documented 1; each entry carries its own migration line where one is needed.
+**The rest, by kind.** The 123 entries since beta.7 are Fixed 44, Changed 24, Tests 18, Security 12, Added 12, Docs 7, CI 3, Performance 1, Migration 1, Documented 1; each entry carries its own migration line where one is needed.
 
 ### Tests: the four discovery tests ask a scripted tracker and assert exactly, hermetic with and without `http` (#779)
 
@@ -5469,6 +5469,13 @@ No SDK has a twin of the baseline. No source line, wire byte, verdict or error t
 - What changed. `.gitattributes` carries `* text=auto eol=lf` ahead of its other lines, one rule for all text, the `-text` lines after it unchanged and still overriding it; the index held no CRLF, so `git add --renormalize .` moves no file.
 - Pinned by: the six tests themselves, red by name in a clone with `core.autocrlf=true` before the rule and green after it, with every step of the Test Suite job run in such a clone; the Windows legs of a full-matrix dispatch are the witness on the platform.
 - Migration. none: a checkout rule and no code. A checkout made on Windows before this keeps its CRLF files until they are checked out again.
+
+### Tests: the doc suite's log is read with either path separator (#819)
+
+- What was red. On both Windows legs of the full matrix (run 43951484420) the step `Read every pin's lines in the doc suite` failed with the doc suite itself green: `the_doc_suite_ran_every_pinned_block_819` read, for every pin, `0 \`compile fail ... ok\` lines in the doc suite, where 1 must run`. Rustdoc names a doc test by its file path with the platform's separator (`test src\auth\peer.rs - auth::peer::PeerOptions (line 125) - compile fail ... ok`), and the pins are keyed by `/`. The step had never run on Windows before.
+- What changed. `tests/arch_non_exhaustive_pins_819.rs` reads a line of the log through one parser, `doc_line`, used by both of its readers: the file path of a doc test's name alone is rewritten to `/`, and a CR at a line's end is set aside. No pin is loosened: a pin whose lines are absent is refused by name with either separator.
+- Pinned by: `a_doc_test_line_is_read_with_either_path_separator_and_a_cr_819`, which runs on every platform (a pin's lines with `/`, with `\` and with `\` and a CR give one answer; an absent line, a `FAILED` line and another line number are refused in each form), RED with the rewrite removed; the Windows leg's own doc-suite lines, RED on the reader before this change and green after it.
+- Migration. none: a test-only change.
 
 ## [0.8.11] - 2026-11-16
 
