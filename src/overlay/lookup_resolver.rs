@@ -519,8 +519,8 @@ impl LookupResolver {
 
     /// Parse a SLAP token from an output and extract the domain.
     fn parse_slap_token(&self, output: &OutputListItem, expected_service: &str) -> Result<String> {
-        // Parse BEEF to get transaction
-        let tx = Transaction::from_beef(&output.beef, None)
+        // The subject alone (txid + the output read below); the ancestry is not used — link nothing here (#749).
+        let tx = Transaction::from_beef_subject(&output.beef, None)
             .map_err(|e| Error::OverlayError(format!("Failed to parse BEEF: {}", e)))?;
 
         // Get the output's locking script
@@ -580,8 +580,8 @@ impl LookupResolver {
             }
         }
 
-        // Parse BEEF and cache the result
-        let tx = Transaction::from_beef(beef, None).ok()?;
+        // The subject's txid alone (unchanged by linking); link nothing here (#749).
+        let tx = Transaction::from_beef_subject(beef, None).ok()?;
         let tx_id = tx.id();
 
         // Update cache
