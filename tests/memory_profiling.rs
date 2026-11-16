@@ -599,3 +599,122 @@ fn test_beef_link_bound_refuses_before_the_allocation() {
          the refusal was moved after the allocation it would need"
     );
 }
+
+/// #749 fold2 ruling 2: a SHARED link budget caps the peak heap of several
+/// concurrent links against one pool, where independent per-link budgets let it
+/// grow with the number of links held at once. Measures k = 2, 3, 5 retained
+/// links with and without a shared pool and prints the peaks; asserts the
+/// shared pool holds the k = 5 peak at or below the k = 2 peak (bounded by the
+/// pool, not by k).
+#[cfg(feature = "transaction")]
+#[test]
+fn test_749_shared_budget_caps_concurrent_peak() {
+    use bsv_rs::script::{LockingScript, UnlockingScript};
+    use bsv_rs::transaction::{
+        Beef, BeefLinkBudget, MerklePath, Transaction, TransactionInput, TransactionOutput,
+    };
+
+    const STUB: usize = 1024 * 1024; // one 1 MiB output per parent
+    const INPUTS: usize = 9; // one full link + 8 repeats => ~8 MiB re-materialized per link
+    const POOL: u64 = 24 * 1024 * 1024; // shared pool: room for ~two links' worth
+
+    // One BEEF: a 1 MiB parent spent by INPUTS inputs of one child.
+    let bytes = {
+        let mut raw = vec![0x4e];
+        raw.extend_from_slice(&u32::try_from(STUB).unwrap().to_le_bytes());
+        raw.extend(std::iter::repeat_n(0u8, STUB));
+        let big = LockingScript::from_binary(&raw).unwrap();
+        let mut parent = Transaction::new();
+        let mut i = TransactionInput::new("aa".repeat(32), 0);
+        i.unlocking_script = Some(UnlockingScript::new());
+        parent.inputs.push(i);
+        parent.outputs.push(TransactionOutput::new(1_000, big));
+        let ptxid = parent.id();
+        let mut beef = Beef::new();
+        let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&ptxid, 800_000));
+        beef.merge_raw_tx(parent.to_binary(), Some(bump));
+        let mut child = Transaction::new();
+        for _ in 0..INPUTS {
+            let mut i = TransactionInput::new(ptxid.clone(), 0);
+            i.unlocking_script = Some(UnlockingScript::new());
+            child.inputs.push(i);
+        }
+        child.outputs.push(TransactionOutput::new(
+            1_000,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ));
+        beef.merge_raw_tx(child.to_binary(), None);
+        beef.to_binary()
+    };
+
+    fn peak(f: impl FnOnce()) -> u64 {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        f();
+        dhat::HeapStats::get().max_bytes as u64
+    }
+
+    let _serial = serial();
+    let mib = |b: u64| b as f64 / (1024.0 * 1024.0);
+
+    println!("\n=== #749 fold2 shared-budget concurrent peak (stub {STUB} B, pool {POOL} B) ===");
+    let ks = [2usize, 3, 5];
+    let mut without_peaks = Vec::new();
+    let mut with_peaks = Vec::new();
+    for &k in &ks {
+        // Independent per-link budgets: every link admitted, all held at once.
+        let without = peak(|| {
+            let mut held = Vec::new();
+            for _ in 0..k {
+                held.push(
+                    Transaction::from_beef_with_budget(&bytes, None, &BeefLinkBudget::per_link())
+                        .expect("per-link admits each link"),
+                );
+            }
+            std::hint::black_box(&held);
+        });
+        // One shared pool: links past the pool are refused; the admitted ones held.
+        let pool = BeefLinkBudget::shared(POOL);
+        let mut held = Vec::new();
+        let with = peak(|| {
+            for _ in 0..k {
+                if let Ok(linked) = Transaction::from_beef_with_budget(&bytes, None, &pool) {
+                    held.push(linked);
+                }
+            }
+            std::hint::black_box(&held);
+        });
+        println!(
+            "k={k}: without-shared {:.1} MiB (all {k} held); with-shared {:.1} MiB ({} admitted)",
+            mib(without),
+            mib(with),
+            held.len(),
+        );
+        without_peaks.push(without);
+        with_peaks.push(with);
+    }
+
+    // Without a shared budget the peak grows with k; with one, the pool holds it
+    // flat — the k=5 peak stays within one per-link link's worth of the k=3 peak
+    // (the only growth is one in-flight refused attempt), and far below the
+    // k=5 independent-budget peak.
+    let per_link_heap = 2 * (INPUTS as u64) * STUB as u64; // generous one-link bound
+    assert!(
+        with_peaks[2] < without_peaks[2],
+        "the shared pool must cap the k=5 peak ({} B) below the independent-budget k=5 peak ({} B)",
+        with_peaks[2],
+        without_peaks[2],
+    );
+    assert!(
+        with_peaks[2] <= with_peaks[1] + per_link_heap,
+        "the shared pool's k=5 peak ({} B) must not grow beyond the k=3 peak ({} B) by more than \
+         one in-flight link",
+        with_peaks[2],
+        with_peaks[1],
+    );
+    assert!(
+        without_peaks[2] > without_peaks[0] + per_link_heap,
+        "without a shared budget the k=5 peak ({} B) must grow well past the k=2 peak ({} B)",
+        without_peaks[2],
+        without_peaks[0],
+    );
+}

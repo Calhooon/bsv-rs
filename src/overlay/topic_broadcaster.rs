@@ -323,8 +323,12 @@ impl TopicBroadcaster {
 
         if let LookupAnswer::OutputList { outputs } = answer {
             for output in outputs {
-                // Parse BEEF and extract admin token
-                if let Ok(tx) = crate::transaction::Transaction::from_beef(&output.beef, None) {
+                // Only this output's own locking script is read below; the
+                // input ancestry is never used, so link nothing (#749 fold2,
+                // ruling 1).
+                if let Ok(tx) =
+                    crate::transaction::Transaction::from_beef_subject(&output.beef, None)
+                {
                     if let Some(script) = tx
                         .outputs
                         .get(output.output_index as usize)
