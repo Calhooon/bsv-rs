@@ -510,3 +510,92 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
         "{per_input:.1} B per input, its edge"
     );
 }
+
+/// The #749 link bound refuses BEFORE the clone that would cross the budget
+/// (rule 5: every refusal of the budget before the allocation it would need).
+///
+/// A parent of one 1 MiB output spent by many inputs re-materializes one stub
+/// clone of that output per repeat. With the budget at 4 MiB, the correct
+/// linker retains four clones and refuses on the fifth repeat's check — BEFORE
+/// cloning it — so the declined link's peak carries four re-materialized copies.
+/// Were the check moved AFTER the clone, the fifth would be cloned before the
+/// refusal and the peak would carry five: this test's ceiling sits between the
+/// two (4.5 copies), so it is RED if the refusal is moved after the allocation.
+/// The gap is a whole 1 MiB stub, and dhat's accounting is exact, so the two
+/// orders never tie.
+#[cfg(feature = "transaction")]
+#[test]
+fn test_beef_link_bound_refuses_before_the_allocation() {
+    use bsv_rs::script::{LockingScript, UnlockingScript};
+    use bsv_rs::transaction::{
+        Beef, BeefLinkLimits, MerklePath, Transaction, TransactionInput, TransactionOutput,
+    };
+    use bsv_rs::Error;
+
+    const STUB: usize = 1024 * 1024; // one 1 MiB output
+    const BUDGET: u64 = 4 * 1024 * 1024; // four clones fit; the fifth repeat trips
+    const INPUTS: usize = 10; // one full link + nine repeats (the fifth trips)
+                              // Measured on this fix: the correct linker (refuse before the clone) peaks
+                              // at ~13.0 MiB (four 1 MiB outputs re-materialized, each held as raw cache
+                              // plus parsed chunk ≈ 2×, over the answer and the memoized stub); the same
+                              // linker with the clone moved before the check peaks at ~15.0 MiB (a fifth
+                              // copy). The ceiling of 14 MiB sits between the two, so a reorder is RED.
+    const CEILING: u64 = 14 * 1024 * 1024;
+
+    fn peak(f: impl FnOnce()) -> u64 {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        f();
+        dhat::HeapStats::get().max_bytes as u64
+    }
+
+    let _serial = serial();
+
+    // Build the BEEF, then drop every temporary but its bytes, so the measured
+    // peak is the link's own — not the writers'.
+    let bytes = {
+        // A single PUSHDATA4 of STUB bytes: one script chunk holding one byte
+        // vector, so its heap weight is its wire weight (a run of single-byte
+        // opcodes would inflate per opcode and blur the +1-clone gap).
+        let mut raw = vec![0x4e];
+        raw.extend_from_slice(&u32::try_from(STUB).unwrap().to_le_bytes());
+        raw.extend(std::iter::repeat_n(0u8, STUB));
+        let big = LockingScript::from_binary(&raw).unwrap();
+        let mut parent = Transaction::new();
+        {
+            let mut i = TransactionInput::new("aa".repeat(32), 0);
+            i.unlocking_script = Some(UnlockingScript::new());
+            parent.inputs.push(i);
+        }
+        parent.outputs.push(TransactionOutput::new(1_000, big));
+        let ptxid = parent.id();
+        let mut beef = Beef::new();
+        let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&ptxid, 800_000));
+        beef.merge_raw_tx(parent.to_binary(), Some(bump));
+        let mut child = Transaction::new();
+        for _ in 0..INPUTS {
+            let mut i = TransactionInput::new(ptxid.clone(), 0);
+            i.unlocking_script = Some(UnlockingScript::new());
+            child.inputs.push(i);
+        }
+        child.outputs.push(TransactionOutput::new(
+            1_000,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ));
+        beef.merge_raw_tx(child.to_binary(), None);
+        beef.to_binary()
+    };
+
+    let budget = BeefLinkLimits::default().with_max_link_bytes(Some(BUDGET));
+    let declined = peak(|| {
+        let err = Transaction::from_beef_with_limits(&bytes, None, &budget)
+            .expect_err("over the byte budget");
+        assert!(matches!(err, Error::BeefResourceLimit(_)), "{err:?}");
+    });
+    println!("\n=== #749 link bound, declined-link peak {declined} B; stub {STUB} B, budget {BUDGET} B ===");
+
+    assert!(
+        declined < CEILING,
+        "the declined link carried an extra re-materialized copy ({declined} B > {CEILING} B): \
+         the refusal was moved after the allocation it would need"
+    );
+}
