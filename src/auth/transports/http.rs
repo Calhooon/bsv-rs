@@ -402,17 +402,13 @@ impl HttpResponse {
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            match take(payload, cursor, body_len) {
-                Some(field) => {
-                    cursor += field.len();
-                    field.to_vec()
-                }
-                // Lenient: a body shorter than claimed consumes the remainder.
-                None => {
-                    cursor = payload.len();
-                    Vec::new()
-                }
-            }
+            // Strict (bsv-rs #843): refuse a body shorter than its length prefix,
+            // as the request reader and the reference's StrictResponseReader do; a
+            // lenient short body let an over-claim swallow a suffix past this check.
+            let field = take(payload, cursor, body_len)
+                .ok_or_else(|| Error::AuthError("Response payload too short for body".into()))?;
+            cursor += field.len();
+            field.to_vec()
         } else {
             Vec::new()
         };

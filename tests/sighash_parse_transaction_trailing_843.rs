@@ -38,12 +38,17 @@ fn parse_transaction_reads_an_exact_transaction_843() {
     assert_eq!(parsed.outputs.len(), 1);
 }
 
+/// Drives both one trailing byte AND many (bsv-rs #843 fold): a refusal that
+/// fired only for a single extra byte would slip the many case.
 #[test]
 fn parse_transaction_refuses_a_trailing_byte_843() {
-    let mut bytes = a_transaction_bytes();
-    bytes.push(0xAB); // one byte past the transaction
-    assert!(
-        parse_transaction(&bytes).is_err(),
-        "a transaction followed by a trailing byte must be refused"
-    );
+    let base = a_transaction_bytes();
+    for n in [1usize, 2, 17, 64] {
+        let mut bytes = base.clone();
+        bytes.resize(bytes.len() + n, 0xAB);
+        assert!(
+            parse_transaction(&bytes).is_err(),
+            "a transaction followed by {n} trailing byte(s) must be refused"
+        );
+    }
 }
