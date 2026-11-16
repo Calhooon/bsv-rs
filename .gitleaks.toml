@@ -65,3 +65,11 @@ regexes = ['''(?i)^02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce
 [[allowlists]]
 description = "the old revealer shape's test key (#105)"
 regexes = ['''^025ad43a22ac38d0bc1f8bacaabb323b5d634703b7a774c4268f6a09e4ddf79097$''']
+
+# CHANGELOG.md: the 0.8.11 entry names the published GitHub advisory GHSA-w6jf-m9c7-6599 in prose
+# ("… removed by this release's authentication refactor, GHSA-w6jf-m9c7-6599 —"); the word
+# "authentication" beside the id trips the generic-api-key rule. A published advisory id is a
+# public identifier, not a secret. Only that exact id is let through, never the file.
+[[allowlists]]
+description = "the GHSA-w6jf-m9c7-6599 advisory id named in the 0.8.11 CHANGELOG prose"
+regexes = ['''^GHSA-w6jf-m9c7-6599$''']
