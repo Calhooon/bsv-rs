@@ -450,7 +450,7 @@ impl Transaction {
     }
 
     /// As [`from_beef`](Self::from_beef), but with an explicit
-    /// [`BeefLinkLimits`](crate::transaction::BeefLinkLimits).
+    /// [`BeefLinkLimits`].
     ///
     /// The default `from_beef` refuses an answer whose input ancestry would
     /// re-materialize a shared parent far beyond the BEEF's own size (bsv-rs
@@ -507,7 +507,7 @@ impl Transaction {
     }
 
     /// As [`from_atomic_beef`](Self::from_atomic_beef), but with an explicit
-    /// [`BeefLinkLimits`](crate::transaction::BeefLinkLimits); see
+    /// [`BeefLinkLimits`]; see
     /// [`from_beef_with_limits`](Self::from_beef_with_limits) for the #749 bound.
     #[allow(clippy::missing_errors_doc)] // as `from_atomic_beef`, its sibling
     pub fn from_atomic_beef_with_limits(beef: &[u8], limits: &BeefLinkLimits) -> Result<Self> {
