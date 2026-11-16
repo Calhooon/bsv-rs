@@ -81,16 +81,23 @@ impl BeefLinkLimits {
     /// may re-materialize up to this many bytes of repeated shared-parent stubs
     /// beyond the BEEF's own bytes before one link is refused.
     ///
-    /// 16 MiB. The heap a declined link peaks at is a small multiple of this
-    /// (≈ 2× the budget, so ~37 MiB at 16 MiB), well within a 128 MB Worker
+    /// 16 MiB. The heap a declined link peaks at follows `≈ 2 × budget +
+    /// baseline` (the re-materialized bytes plus one in-flight stub clone, over
+    /// the host's resident baseline): ~37 MiB measured on the test harness,
+    /// ~62 MiB on a 128 MB Worker (~30 MiB baseline) — well within the Worker
     /// with room to spare. It sits far below the #749 denial of service (a
     /// 128 KiB answer re-materializing ~1.69 GB) and far above every honest
     /// BEEF: the largest shared-parent fan any real dependent's BEEF carries is
-    /// 20, and the onset of an honest same-parent-sweep decline at 16 MiB is
-    /// ~1,290 swept outputs — so the default refuses no honest input while
-    /// leaving generous single-link headroom above anything a wallet or the
-    /// overlay engine builds. Raising it erases that headroom; the pin in
-    /// `tests/beef_link_bound.rs` turns red if this value moves.
+    /// 20, and the default admits an honest single child sweeping many outputs
+    /// of one parent — up to 702 plain-payment (P2PKH) outputs, 251
+    /// data-carrying outputs of 256 B, or 127 of 1 KiB, before one such sweep is
+    /// refused (at 32 MiB: 993 / 354 / 180). There is no single "general"
+    /// figure: the onset falls as the output grows, so the reach is stated per
+    /// output size. The default refuses no honest input while leaving generous
+    /// single-link headroom above anything a wallet or the overlay engine
+    /// builds. Raising it erases that headroom; the headroom pin in
+    /// `tests/beef_link_bound.rs`, which fixes those per-output-size cells, turns
+    /// red if this value moves.
     pub const DEFAULT_MAX_LINK_BYTES: u64 = 16 * 1024 * 1024;
 
     /// No bound: link whatever the bytes hold. Only for a BEEF whose source the
@@ -141,9 +148,12 @@ impl BeefLinkLimits {
 ///   admitted.
 /// - [`unbounded`](Self::unbounded) — no bound, for a source the caller trusts.
 ///
-/// Size a shared pool so `≈ 2 × pool + a baseline` fits the host: for a 128 MB
-/// Worker (~30 MiB baseline) a 32 MiB pool peaks at ~69 MiB regardless of
-/// concurrency, versus the default's `~37 MiB × k` for k independent links.
+/// Size a shared pool so its worst-case peak, `≈ 2 × pool + baseline`, fits the
+/// host: on a 128 MB Worker (~30 MiB baseline) a 32 MiB pool peaks at ~94 MiB
+/// regardless of concurrency, where k independent per-link budgets instead grow
+/// with the number of concurrent links (measured k = 2/3/5 retained links at
+/// 41/59/95 MiB on the test harness, versus 41/57/57 MiB flat under a 24 MiB
+/// shared pool).
 #[derive(Debug, Clone)]
 pub struct BeefLinkBudget(BudgetRepr);
 

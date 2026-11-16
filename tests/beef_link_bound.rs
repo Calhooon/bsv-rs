@@ -10,7 +10,7 @@
 //!
 //! So `Transaction::from_beef` / `find_atomic_transaction` cap, in ABSOLUTE
 //! BYTES, how far linking may re-materialize a shared parent beyond the BEEF's
-//! own bytes (closed by default at 32 MiB) and refuse an answer that would blow
+//! own bytes (closed by default at 16 MiB) and refuse an answer that would blow
 //! past it — BEFORE the clone that would cross the budget — with a resource
 //! error of its own class (`Error::BeefResourceLimit`), never a silent "not
 //! found". A byte budget (not a count of output slots) charges a parent of a
@@ -113,7 +113,7 @@ fn linked_inputs(tx: &Transaction) -> usize {
 #[test]
 fn a_shared_parent_of_large_outputs_is_refused_by_the_default_byte_bound() {
     // 160 outputs of ~2 KiB each spent by 160 inputs re-materializes ~160×2 KiB
-    // × 159 ≈ 50 MB of stub clones, past the default 32 MiB byte budget. The
+    // × 159 ≈ 50 MB of stub clones, past the default 16 MiB byte budget. The
     // default `from_beef` refuses it rather than let a ~330 KiB answer force
     // tens of megabytes of heap. (The slot bound this folds over admitted a
     // few-large-output shape — 1 slot per output regardless of its bytes.)
@@ -180,7 +180,7 @@ fn a_few_large_outputs_the_slot_count_would_admit_are_refused_by_the_byte_budget
     // spent by a modest number of inputs. A SLOT count admits it (few slots,
     // under any floor); the BYTE budget charges each repeat its true weight and
     // refuses it. An explicit 256 KiB budget stands in for the proportionality
-    // the default has at 32 MiB, kept small so the test is fast.
+    // the default has at 16 MiB, kept small so the test is fast.
     let budget = BeefLinkLimits::default().with_max_link_bytes(Some(256 * 1024));
     // 8 outputs of 32 KiB spent by 8 inputs: 7 repeats × ~256 KiB ≈ 1.8 MiB of
     // re-materialization — far past 256 KiB — yet only 7 output slots.
@@ -253,6 +253,62 @@ fn the_default_per_link_budget_is_16_mib_with_headroom_above_any_honest_input() 
         .expect("the default leaves headroom for a 500-output honest sweep");
     assert_eq!(tx.id(), child);
     assert_eq!(linked_inputs(&tx), 500);
+}
+
+#[test]
+fn the_default_headroom_is_stated_per_output_size() {
+    // Ruling 4 (fold2): the honest reach the per-link default admits is stated
+    // by OUTPUT SIZE, not as one "general" figure — the onset of an honest
+    // same-parent single-child sweep falls as the output grows, so no single
+    // number reads as the general case. These cells — the largest N outputs of
+    // one parent a single child can sweep before the link is refused — are
+    // measured by this crate's own writer and pinned EXACTLY, so a metering
+    // change that eroded any of them turns this red. The link.rs doc, the
+    // CHANGELOG, the advisory and the relay figures state the same numbers.
+    //
+    // (output-script bytes, 16 MiB default onset, 32 MiB onset). 25 B is a
+    // plain-payment (P2PKH) locking script's exact size; 256 B and 1 KiB are
+    // data-carrying outputs.
+    let cells: &[(usize, usize, usize)] = &[(25, 702, 993), (256, 251, 354), (1024, 127, 180)];
+    for &(script_bytes, onset16, onset32) in cells {
+        let script = filler_script(script_bytes);
+        // The shipped default (16 MiB) admits exactly `onset16` and refuses one
+        // more.
+        assert_onset(&script, None, onset16);
+        // An explicit 32 MiB budget admits exactly `onset32` and refuses one
+        // more — the other column of the owner's 16-vs-32 table.
+        assert_onset(&script, Some(32 * 1024 * 1024), onset32);
+    }
+}
+
+/// Asserts the largest same-parent sweep that links is exactly `onset`: the
+/// onset-wide sweep links, the next (`onset + 1`) is refused. `budget` is `None`
+/// for the shipped default (`from_beef`) or `Some(bytes)` for an explicit limit.
+fn assert_onset(script: &LockingScript, budget: Option<u64>, onset: usize) {
+    let link = |n: usize| -> Result<Transaction, Error> {
+        let (bytes, child) = shared_parent_beef(n, n, script);
+        let tx = match budget {
+            None => Transaction::from_beef(&bytes, None)?,
+            Some(b) => {
+                let limits = BeefLinkLimits::default().with_max_link_bytes(Some(b));
+                Transaction::from_beef_with_limits(&bytes, None, &limits)?
+            }
+        };
+        assert_eq!(tx.id(), child, "the linked subject is the child");
+        Ok(tx)
+    };
+    let tx = link(onset)
+        .unwrap_or_else(|e| panic!("the default admits an {onset}-output honest sweep, got {e:?}"));
+    assert_eq!(
+        linked_inputs(&tx),
+        onset,
+        "every swept output of the onset linked"
+    );
+    let err = link(onset + 1).expect_err("one output past the onset is refused");
+    assert!(
+        matches!(err, Error::BeefResourceLimit(_)),
+        "the refusal past the onset is a resource limit, not {err:?}"
+    );
 }
 
 #[test]
