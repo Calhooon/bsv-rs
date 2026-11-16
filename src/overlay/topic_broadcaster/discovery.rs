@@ -104,7 +104,8 @@ pub(super) fn interested_hosts(
 /// satoshi; the token authenticated as SHIP (#544); a topic of ours; the
 /// host the advertised domain's endpoint origin, `http:` never allowed.
 fn admitted(topics: &[String], output: &OutputListItem) -> Option<(String, String)> {
-    let tx = Transaction::from_beef(&output.beef, None).ok()?;
+    // Reads only this output's own script / txid; link nothing (#749 fold2, ruling 1).
+    let tx = Transaction::from_beef_subject(&output.beef, None).ok()?;
     if let Some(hint) = &output.txid {
         if hint.to_ascii_lowercase() != tx.id() {
             return None;

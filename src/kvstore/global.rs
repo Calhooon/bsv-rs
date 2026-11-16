@@ -431,8 +431,8 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         match answer {
             LookupAnswer::OutputList { outputs } => {
                 for output in outputs {
-                    // Parse BEEF to get transaction
-                    let tx = match Transaction::from_beef(&output.beef, None) {
+                    // Reads only this output's own script; link nothing (#749 fold2, ruling 1).
+                    let tx = match Transaction::from_beef_subject(&output.beef, None) {
                         Ok(tx) => tx,
                         Err(_) => continue,
                     };

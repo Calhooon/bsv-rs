@@ -3,24 +3,15 @@
 //! the linker and its bound live outside `beef.rs`.
 
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use crate::transaction::merkle_path::MerklePath;
 use crate::transaction::Transaction;
 use crate::Result;
 
 use super::Beef;
-
-/// The default [`BeefLinkLimits::max_link_bytes`]: linking may re-materialize up
-/// to this many bytes of repeated shared-parent stubs beyond the BEEF's own
-/// bytes before it is refused. 32 MiB matches the overlay lookup resolver's own
-/// `LookupLimits::max_response_bytes`, so the heap a linked answer costs stays a
-/// small multiple of the wire the caller already chose to read: the answer
-/// itself (≤ 32 MiB at the resolver) plus at most another 32 MiB of
-/// re-materialization, well within a 128 MB Worker. It sits far below the #749
-/// denial of service (a 128 KiB answer re-materializing ~1.69 GB) and far above
-/// every honest BEEF the corpus holds (their repeats re-materialize a few
-/// hundred KiB at most).
-const DEFAULT_MAX_LINK_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Bounds on how many bytes linking a BEEF's input ancestry may re-materialize
 /// for a shared parent, applied by [`Beef::find_atomic_transaction`] and
@@ -39,9 +30,15 @@ const DEFAULT_MAX_LINK_BYTES: u64 = 32 * 1024 * 1024;
 /// Worker-OOM re-materialization past the bound.
 ///
 /// An honest BEEF re-materializes a few hundred KiB at most, far under the
-/// [default](BeefLinkLimits::default) 32 MiB, so the default refuses none of
-/// them. A caller that must link a large ancestry it TRUSTS opts out with
-/// [`BeefLinkLimits::unbounded`].
+/// [default](BeefLinkLimits::DEFAULT_MAX_LINK_BYTES) 16 MiB, so the default
+/// refuses none of them. A caller that must link a large ancestry it TRUSTS
+/// opts out with [`BeefLinkLimits::unbounded`].
+///
+/// These limits bound ONE link in isolation. A caller that links several
+/// untrusted answers AT THE SAME TIME (k concurrent `from_beef` calls) gets k
+/// independent budgets, so its peak heap grows with k; to cap the TOTAL across
+/// concurrent links against one pool, use [`BeefLinkBudget::shared`] with
+/// [`Transaction::from_beef_with_budget`](crate::transaction::Transaction::from_beef_with_budget).
 ///
 /// Build from [`default`](Self::default) or [`unbounded`](Self::unbounded) and
 /// adjust with [`with_max_link_bytes`](Self::with_max_link_bytes); the struct is
@@ -74,12 +71,28 @@ crate::util::non_exhaustive::assert_no_drop!(BeefLinkLimits, bsv_rs::transaction
 impl Default for BeefLinkLimits {
     fn default() -> Self {
         Self {
-            max_link_bytes: Some(DEFAULT_MAX_LINK_BYTES),
+            max_link_bytes: Some(Self::DEFAULT_MAX_LINK_BYTES),
         }
     }
 }
 
 impl BeefLinkLimits {
+    /// The default per-link byte budget (bsv-rs #749 fold2, ruling 3): linking
+    /// may re-materialize up to this many bytes of repeated shared-parent stubs
+    /// beyond the BEEF's own bytes before one link is refused.
+    ///
+    /// 16 MiB. The heap a declined link peaks at is a small multiple of this
+    /// (≈ 2× the budget, so ~37 MiB at 16 MiB), well within a 128 MB Worker
+    /// with room to spare. It sits far below the #749 denial of service (a
+    /// 128 KiB answer re-materializing ~1.69 GB) and far above every honest
+    /// BEEF: the largest shared-parent fan any real dependent's BEEF carries is
+    /// 20, and the onset of an honest same-parent-sweep decline at 16 MiB is
+    /// ~1,290 swept outputs — so the default refuses no honest input while
+    /// leaving generous single-link headroom above anything a wallet or the
+    /// overlay engine builds. Raising it erases that headroom; the pin in
+    /// `tests/beef_link_bound.rs` turns red if this value moves.
+    pub const DEFAULT_MAX_LINK_BYTES: u64 = 16 * 1024 * 1024;
+
     /// No bound: link whatever the bytes hold. Only for a BEEF whose source the
     /// caller trusts — an untrusted answer linked unbounded is the #749 denial
     /// of service.
@@ -96,6 +109,266 @@ impl BeefLinkLimits {
     pub fn with_max_link_bytes(mut self, max_link_bytes: Option<u64>) -> Self {
         self.max_link_bytes = max_link_bytes;
         self
+    }
+}
+
+/// A link budget in one of three forms, for a caller that links a BEEF through
+/// [`Transaction::from_beef_with_budget`](crate::transaction::Transaction::from_beef_with_budget)
+/// or [`Beef::find_atomic_transaction_with_budget`] (bsv-rs #749 fold2,
+/// ruling 2).
+///
+/// [`BeefLinkLimits`] bounds ONE link in isolation; a service that links k
+/// untrusted answers AT THE SAME TIME (k concurrent calls) under that default
+/// gets k independent budgets, so its peak heap grows with k and two
+/// near-budget concurrent links can exceed a 128 MB Worker. A shared budget
+/// caps the TOTAL bytes every link sharing the same handle may re-materialize
+/// at once, against one pool, so the peak is bounded no matter how many links
+/// run concurrently.
+///
+/// The three forms:
+///
+/// - [`per_link`](Self::per_link) — the default: each link gets its own
+///   [`BeefLinkLimits::DEFAULT_MAX_LINK_BYTES`] budget, exactly as a plain
+///   [`Transaction::from_beef`](crate::transaction::Transaction::from_beef).
+/// - [`shared`](Self::shared) — a pool of a fixed size, drawn down by every
+///   link given the SAME handle (clone it into each concurrent task), and
+///   handed back when the [`LinkedTransaction`] it produced is dropped (its
+///   re-materialized bytes are freed then). Each link is additionally capped at
+///   the per-link default, so a single answer cannot be larger than one
+///   isolated link. The first link whose reservation would overdraw the pool is
+///   refused with [`Error::BeefResourceLimit`](crate::Error::BeefResourceLimit)
+///   BEFORE it allocates; once an earlier link is dropped, the next is
+///   admitted.
+/// - [`unbounded`](Self::unbounded) — no bound, for a source the caller trusts.
+///
+/// Size a shared pool so `≈ 2 × pool + a baseline` fits the host: for a 128 MB
+/// Worker (~30 MiB baseline) a 32 MiB pool peaks at ~69 MiB regardless of
+/// concurrency, versus the default's `~37 MiB × k` for k independent links.
+#[derive(Debug, Clone)]
+pub struct BeefLinkBudget(BudgetRepr);
+
+#[derive(Debug, Clone)]
+enum BudgetRepr {
+    /// Each link independent; `None` disables the bound (unbounded).
+    PerLink(Option<u64>),
+    /// A pool shared by every clone of the handle: `pool` is the bytes still
+    /// available, `capacity` the size it was built with (for the error text).
+    Shared { pool: Arc<AtomicU64>, capacity: u64 },
+}
+
+impl Default for BeefLinkBudget {
+    fn default() -> Self {
+        Self::per_link()
+    }
+}
+
+impl BeefLinkBudget {
+    /// Each link gets its own [`BeefLinkLimits::DEFAULT_MAX_LINK_BYTES`] budget
+    /// (16 MiB) — the same bound a plain
+    /// [`Transaction::from_beef`](crate::transaction::Transaction::from_beef)
+    /// applies, and the form a caller gets by passing nothing.
+    #[must_use]
+    pub fn per_link() -> Self {
+        Self(BudgetRepr::PerLink(Some(
+            BeefLinkLimits::DEFAULT_MAX_LINK_BYTES,
+        )))
+    }
+
+    /// Each link gets its own budget of `max_link_bytes` (`None` disables the
+    /// bound for every link).
+    #[must_use]
+    pub fn per_link_bytes(max_link_bytes: Option<u64>) -> Self {
+        Self(BudgetRepr::PerLink(max_link_bytes))
+    }
+
+    /// A pool of `total_bytes` shared by every link given THIS handle or a
+    /// clone of it. The sum of the bytes all the links sharing the pool
+    /// re-materialize at once cannot exceed `total_bytes`; the link that would
+    /// overdraw it is refused before it allocates, and a link's share is
+    /// returned to the pool when its [`LinkedTransaction`] is dropped.
+    ///
+    /// Clone this value (or the whole handle) into each concurrent task: a
+    /// clone shares the same pool. Each individual link is also capped at
+    /// [`BeefLinkLimits::DEFAULT_MAX_LINK_BYTES`], so one answer can be at most
+    /// one isolated link's worth however large the pool.
+    #[must_use]
+    pub fn shared(total_bytes: u64) -> Self {
+        Self(BudgetRepr::Shared {
+            pool: Arc::new(AtomicU64::new(total_bytes)),
+            capacity: total_bytes,
+        })
+    }
+
+    /// No bound: link whatever the bytes hold. Only for a BEEF whose source the
+    /// caller trusts.
+    #[must_use]
+    pub fn unbounded() -> Self {
+        Self(BudgetRepr::PerLink(None))
+    }
+
+    /// The bytes still available in a shared pool, or `None` for a per-link or
+    /// unbounded budget. For tests and observability; a concurrent link may
+    /// change it at any moment.
+    #[must_use]
+    pub fn remaining(&self) -> Option<u64> {
+        match &self.0 {
+            BudgetRepr::Shared { pool, .. } => Some(pool.load(Ordering::Acquire)),
+            BudgetRepr::PerLink(_) => None,
+        }
+    }
+}
+
+/// A caller's claim on a shared [`BeefLinkBudget`] pool: the bytes one link
+/// reserved, returned to the pool when this is dropped. Reserving is atomic, so
+/// concurrent links on clones of the handle cannot together overdraw the pool;
+/// dropping always returns exactly what was reserved, once, so a pool can
+/// neither leak nor double-count across any sequence of links and releases.
+#[derive(Debug)]
+struct SharedReservation {
+    pool: Arc<AtomicU64>,
+    capacity: u64,
+    reserved: u64,
+}
+
+impl SharedReservation {
+    /// Atomically take `bytes` from the pool, or refuse before any allocation
+    /// if the pool cannot cover it.
+    fn charge(&mut self, bytes: u64) -> Result<()> {
+        let mut available = self.pool.load(Ordering::Acquire);
+        loop {
+            let Some(remaining) = available.checked_sub(bytes) else {
+                return Err(crate::Error::BeefResourceLimit(format!(
+                    "linking would re-materialize more than the shared link budget's remaining \
+                     bytes ({available} of {capacity}) for a shared parent spent by many inputs \
+                     (bsv-rs #749). Drop a linked transaction to return its share, raise the pool, \
+                     or link the source you trust unbounded.",
+                    capacity = self.capacity
+                )));
+            };
+            match self.pool.compare_exchange_weak(
+                available,
+                remaining,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => {
+                    self.reserved = self.reserved.saturating_add(bytes);
+                    return Ok(());
+                }
+                Err(actual) => available = actual,
+            }
+        }
+    }
+}
+
+impl Drop for SharedReservation {
+    fn drop(&mut self) {
+        // Return exactly the bytes this link reserved. Runs on both the error
+        // path (a refused link returns the partial reservation it had taken)
+        // and the success path (when the LinkedTransaction is dropped, freeing
+        // the re-materialized bytes this reservation accounted for).
+        self.pool.fetch_add(self.reserved, Ordering::Release);
+    }
+}
+
+/// How one `add_input_proof` walk meters the bytes its repeat inputs
+/// re-materialize: against a per-link budget, or against a shared pool (plus
+/// the per-link cap).
+enum LinkMeter<'r> {
+    /// A budget local to this one link; `None` is unbounded.
+    PerLink { budget: Option<u64>, used: u64 },
+    /// A shared pool, with a per-link cap on this one link besides.
+    Shared {
+        per_link: Option<u64>,
+        used: u64,
+        reservation: &'r mut SharedReservation,
+    },
+}
+
+impl LinkMeter<'_> {
+    fn per_link(budget: Option<u64>) -> Self {
+        LinkMeter::PerLink { budget, used: 0 }
+    }
+
+    /// Charge `stub_bytes` to this meter, refusing BEFORE the clone that would
+    /// allocate past the budget (or overdraw the shared pool).
+    fn charge(&mut self, stub_bytes: u64) -> Result<()> {
+        match self {
+            LinkMeter::PerLink { budget: None, .. } => Ok(()),
+            LinkMeter::PerLink {
+                budget: Some(budget),
+                used,
+            } => {
+                *used = used.saturating_add(stub_bytes);
+                if *used > *budget {
+                    return Err(per_link_limit_error(*budget));
+                }
+                Ok(())
+            }
+            LinkMeter::Shared {
+                per_link,
+                used,
+                reservation,
+            } => {
+                *used = used.saturating_add(stub_bytes);
+                if let Some(cap) = per_link {
+                    if *used > *cap {
+                        return Err(per_link_limit_error(*cap));
+                    }
+                }
+                reservation.charge(stub_bytes)
+            }
+        }
+    }
+}
+
+fn per_link_limit_error(budget: u64) -> crate::Error {
+    crate::Error::BeefResourceLimit(format!(
+        "linking would re-materialize more than {budget} bytes for a shared parent spent by many \
+         inputs (bsv-rs #749). Raise or disable the bound with \
+         Transaction::from_beef_with_limits / BeefLinkLimits::unbounded."
+    ))
+}
+
+/// A transaction linked under a [`BeefLinkBudget`], holding its claim on the
+/// budget's shared pool (when it has one) until it is dropped.
+///
+/// It derefs to the [`Transaction`], so a caller reads it as one. When the
+/// budget was [`BeefLinkBudget::shared`], the re-materialized bytes this link
+/// accounts for are returned to the pool the moment this value is dropped — so
+/// keep it alive for as long as the linked ancestry is in use, and the pool
+/// then bounds the total heap of every concurrent link, not each one alone.
+///
+/// [`into_transaction`](Self::into_transaction) hands back the bare
+/// [`Transaction`] and releases the pool claim early; the linked bytes are
+/// still alive, so the pool then undercounts until the transaction is dropped —
+/// use it only when the budget is no longer shared with other in-flight links.
+#[derive(Debug)]
+pub struct LinkedTransaction {
+    tx: Transaction,
+    _reservation: Option<SharedReservation>,
+}
+
+impl LinkedTransaction {
+    /// The linked transaction.
+    #[must_use]
+    pub fn transaction(&self) -> &Transaction {
+        &self.tx
+    }
+
+    /// Takes the linked [`Transaction`], releasing any shared-pool claim early
+    /// (see the type's note).
+    #[must_use]
+    pub fn into_transaction(self) -> Transaction {
+        self.tx
+    }
+}
+
+impl Deref for LinkedTransaction {
+    type Target = Transaction;
+
+    fn deref(&self) -> &Transaction {
+        &self.tx
     }
 }
 
@@ -142,8 +415,67 @@ impl Beef {
         let Some(mut tx) = beef_tx.tx().cloned() else {
             return Ok(None);
         };
-        self.add_input_proof(&mut tx, limits)?;
+        let mut meter = LinkMeter::per_link(limits.max_link_bytes);
+        self.add_input_proof(&mut tx, &mut meter)?;
         Ok(Some(tx))
+    }
+
+    /// As [`find_atomic_transaction_limited`](Self::find_atomic_transaction_limited),
+    /// but under a [`BeefLinkBudget`], which can be a budget SHARED across every
+    /// link given the same handle (bsv-rs #749 fold2, ruling 2). Returns
+    /// `Ok(None)` when `txid` is absent, `Err(`[`BeefResourceLimit`](crate::Error::BeefResourceLimit)`)`
+    /// when linking would overdraw the budget, and otherwise a
+    /// [`LinkedTransaction`] that holds its share of a shared pool until it is
+    /// dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BeefResourceLimit`](crate::Error::BeefResourceLimit) when
+    /// linking `txid`'s ancestry would re-materialize more bytes than `budget`
+    /// (per link, or across the shared pool) allows (bsv-rs #749).
+    pub fn find_atomic_transaction_with_budget(
+        &self,
+        txid: &str,
+        budget: &BeefLinkBudget,
+    ) -> Result<Option<LinkedTransaction>> {
+        let Some(beef_tx) = self.find_txid(txid) else {
+            return Ok(None);
+        };
+        let Some(mut tx) = beef_tx.tx().cloned() else {
+            return Ok(None);
+        };
+        match &budget.0 {
+            BudgetRepr::PerLink(max) => {
+                let mut meter = LinkMeter::per_link(*max);
+                self.add_input_proof(&mut tx, &mut meter)?;
+                Ok(Some(LinkedTransaction {
+                    tx,
+                    _reservation: None,
+                }))
+            }
+            BudgetRepr::Shared { pool, capacity } => {
+                let mut reservation = SharedReservation {
+                    pool: Arc::clone(pool),
+                    capacity: *capacity,
+                    reserved: 0,
+                };
+                // Meter in a block so the `&mut reservation` borrow ends before
+                // the reservation moves into the result. On the `?` error path
+                // the reservation drops here, returning the bytes it had taken.
+                {
+                    let mut meter = LinkMeter::Shared {
+                        per_link: Some(BeefLinkLimits::DEFAULT_MAX_LINK_BYTES),
+                        used: 0,
+                        reservation: &mut reservation,
+                    };
+                    self.add_input_proof(&mut tx, &mut meter)?;
+                }
+                Ok(Some(LinkedTransaction {
+                    tx,
+                    _reservation: Some(reservation),
+                }))
+            }
+        }
     }
 
     /// Attach merkle paths and source transactions to `tx` and its whole
@@ -197,28 +529,17 @@ impl Beef {
     /// Bumps are looked up through an index built once, so the walk is linear
     /// in the BEEF rather than in transactions times bumps.
     ///
-    /// The bytes the repeat inputs re-materialize are metered against `limits`
-    /// (the #749 bound; `BeefLinkLimits::unbounded` lifts it), and a BEEF that
-    /// would cross the budget is refused with
+    /// The bytes the repeat inputs re-materialize are metered against `meter`
+    /// (the #749 bound; an unbounded budget lifts it), and a BEEF that would
+    /// cross the budget — per link, or across a shared pool — is refused with
     /// [`Error::BeefResourceLimit`](crate::Error::BeefResourceLimit) BEFORE the
     /// clone that would allocate past it.
-    fn add_input_proof(&self, tx: &mut Transaction, limits: &BeefLinkLimits) -> Result<()> {
+    fn add_input_proof(&self, tx: &mut Transaction, meter: &mut LinkMeter) -> Result<()> {
         /// One transaction being linked, and the next input to link.
         struct Frame {
             tx: Transaction,
             next_input: usize,
         }
-
-        // The #749 bound, in ABSOLUTE BYTES: every repeat input that spends an
-        // already-linked parent is handed a clone of that parent (its outputs
-        // are what the input spends), so the heap the repeats re-materialize is
-        // the sum of each stub's wire size over the repeats. Cap that running
-        // sum at the limits' budget and refuse BEFORE the clone that would
-        // cross it; the full links (one per distinct parent) are the BEEF's own
-        // bytes and are not counted. A byte budget (not a count of slots)
-        // charges a parent of a few large outputs its true weight.
-        let budget = limits.max_link_bytes;
-        let mut materialized_bytes: u64 = 0;
 
         // `find_bump`'s answer for every hash at level 0: the LAST bump whose
         // leaf level carries it, as the reference's index keeps it
@@ -290,17 +611,8 @@ impl Beef {
                 // carries the output being spent (and the proof when there is
                 // one) without repeating the ancestry underneath it. Meter the
                 // stub's byte weight and refuse BEFORE the clone that would
-                // allocate past the budget.
-                if let Some(budget) = budget {
-                    materialized_bytes = materialized_bytes.saturating_add(*stub_bytes);
-                    if materialized_bytes > budget {
-                        return Err(crate::Error::BeefResourceLimit(format!(
-                            "linking would re-materialize more than {budget} bytes for a shared \
-                             parent spent by many inputs (bsv-rs #749). Raise or disable the bound \
-                             with Transaction::from_beef_with_limits / BeefLinkLimits::unbounded."
-                        )));
-                    }
-                }
+                // allocate past the budget (per link, or across a shared pool).
+                meter.charge(*stub_bytes)?;
                 top.tx.replace_source(i, Some(Box::new(stub.clone())));
                 continue;
             }
@@ -343,5 +655,47 @@ impl Beef {
             stub.merkle_path = Some(mp.clone());
         }
         stub
+    }
+}
+
+impl Transaction {
+    /// As [`from_beef`](Transaction::from_beef), but under a [`BeefLinkBudget`]
+    /// — which can be a budget SHARED across every link given the same handle,
+    /// so a service linking several untrusted answers at once caps its TOTAL
+    /// re-materialized heap against one pool instead of paying an independent
+    /// budget per link (bsv-rs #749 fold2, ruling 2). Returns a
+    /// [`LinkedTransaction`] (derefs to the [`Transaction`]); when the budget is
+    /// [`BeefLinkBudget::shared`] keep it alive while the linked ancestry is in
+    /// use, as its share of the pool is returned when it is dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BeefResourceLimit`](crate::Error::BeefResourceLimit) when
+    /// linking would overdraw the budget, or a parse/lookup error as
+    /// [`from_beef`](Transaction::from_beef) does.
+    pub fn from_beef_with_budget(
+        beef: &[u8],
+        txid: Option<&str>,
+        budget: &BeefLinkBudget,
+    ) -> Result<LinkedTransaction> {
+        let parsed = Beef::from_binary(beef)?;
+        let target = match txid {
+            Some(id) => id.to_string(),
+            None => match parsed.atomic_txid.clone() {
+                Some(atomic) => atomic,
+                None => parsed
+                    .txs
+                    .last()
+                    .map(crate::transaction::beef_tx::BeefTx::txid)
+                    .ok_or_else(|| {
+                        crate::Error::TransactionError("No transactions in BEEF".to_string())
+                    })?,
+            },
+        };
+        parsed
+            .find_atomic_transaction_with_budget(&target, budget)?
+            .ok_or_else(|| {
+                crate::Error::TransactionError(format!("Transaction {target} not found in BEEF"))
+            })
     }
 }

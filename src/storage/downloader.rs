@@ -106,8 +106,9 @@ impl StorageDownloader {
         let mut hosts: Vec<String> = Vec::new();
 
         for output in outputs {
-            // Parse BEEF to get transaction
-            let tx = match Transaction::from_beef(&output.beef, None) {
+            // Only this output's own locking script is read below; the input
+            // ancestry is never used, so link nothing (#749 fold2, ruling 1).
+            let tx = match Transaction::from_beef_subject(&output.beef, None) {
                 Ok(tx) => tx,
                 Err(_) => continue,
             };
