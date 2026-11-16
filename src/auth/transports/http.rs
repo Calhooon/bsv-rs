@@ -9,11 +9,6 @@
 //!   are sent as JSON POST to `/.well-known/auth`
 //! - General messages deserialize the payload into HTTP request components (method, URL, headers, body),
 //!   add auth headers, and make actual HTTP requests
-//!
-//! ## Payload Format for General Messages
-//!
-//! Request payload: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
-//! Response payload: `[request_id: 32][status: varint][headers: varint+pairs][body: varint+bytes]`
 
 use crate::auth::types::AuthMessage;
 
@@ -93,11 +88,9 @@ impl HttpRequest {
 impl HttpRequest {
     /// Deserializes an HTTP request from payload bytes.
     ///
-    /// Format: `[request_id: 32][method: varint+str][path: varint+str][search: varint+str][headers: varint+pairs][body: varint+bytes]`
     pub fn from_payload(payload: &[u8]) -> Result<Self> {
         let mut cursor = 0;
 
-        // Read request ID (32 bytes)
         if payload.len() < 32 {
             return Err(Error::AuthError("Payload too short for request ID".into()));
         }
@@ -105,7 +98,6 @@ impl HttpRequest {
         request_id.copy_from_slice(&payload[..32]);
         cursor += 32;
 
-        // Read method (varint length + string)
         let (method_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let method = if method_len > 0 {
@@ -121,7 +113,6 @@ impl HttpRequest {
             "GET".to_string()
         };
 
-        // Read path (varint length + string, -1 means empty)
         let (path_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let path = if path_len > 0 {
@@ -137,7 +128,6 @@ impl HttpRequest {
             String::new()
         };
 
-        // Read search (varint length + string, -1 means empty)
         let (search_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let search = if search_len > 0 {
@@ -153,7 +143,6 @@ impl HttpRequest {
             String::new()
         };
 
-        // Read headers (varint count, then pairs of varint+string)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let count = if header_count > 0 {
@@ -161,15 +150,13 @@ impl HttpRequest {
         } else {
             0
         };
-        // Bound the pre-allocation: each header is >= 2 bytes (key len varint +
-        // value len varint), so a bogus count cannot OOM-abort before any read.
+        // Bound the pre-allocation so a bogus count cannot OOM-abort before a read.
         let mut headers = Vec::with_capacity(bounded_capacity(
             count,
             payload.len().saturating_sub(cursor),
             2,
         ));
         for _ in 0..count {
-            // Read key
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
             let klen = if key_len > 0 { key_len as usize } else { 0 };
@@ -180,7 +167,6 @@ impl HttpRequest {
                 .map_err(|e| Error::AuthError(format!("Invalid header key UTF-8: {}", e)))?;
             cursor += klen;
 
-            // Read value
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
             let vlen = if val_len > 0 { val_len as usize } else { 0 };
@@ -196,7 +182,6 @@ impl HttpRequest {
             headers.push((key, value));
         }
 
-        // Read body (varint length + bytes, -1 means empty)
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
@@ -204,10 +189,19 @@ impl HttpRequest {
             if cursor + len > payload.len() {
                 return Err(Error::AuthError("Payload too short for body".into()));
             }
-            payload[cursor..cursor + len].to_vec()
+            let body = payload[cursor..cursor + len].to_vec();
+            cursor += len;
+            body
         } else {
             Vec::new()
         };
+
+        // Refuse trailing bytes after the body (bsv-rs #843; the reference does too).
+        if cursor != payload.len() {
+            return Err(Error::AuthError(
+                "Authenticated request contains trailing bytes".into(),
+            ));
+        }
 
         Ok(Self {
             request_id,
@@ -327,7 +321,6 @@ impl HttpResponse {
     pub fn from_payload(payload: &[u8]) -> Result<Self> {
         let mut cursor = 0;
 
-        // Read request ID (32 bytes)
         if payload.len() < 32 {
             return Err(Error::AuthError(
                 "Response payload too short for request ID".into(),
@@ -337,12 +330,10 @@ impl HttpResponse {
         request_id.copy_from_slice(&payload[..32]);
         cursor += 32;
 
-        // Read status (varint)
         let (status, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let status = status as u16;
 
-        // Read headers (varint count, then pairs)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let count = if header_count > 0 {
@@ -350,8 +341,7 @@ impl HttpResponse {
         } else {
             0
         };
-        // Bound the pre-allocation: each header is >= 2 bytes (key len varint +
-        // value len varint), so a bogus count cannot OOM-abort before any read.
+        // Bound the pre-allocation so a bogus count cannot OOM-abort before a read.
         let mut headers = Vec::with_capacity(bounded_capacity(
             count,
             payload.len().saturating_sub(cursor),
@@ -385,19 +375,29 @@ impl HttpResponse {
             headers.push((key, value));
         }
 
-        // Read body (varint length + bytes, -1 means empty)
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
             let len = body_len as usize;
             if cursor + len <= payload.len() {
-                payload[cursor..cursor + len].to_vec()
+                let body = payload[cursor..cursor + len].to_vec();
+                cursor += len;
+                body
             } else {
+                // Lenient: a body shorter than claimed consumes the remainder.
+                cursor = payload.len();
                 Vec::new()
             }
         } else {
             Vec::new()
         };
+
+        // Refuse trailing bytes after the body (bsv-rs #843; the reference does too).
+        if cursor != payload.len() {
+            return Err(Error::AuthError(
+                "Authenticated response contains trailing bytes.".into(),
+            ));
+        }
 
         Ok(Self {
             request_id,
