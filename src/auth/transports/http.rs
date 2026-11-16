@@ -209,12 +209,21 @@ impl HttpRequest {
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            take(payload, cursor, body_len)
-                .ok_or_else(|| Error::AuthError("Payload too short for body".into()))?
-                .to_vec()
+            let field = take(payload, cursor, body_len)
+                .ok_or_else(|| Error::AuthError("Payload too short for body".into()))?;
+            cursor += field.len();
+            field.to_vec()
         } else {
             Vec::new()
         };
+
+        // Refuse any trailing bytes after the body: the reference does too
+        // (SimplifiedFetchTransport.ts:682; bsv-rs #843).
+        if cursor != payload.len() {
+            return Err(Error::AuthError(
+                "Authenticated request contains trailing bytes".into(),
+            ));
+        }
 
         Ok(Self {
             request_id,
@@ -393,12 +402,28 @@ impl HttpResponse {
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            take(payload, cursor, body_len)
-                .map(<[u8]>::to_vec)
-                .unwrap_or_default()
+            match take(payload, cursor, body_len) {
+                Some(field) => {
+                    cursor += field.len();
+                    field.to_vec()
+                }
+                // Lenient: a body shorter than claimed consumes the remainder.
+                None => {
+                    cursor = payload.len();
+                    Vec::new()
+                }
+            }
         } else {
             Vec::new()
         };
+
+        // Refuse any trailing bytes after the body: the reference does too
+        // (AuthFetch.ts StrictResponseReader.assertFinished; bsv-rs #843).
+        if cursor != payload.len() {
+            return Err(Error::AuthError(
+                "Authenticated response contains trailing bytes.".into(),
+            ));
+        }
 
         Ok(Self {
             request_id,
