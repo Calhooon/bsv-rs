@@ -155,18 +155,23 @@ fn an_http_header_length_that_wraps_a_32_bit_bounds_check_is_refused() {
 }
 
 #[test]
-fn an_http_response_body_length_that_wraps_a_32_bit_bounds_check_reads_as_empty() {
-    // A response body that overruns the payload reads as empty, as before.
+fn an_http_response_body_length_that_wraps_a_32_bit_bounds_check_is_refused() {
+    // A response body-length prefix that overruns the payload is refused, not
+    // read as an empty body: the response reader rejects a body shorter than
+    // its length prefix, as the request reader (above) and the reference's
+    // `StrictResponseReader` (`readExact`) do (bsv-rs #843). A lenient empty
+    // read once let such an over-claim swallow a trailing suffix.
     for len in wrapping_lengths() {
         let mut payload = request_head();
         payload.extend_from_slice(&[0xfd, 200, 0, 0]); // status 200, no headers
         payload.extend_from_slice(&len);
         payload.extend_from_slice(b"body");
-        let response = std::panic::catch_unwind(|| HttpResponse::from_payload(&payload))
-            .unwrap()
-            .unwrap();
-        assert_eq!(response.status, 200);
-        assert!(response.body.is_empty());
+        let result = std::panic::catch_unwind(|| HttpResponse::from_payload(&payload))
+            .unwrap_or_else(|_| panic!("panicked on a wrapping body length"));
+        assert!(
+            matches!(result, Err(Error::AuthError(ref m)) if m.contains("too short")),
+            "{result:?}"
+        );
     }
 }
 
