@@ -411,6 +411,35 @@ mod tests {
         Ok(line["version = ".len()..].trim_matches('"').to_string())
     }
 
+    /// A well-formed prerelease that is never the committed version, whatever the crate
+    /// is at: `<the committed core>-beta.8`, or `-beta.9` where the crate is at that one.
+    /// A literal here was the version the crate took next, and these tests went red on
+    /// the release commit alone.
+    fn another_prerelease(committed: &str) -> String {
+        let core = committed.split(['-', '+']).next().unwrap_or(committed);
+        let candidate = format!("{core}-beta.8");
+        if candidate == committed {
+            format!("{core}-beta.9")
+        } else {
+            candidate
+        }
+    }
+
+    #[test]
+    fn another_prerelease_is_never_the_version_it_is_given() {
+        let cells = [
+            ("0.9.0-beta.7", "0.9.0-beta.8"),
+            ("0.9.0-beta.8", "0.9.0-beta.9"),
+            ("0.9.0-beta.9", "0.9.0-beta.8"),
+            ("0.9.0", "0.9.0-beta.8"),
+            ("1.2.3-rc.1+build.5", "1.2.3-beta.8"),
+        ];
+        for (committed, other) in cells {
+            assert_eq!(another_prerelease(committed), other);
+            assert_ne!(another_prerelease(committed), committed);
+        }
+    }
+
     /// The lines of `a` and `b` that differ, by index; both have the same line count.
     fn differing_lines(a: &str, b: &str) -> Vec<(String, String)> {
         assert_eq!(a.lines().count(), b.lines().count());
@@ -424,7 +453,12 @@ mod tests {
     #[test]
     fn the_crates_own_version_moved_sets_the_root_entry_alone() -> Result<()> {
         let committed = committed_version()?;
-        for version in ["0.8.4", "0.9.0-beta.8", "10.200.3000-rc.1+build.20261110"] {
+        let prerelease = another_prerelease(&committed);
+        for version in [
+            "0.8.4",
+            prerelease.as_str(),
+            "10.200.3000-rc.1+build.20261110",
+        ] {
             assert_ne!(version, committed);
             let lock = lock_for_package(LIBRARY_LOCK, "bsv-rs", version)?;
             assert_eq!(
@@ -954,9 +988,10 @@ mod tests {
         let inherited = "[workspace]\n\n[workspace.package]\nversion = \"4.5.6\"\n\n\
                          [package]\nname = \"bsv-rs\"\nversion.workspace = true\n\
                          edition = \"2021\"\n";
+        let prerelease = another_prerelease(&committed);
         let cells = [
             (manifest("99.0.0"), "99.0.0"),
-            (manifest("0.9.0-beta.8"), "0.9.0-beta.8"),
+            (manifest(&prerelease), prerelease.as_str()),
             (inherited.to_string(), "4.5.6"),
             (
                 "[package]\nname = \"bsv-rs\"\nedition = \"2021\"\n".to_string(),
@@ -997,7 +1032,7 @@ mod tests {
     fn a_dependency_moved_is_still_a_stale_lock() -> Result<()> {
         // The tool touches the root's version line alone: a dependency the manifest
         // gained is not added, so cargo --locked still refuses the scratch lock.
-        let mut planted = manifest("0.9.0-beta.8");
+        let mut planted = manifest(&another_prerelease(&committed_version()?));
         planted.push_str("semver = \"1\"\n");
         let repository = new_repository(Some(&planted))?;
         for lock in scratch_locks(&repository)? {
