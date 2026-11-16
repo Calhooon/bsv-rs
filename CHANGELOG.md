@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the ratchet tool's own tests hold at any committed crate version
+
+Three tests of `tools/ratchet/src/tree.rs` named `0.9.0-beta.8`, the version the crate takes next, as "a version other than the committed one": at that version commit they failed (27 passed, 3 failed) and reddened the required `lint` job. The prerelease is now derived from the committed version (`another_prerelease`: its core with `-beta.8`, or `-beta.9` where the crate is at that one), pinned by `another_prerelease_is_never_the_version_it_is_given`; the tool's tests read 31 passed at `0.9.0-beta.7`, `0.9.0-beta.8`, `0.9.0-beta.9` and `0.9.0` on scratch copies.
+Migration: none: a test-only change of the tool.
+
 ### Changed (benchmarks): the Linux entry of `benches/baseline.json` recorded again at `d892e206` by one dispatch of `bench.yml`; what the tests hold of the entries, said as it is (#245, #911)
 
 One entry of one data file, sentences of two documents and the records; no file under `src/`, `tests/`, `tools/` or `.github/` moves. The key, every row old against new, the byte comparison and the scratch runs are `docs/lanes/bench-245-linux-entry.md`.
