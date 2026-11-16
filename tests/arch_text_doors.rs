@@ -107,7 +107,12 @@ const CUTS_NO_TEXT: &[(&str, &str, &str)] = &[
     ("storage/uploader.rs", "find_file find_file renew_file renew_file", URLS),
     (
         "transaction/beef.rs",
-        "find_transaction_for_signing find_atomic_transaction make_txid_only",
+        "find_transaction_for_signing make_txid_only",
+        KEYS,
+    ),
+    (
+        "transaction/beef/link.rs",
+        "find_atomic_transaction find_atomic_transaction_limited find_atomic_transaction_with_budget from_beef_with_budget",
         KEYS,
     ),
     ("transaction/beef/index.rs", "find_txid_mut edit_tx", KEYS),
@@ -120,7 +125,7 @@ const CUTS_NO_TEXT: &[(&str, &str, &str)] = &[
     ("transaction/fee_models/live_policy.rs", "with_url", URLS),
     ("transaction/merkle_path.rs", "contains_and_mark", KEYS),
     ("transaction/merkle_path_verify.rs", "verify", KEYS),
-    ("transaction/transaction.rs", "from_beef add_input_from update_metadata", KEYS),
+    ("transaction/transaction.rs", "from_beef from_beef_subject from_beef_with_limits add_input_from update_metadata", KEYS),
     (
         "wallet/key_deriver.rs",
         "derive_public_key derive_private_key derive_private_key_raw derive_symmetric_key reveal_specific_secret",

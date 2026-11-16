@@ -895,7 +895,12 @@ fn read_definitions<T>(
     answers: impl Fn(&T) -> bool,
 ) -> Vec<T> {
     let read = |output: &OutputListItem| {
-        let tx = Transaction::from_beef(&output.beef, None).ok()?;
+        // Reads only this output's own locking script below; the input ancestry
+        // is never used, so link nothing (#749 fold2 ruling 1, carried to the
+        // release's relocated registry reader — fold3 ruling 5b). A linking
+        // `from_beef` here would drop an honest high-fan registry answer for a
+        // byte budget it never had to meet, and re-open the #749 door at this site.
+        let tx = Transaction::from_beef_subject(&output.beef, None).ok()?;
         let tx_output = tx.outputs().get(output.output_index as usize)?;
         let fields = token::data_fields(definition_type, &tx_output.locking_script).ok()?;
         definition_checks::fields_admitted(definition_type, &fields)
@@ -914,6 +919,102 @@ fn read_definitions<T>(
 mod tests {
     use super::*;
     use crate::wallet::{Protocol as WalletProtocol, SecurityLevel};
+
+    /// Fold3 ruling 5b (carry guard): the release's relocated registry reader
+    /// (`read_definitions`) reads only one output's own script, so it parses the
+    /// subject alone via `from_beef_subject` and links NOTHING on an untrusted
+    /// overlay answer. A validly signed basket definition (built by the
+    /// production signer `token::lock_definition`) sits at the subject output of
+    /// an answer whose shared-parent ancestry the linking door refuses; the
+    /// reader surfaces it. Reverting `read_definitions` to `from_beef` refuses
+    /// the whole answer before its output is read, dropping the definition — RED.
+    #[tokio::test]
+    async fn the_relocated_registry_reader_links_nothing_on_a_hostile_answer() {
+        use crate::primitives::PrivateKey;
+        use crate::script::{LockingScript, UnlockingScript};
+        use crate::transaction::{
+            Beef, MerklePath, Transaction, TransactionInput, TransactionOutput,
+        };
+        use crate::wallet::ProtoWallet;
+
+        let operator = ProtoWallet::new(Some(PrivateKey::from_hex(&"a5".repeat(32)).unwrap()));
+        let operator_hex = operator.identity_key().to_hex();
+        let basket = BasketDefinitionData::new("basket749", "Basket 749")
+            .with_icon_url("https://icon-749.example")
+            .with_description("the 749 fold3 basket")
+            .with_documentation_url("https://docs-749.example");
+        let fields = basket.to_pushdrop_fields(&operator_hex);
+        let script = crate::registry::token::lock_definition(
+            &operator,
+            DefinitionType::Basket,
+            fields,
+            None,
+        )
+        .await
+        .expect("a valid signed basket definition");
+
+        // A hostile amplifying BEEF: a shared parent of 120 x 2 KiB outputs spent
+        // by 120 inputs re-materializes ~29 MiB past the 16 MiB default, so a
+        // linking parse refuses it; the subject carries the signed definition at
+        // output 0 (1 satoshi, the overlay admission value).
+        const FAN: usize = 120;
+        let filler = LockingScript::from_binary(&vec![0u8; 2 * 1024]).unwrap();
+        let mut parent = Transaction::new();
+        let mut funding = TransactionInput::new("11".repeat(32), 0);
+        funding.unlocking_script = Some(UnlockingScript::new());
+        parent.inputs_mut().push(funding);
+        for _ in 0..FAN {
+            parent
+                .outputs_mut()
+                .push(TransactionOutput::new(1_000, filler.clone()));
+        }
+        let ptxid = parent.id();
+        let mut beef = Beef::new();
+        let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&ptxid, 800_000));
+        beef.merge_raw_tx(parent.to_binary(), Some(bump)).unwrap();
+        let mut subject = Transaction::new();
+        for vout in 0..FAN {
+            let mut spend = TransactionInput::new(ptxid.clone(), vout as u32);
+            spend.unlocking_script = Some(UnlockingScript::new());
+            subject.inputs_mut().push(spend);
+        }
+        subject
+            .outputs_mut()
+            .push(TransactionOutput::new(1, script));
+        beef.merge_raw_tx(subject.to_binary(), None).unwrap();
+        let beef = beef.to_binary().unwrap();
+
+        assert!(
+            matches!(
+                Transaction::from_beef(&beef, None),
+                Err(crate::Error::BeefResourceLimit(_))
+            ),
+            "the fixture must trip the link bound so a linking reader would drop it"
+        );
+        assert!(
+            Transaction::from_beef_subject(&beef, None).is_ok(),
+            "the subject reader parses the same answer without linking"
+        );
+
+        let output = OutputListItem {
+            beef,
+            output_index: 0,
+            context: None,
+            txid: None,
+        };
+        let defs = read_definitions(
+            vec![output],
+            DefinitionType::Basket,
+            BasketDefinitionData::from_pushdrop_fields,
+            |_| true,
+        );
+        assert_eq!(
+            defs.len(),
+            1,
+            "the relocated reader surfaced the signed definition from an answer a linking reader drops"
+        );
+        assert_eq!(defs[0].basket_id, "basket749");
+    }
 
     #[test]
     fn test_config_defaults() {
