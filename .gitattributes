@@ -1,3 +1,14 @@
+# Every text file is checked out as the repository holds it, LF, on every
+# platform (lane fix-windows-crlf): the tests read the documents, the
+# workflows and the sources as text and compare them by line and by sentence
+# with LF text, and a Windows runner's checkout (core.autocrlf=true) handed
+# them CRLF. Six tests of tests/arch_ci_runs_every_test.rs and
+# tests/front_page.rs were red there alone on the full matrix of 2026-11-16.
+# One rule for all text, not a list of the paths those six read: a list goes
+# stale with the next test that reads a file (bsv-rs#367 mended such readers
+# one at a time). The index holds no CRLF, so no file is renormalized. The
+# lines below stay and override this one for their paths: no conversion at all.
+* text=auto eol=lf
 # The shared vectors and the recorded fixtures are read byte for byte (their
 # sha256 is pinned in the tests that load them; a vector is never edited to
 # make a test pass). No line-ending conversion on any checkout: #146's whole-

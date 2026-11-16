@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0-beta.8] - 2026-11-16
 
-The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `98f1800a` after the stable line's 0.8.11 was synced in. 121 entries since beta.7.
+The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `98f1800a` after the stable line's 0.8.11 was synced in. 122 entries since beta.7.
 
 **Security carry.** This is the first 0.9.0 prerelease to carry the security fixes the stable line shipped in 0.8.6 through 0.8.11. It carries the fixes of sixteen published advisories: GHSA-4mcm-g5xq-jv3r, GHSA-67vc-6c8g-7x48, GHSA-84xq-3662-pvx5, GHSA-9c8r-76f3-m426, GHSA-cgp9-rj5h-jxw6, GHSA-crr5-gh8p-q2h2, GHSA-cwxv-4866-5gq2, GHSA-fr33-7jw7-mwwh, GHSA-gg5p-wgff-v3hr, GHSA-gvmh-f5gf-5vjj, GHSA-h4m7-c6p8-725m, GHSA-j8hr-pjhm-6h27, GHSA-mj2m-jxgv-r446, GHSA-qhj8-j8mj-9cgc, GHSA-vmgj-w2jr-c52x and GHSA-x3m6-jp5x-236c, each described on its advisory page and, where an entry below names it, in that entry. GHSA-82g9-h6jw-r99f, which two entries below name, has no patched version. A dependent pinned to `=0.9.0-beta.7` or earlier moves to this prerelease.
 
@@ -25,7 +25,7 @@ The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `
 - a `Transaction` owns its four serialized fields, now private (#843): a read is `tx.inputs()`, `tx.outputs()`, `tx.version()`, `tx.lock_time()`; a write is `tx.inputs_mut()`, `tx.outputs_mut()`, `tx.set_version(v)`, `tx.set_lock_time(n)`; delete every `invalidate_caches()` call.
 - the Shamir backup is BRC-140's (#854): a backup an earlier release wrote is read by `shamir::recover_private_key_from_legacy_backup`, and `split_private_key_with` takes six arguments (it adds `seed` and `draws`).
 
-**The rest, by kind.** The 121 entries since beta.7 are Fixed 44, Changed 24, Tests 17, Security 12, Added 12, Docs 7, CI 2, Performance 1, Migration 1, Documented 1; each entry carries its own migration line where one is needed.
+**The rest, by kind.** The 122 entries since beta.7 are Fixed 44, Changed 24, Tests 17, Security 12, Added 12, Docs 7, CI 3, Performance 1, Migration 1, Documented 1; each entry carries its own migration line where one is needed.
 
 ### Tests: the four discovery tests ask a scripted tracker and assert exactly, hermetic with and without `http` (#779)
 
@@ -5462,6 +5462,13 @@ One entry of one data file, sentences of two documents and the records; no file 
 ### Notes: cross-SDK parity (#245, the Linux record)
 
 No SDK has a twin of the baseline. No source line, wire byte, verdict or error text of the crate moves, and no row of the root `CLAUDE.md` divergence list is touched.
+
+### CI: every text file is checked out with LF on every platform; six document tests were red on Windows (lane fix-windows-crlf)
+
+- What was red. On the full matrix of 2026-11-16 (run 43945679746) both Windows legs of the Test Suite failed `Run every integration test` on six tests that read documents and workflow files as text: two of `tests/arch_ci_runs_every_test.rs` (`ci_runs_every_integration_test_binary`, `the_doc_suite_log_is_written_and_read_for_every_pin_819`) and four of `tests/front_page.rs` (`every_badge_shows_a_status`, `every_marked_sentence_is_worked_out_again_from_its_producer`, `the_install_line_is_cargo_add_without_a_version`, `the_security_page_says_where_advisories_are_published_and_that_none_is_filed_to_rustsec_849`). The runner's git (`core.autocrlf=true`) checked the files out with CRLF and the tests compare LF text; `.gitattributes` kept only the vectors, fixtures, corpora, wordlists and the collation table from conversion.
+- What changed. `.gitattributes` carries `* text=auto eol=lf` ahead of its other lines, one rule for all text, the `-text` lines after it unchanged and still overriding it; the index held no CRLF, so `git add --renormalize .` moves no file.
+- Pinned by: the six tests themselves, red by name in a clone with `core.autocrlf=true` before the rule and green after it, with every step of the Test Suite job run in such a clone; the Windows legs of a full-matrix dispatch are the witness on the platform.
+- Migration. none: a checkout rule and no code. A checkout made on Windows before this keeps its CRLF files until they are checked out again.
 
 ## [0.8.11] - 2026-11-16
 
