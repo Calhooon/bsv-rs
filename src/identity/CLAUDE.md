@@ -557,3 +557,7 @@ Key compatibility points:
 - `../overlay/CLAUDE.md` - Overlay network module for resolution queries
 - `../wallet/CLAUDE.md` - Wallet module for key operations
 - `../../CLAUDE.md` - Project root documentation
+
+## Open enums (#843d9)
+
+`KnownCertificateType`: `#[non_exhaustive]` since #843d9 (the freeze plan's row 9), each defined inside `crate::util::non_exhaustive::non_exhaustive_enum!` under its public path, which writes into its doc the every-variant `compile_fail` match and its wildcard twin from the definition (`tests/arch_non_exhaustive_pins_819.rs` holds the pin, `tests/arch_non_exhaustive_843d.rs` that every `pub enum` is open or a row of `CLOSED_ENUMS`). A later variant is additive: a `match` outside the crate ends in a wildcard arm, and at a door that arm refuses, it never skips. Inside the crate the attribute binds nothing: every match under `src/` stays exhaustive, and no wildcard arm is added for it. Building a variant and serde are unchanged. `KnownCertificateType::all()` is held against the definition by `all_holds_every_known_certificate_type_and_each_id_reads_back_843d9` (`types_tests.rs`). `BroadcastResult` waits on the freeze plan's row 4.

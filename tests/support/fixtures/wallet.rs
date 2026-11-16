@@ -84,6 +84,7 @@ macro_rules! implementations {
                 WalletCall::RevealCounterpartyKeyLinkage => wallet.reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
                 WalletCall::RevealSpecificKeyLinkage => wallet.reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
                 WalletCall::GetHeaderForHeight => wallet.get_header_for_height(GetHeaderArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
+                other => panic!("unknown variant: {other:?}"),
             })
         }
 

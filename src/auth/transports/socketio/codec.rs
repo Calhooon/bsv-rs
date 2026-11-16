@@ -94,10 +94,13 @@ pub const RECORD_SEP: char = '\x1e';
 // Engine.IO
 // ============================================================================
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::auth::transports::socketio::codec::EngineIoPacket;
 /// One Engine.IO packet in decoded form. The payload (when present) is
 /// kept as `String` because the polling/WS transports always speak text
 /// for the AuthSocket use-case.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum EngineIoPacket {
     /// Server → client open packet. Payload is the handshake JSON.
     Open(String),
@@ -115,6 +118,7 @@ pub enum EngineIoPacket {
     Upgrade,
     /// Server → client noop, used to flush a pending HTTP poll mid-upgrade.
     Noop,
+}
 }
 
 impl EngineIoPacket {
@@ -192,10 +196,13 @@ pub fn decode_polling_batch(raw: &str) -> Result<Vec<EngineIoPacket>, CodecError
 // Socket.IO
 // ============================================================================
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::auth::transports::socketio::codec::SocketIoPacket;
 /// Decoded Socket.IO packet. `BINARY_EVENT` / `BINARY_ACK` are
 /// intentionally omitted because the AuthSocket transport never sends
 /// binary attachments — the JSON payload carries everything.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum SocketIoPacket {
     /// CONNECT (type 0). Client → server: optional auth payload.
     /// Server → client: `{ sid: <socket-sid> }`.
@@ -242,6 +249,7 @@ pub enum SocketIoPacket {
         /// Optional rejection reason: a JSON string or object.
         data: Option<Value>,
     },
+}
 }
 
 const DEFAULT_NSP: &str = "/";
@@ -403,8 +411,11 @@ pub fn decode_event_args_text(raw: &str) -> Result<Vec<Box<RawValue>>, CodecErro
 // Errors
 // ============================================================================
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::auth::transports::socketio::codec::CodecError;
 /// Error returned by the Engine.IO / Socket.IO codec on malformed input.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CodecError {
     /// The packet string was empty (no leading type digit).
     EmptyPacket,
@@ -412,6 +423,7 @@ pub enum CodecError {
     UnknownType(char),
     /// The packet was structurally invalid (bad JSON, missing ack id, ...).
     Malformed(String),
+}
 }
 
 impl std::fmt::Display for CodecError {

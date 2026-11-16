@@ -73,10 +73,13 @@ use k256::elliptic_curve::point::AffineCoordinates;
 use k256::elliptic_curve::subtle::CtOption;
 use k256::{FieldBytes, NonZeroScalar, ProjectivePoint, Scalar, U256};
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::script::templates::RPuzzleType;
 /// The type of R-Puzzle to create.
 ///
 /// Determines whether the R value is stored raw or hashed in the locking script.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum RPuzzleType {
     /// Store the raw R value (largest script, but simplest).
     #[default]
@@ -91,6 +94,7 @@ pub enum RPuzzleType {
     Ripemd160,
     /// Hash the R value with HASH160 (RIPEMD-160 of SHA-256, 20 bytes).
     Hash160,
+}
 }
 
 impl RPuzzleType {

@@ -38,10 +38,13 @@ use crate::transaction::{
     BroadcastFailure, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
 };
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::broadcasters::WocBroadcastNetwork;
 /// WhatsOnChain broadcast network selection.
 ///
 /// Supports mainnet, testnet, and STN (Scaling Test Network).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum WocBroadcastNetwork {
     /// BSV Mainnet
     #[default]
@@ -50,6 +53,7 @@ pub enum WocBroadcastNetwork {
     Testnet,
     /// BSV Scaling Test Network
     Stn,
+}
 }
 
 impl WocBroadcastNetwork {

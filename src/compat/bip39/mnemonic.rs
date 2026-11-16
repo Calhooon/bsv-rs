@@ -57,8 +57,11 @@ impl WordCount {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::compat::Language;
 /// Supported languages for BIP-39 wordlists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum Language {
     /// Chinese Simplified wordlist
     ChineseSimplified,
@@ -79,6 +82,7 @@ pub enum Language {
     Korean,
     /// Spanish wordlist
     Spanish,
+}
 }
 
 impl Language {

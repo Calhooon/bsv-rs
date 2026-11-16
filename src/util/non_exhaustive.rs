@@ -171,6 +171,27 @@ macro_rules! non_exhaustive_twin_block {
 /// # fn main() {}
 /// ```
 ///
+/// A variant's explicit discriminant is passed through (#843d9, `WalletCall`):
+/// the blocks name the variant alone, and `as` reads the value written.
+///
+/// ```
+/// # mod util { pub mod non_exhaustive {
+/// #     include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/util/non_exhaustive.rs"));
+/// # } }
+/// pub mod sample {
+///     crate::util::non_exhaustive::non_exhaustive_enum! {
+///         path = crate::sample::Coded;
+///     #[repr(u8)]
+///     pub enum Coded { One = 1, Seven = 7, Eight }
+///     }
+/// }
+/// # fn main() {
+/// assert_eq!(sample::Coded::One as u8, 1);
+/// assert_eq!(sample::Coded::Seven as u8, 7);
+/// assert_eq!(sample::Coded::Eight as u8, 8);
+/// # }
+/// ```
+///
 /// What it cannot hold: a variant under `cfg` (its arm would be written
 /// whether or not the variant exists; `tests/arch_non_exhaustive_pins_819.rs`
 /// refuses one inside an invocation).
@@ -183,6 +204,7 @@ macro_rules! non_exhaustive_enum {
             $(
                 $(#[$variant_meta:meta])*
                 $variant:ident $({ $($named:tt)* })? $(( $($unnamed:tt)* ))?
+                $(= $discriminant:expr)?
             ),* $(,)?
         }
     ) => {
@@ -207,6 +229,7 @@ macro_rules! non_exhaustive_enum {
             $(
                 $(#[$variant_meta])*
                 $variant $({ $($named)* })? $(( $($unnamed)* ))?
+                $(= $discriminant)?
             ),*
         }
 

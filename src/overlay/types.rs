@@ -47,10 +47,13 @@ impl fmt::Display for Protocol {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::overlay::NetworkPreset;
 /// Network preset for overlay services.
 ///
 /// Determines which default endpoints and settings to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum NetworkPreset {
     /// BSV mainnet - production network.
     #[default]
@@ -59,6 +62,7 @@ pub enum NetworkPreset {
     Testnet,
     /// Local development network.
     Local,
+}
 }
 
 impl NetworkPreset {
@@ -104,8 +108,11 @@ impl LookupQuestion {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::overlay::LookupAnswerType;
 /// Answer type from lookup service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LookupAnswerType {
     /// List of transaction outputs.
     OutputList,
@@ -113,6 +120,7 @@ pub enum LookupAnswerType {
     Freeform,
     /// Formula-based response.
     Formula,
+}
 }
 
 /// Single output in a lookup answer.
@@ -147,9 +155,12 @@ pub struct LookupFormula {
     pub history_fn: String,
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::overlay::LookupAnswer;
 /// Answer from a lookup service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum LookupAnswer {
     /// List of transaction outputs.
     #[serde(rename = "output-list")]
@@ -169,6 +180,7 @@ pub enum LookupAnswer {
         /// The list of formulas.
         formulas: Vec<LookupFormula>,
     },
+}
 }
 
 impl LookupAnswer {

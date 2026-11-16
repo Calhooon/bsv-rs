@@ -30,11 +30,14 @@ pub type Base64String = String;
 // Known Certificate Types
 // ============================================================================
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::identity::KnownCertificateType;
 /// Known certificate types for identity verification.
 ///
 /// Each certificate type has a unique 32-byte type ID (base64-encoded)
 /// that identifies the certificate schema and field structure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum KnownCertificateType {
     /// IdentiCert - Government ID verification.
     /// Fields: firstName, lastName, profilePhoto
@@ -61,6 +64,7 @@ pub enum KnownCertificateType {
     /// CoolCert - Example/demo certificate type.
     /// Fields: cool (boolean)
     CoolCert,
+}
 }
 
 impl KnownCertificateType {

@@ -89,6 +89,7 @@ fn protocol_of(definition_type: DefinitionType) -> Protocol {
         DefinitionType::Basket => "basketmap",
         DefinitionType::Protocol => "protomap",
         DefinitionType::Certificate => "certmap",
+        other => panic!("unknown variant: {other:?}"),
     };
     Protocol::new(SecurityLevel::App, name)
 }
@@ -151,6 +152,7 @@ async fn resolved(definition_type: DefinitionType, script: &LockingScript) -> Op
                 f
             })
             .collect(),
+        other => panic!("unknown variant: {other:?}"),
     };
     assert!(fields.len() <= 1);
     fields.into_iter().next().map(|f| {
