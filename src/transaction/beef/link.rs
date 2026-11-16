@@ -4,28 +4,26 @@
 
 use std::collections::HashMap;
 
-use crate::transaction::beef_tx::BeefTx;
 use crate::transaction::merkle_path::MerklePath;
 use crate::transaction::Transaction;
 use crate::Result;
 
 use super::Beef;
 
-/// The default [`BeefLinkLimits::max_amplification`]: linking may re-materialize
-/// up to this multiple of a BEEF's own output count before it is refused. Set
-/// well above the amplification of every honest BEEF the test corpus holds
-/// (their repeats re-materialize far fewer slots than the BEEF's own outputs)
-/// and far below the #749 denial of service's (thousands).
-const DEFAULT_LINK_AMPLIFICATION: u64 = 64;
+/// The default [`BeefLinkLimits::max_link_bytes`]: linking may re-materialize up
+/// to this many bytes of repeated shared-parent stubs beyond the BEEF's own
+/// bytes before it is refused. 32 MiB matches the overlay lookup resolver's own
+/// `LookupLimits::max_response_bytes`, so the heap a linked answer costs stays a
+/// small multiple of the wire the caller already chose to read: the answer
+/// itself (≤ 32 MiB at the resolver) plus at most another 32 MiB of
+/// re-materialization, well within a 128 MB Worker. It sits far below the #749
+/// denial of service (a 128 KiB answer re-materializing ~1.69 GB) and far above
+/// every honest BEEF the corpus holds (their repeats re-materialize a few
+/// hundred KiB at most).
+const DEFAULT_MAX_LINK_BYTES: u64 = 32 * 1024 * 1024;
 
-/// The default [`BeefLinkLimits::floor`]: a BEEF may always re-materialize this
-/// many output slots regardless of its own output count, so a small honest BEEF
-/// with a few repeats is never refused for its size. 4096 slots is well under a
-/// megabyte of heap.
-const DEFAULT_LINK_FLOOR: u64 = 4096;
-
-/// Bounds on how far linking a BEEF's input ancestry may re-materialize the
-/// BEEF's own outputs, applied by [`Beef::find_atomic_transaction`] and
+/// Bounds on how many bytes linking a BEEF's input ancestry may re-materialize
+/// for a shared parent, applied by [`Beef::find_atomic_transaction`] and
 /// [`Transaction::from_beef`](crate::transaction::Transaction::from_beef).
 ///
 /// Linking hands every repeat input that spends an already-linked parent a
@@ -33,20 +31,22 @@ const DEFAULT_LINK_FLOOR: u64 = 4096;
 /// one parent of N outputs is spent by M separate inputs therefore holds M
 /// copies of all N outputs — a cost that grows with the PRODUCT M×N, not the
 /// sum, so a small answer well within a resolver's byte bound can force
-/// multi-gigabyte heap (bsv-rs #749). These limits cap the re-materialized
-/// output count at a multiple of the BEEF's own output count plus a floor,
-/// restoring the crate's rule that every allocation is bounded by the input.
+/// multi-gigabyte heap (bsv-rs #749). These limits cap, in ABSOLUTE BYTES, how
+/// far the repeats may re-materialize beyond the answer's own bytes, restoring
+/// the crate's rule that every allocation is bounded by the input. A byte
+/// budget (not a count of output slots) charges a parent of a few large outputs
+/// its true weight, so a sub-megabyte BEEF of few large outputs cannot slip a
+/// Worker-OOM re-materialization past the bound.
 ///
-/// An honest BEEF re-materializes far fewer slots than its own outputs, so the
-/// [default](BeefLinkLimits::default) refuses none of them. A caller that must
-/// link a large ancestry it TRUSTS opts out with
+/// An honest BEEF re-materializes a few hundred KiB at most, far under the
+/// [default](BeefLinkLimits::default) 32 MiB, so the default refuses none of
+/// them. A caller that must link a large ancestry it TRUSTS opts out with
 /// [`BeefLinkLimits::unbounded`].
 ///
 /// Build from [`default`](Self::default) or [`unbounded`](Self::unbounded) and
-/// adjust with [`with_max_amplification`](Self::with_max_amplification) /
-/// [`with_floor`](Self::with_floor); the struct is `#[non_exhaustive]` so a
-/// later bound can be added without a break. No struct expression builds one
-/// outside this crate, a functional update included:
+/// adjust with [`with_max_link_bytes`](Self::with_max_link_bytes); the struct is
+/// `#[non_exhaustive]` so a later bound can be added without a break. No struct
+/// expression builds one outside this crate, a functional update included:
 ///
 /// ```compile_fail,E0639
 /// fn rebuilt(value: bsv_rs::transaction::BeefLinkLimits) -> bsv_rs::transaction::BeefLinkLimits {
@@ -62,13 +62,11 @@ const DEFAULT_LINK_FLOOR: u64 = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BeefLinkLimits {
-    /// The multiple of the BEEF's own output count that linking may
-    /// re-materialize before it is refused. `None` disables the bound (link
-    /// whatever the bytes hold — for a source the caller trusts).
-    pub max_amplification: Option<u64>,
-    /// A floor, in re-materialized output slots, added to the budget so a small
-    /// honest BEEF is never refused for its size.
-    pub floor: u64,
+    /// The maximum number of bytes linking may re-materialize for repeat inputs
+    /// that spend an already-linked shared parent, beyond the BEEF's own bytes,
+    /// before it is refused. `None` disables the bound (link whatever the bytes
+    /// hold — for a source the caller trusts).
+    pub max_link_bytes: Option<u64>,
 }
 
 crate::util::non_exhaustive::assert_no_drop!(BeefLinkLimits, bsv_rs::transaction::BeefLinkLimits);
@@ -76,8 +74,7 @@ crate::util::non_exhaustive::assert_no_drop!(BeefLinkLimits, bsv_rs::transaction
 impl Default for BeefLinkLimits {
     fn default() -> Self {
         Self {
-            max_amplification: Some(DEFAULT_LINK_AMPLIFICATION),
-            floor: DEFAULT_LINK_FLOOR,
+            max_link_bytes: Some(DEFAULT_MAX_LINK_BYTES),
         }
     }
 }
@@ -89,33 +86,16 @@ impl BeefLinkLimits {
     #[must_use]
     pub fn unbounded() -> Self {
         Self {
-            max_amplification: None,
-            floor: 0,
+            max_link_bytes: None,
         }
     }
 
-    /// Sets [`max_amplification`](Self::max_amplification) (`None` disables the
+    /// Sets [`max_link_bytes`](Self::max_link_bytes) (`None` disables the
     /// bound).
     #[must_use]
-    pub fn with_max_amplification(mut self, max_amplification: Option<u64>) -> Self {
-        self.max_amplification = max_amplification;
+    pub fn with_max_link_bytes(mut self, max_link_bytes: Option<u64>) -> Self {
+        self.max_link_bytes = max_link_bytes;
         self
-    }
-
-    /// Sets [`floor`](Self::floor), the re-materialized output slots a BEEF may
-    /// always reach regardless of its own output count.
-    #[must_use]
-    pub fn with_floor(mut self, floor: u64) -> Self {
-        self.floor = floor;
-        self
-    }
-
-    /// The budget, in re-materialized output slots, for a BEEF whose own
-    /// transactions carry `total_outputs` outputs, or `None` when the bound is
-    /// disabled.
-    fn budget(&self, total_outputs: u64) -> Option<u64> {
-        self.max_amplification
-            .map(|k| total_outputs.saturating_mul(k).saturating_add(self.floor))
     }
 }
 
@@ -124,9 +104,14 @@ impl Beef {
     /// [default](BeefLinkLimits::default) link bound: a BEEF whose linking
     /// would re-materialize a shared parent far beyond the BEEF's own size
     /// (bsv-rs #749) yields `None`, as a BEEF whose `txid` is absent does. Use
-    /// [`find_atomic_transaction_limited`](Self::find_atomic_transaction_limited)
-    /// to tell the two apart or to raise the bound.
-    #[must_use]
+    /// [`find_atomic_transaction_limited`](Self::find_atomic_transaction_limited),
+    /// which returns `Err(`[`BeefResourceLimit`](crate::Error::BeefResourceLimit)`)`
+    /// on a refusal, to tell the two apart or to raise the bound.
+    // No `#[must_use]`: a public attribute added to this pre-existing method is a
+    // semver MINOR (`inherent_method_must_use_added`); the stable line cannot
+    // carry it as a patch (bsv-rs #749 fold, ruling 1), so both lines drop it;
+    // the local allow silences the pedantic lint without touching the public API.
+    #[allow(clippy::must_use_candidate)]
     pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction> {
         self.find_atomic_transaction_limited(txid, &BeefLinkLimits::default())
             .ok()
@@ -135,10 +120,17 @@ impl Beef {
 
     /// As [`find_atomic_transaction`](Self::find_atomic_transaction), but with
     /// an explicit [`BeefLinkLimits`]: `Ok(None)` when `txid` is not in this
-    /// BEEF, `Err(`[`BeefError`](crate::Error::BeefError)`)` when linking would
-    /// re-materialize more output slots than the limits allow (bsv-rs #749),
-    /// and `Ok(Some(_))` with the linked transaction otherwise.
-    #[allow(clippy::missing_errors_doc)] // the Errors are stated in the summary
+    /// BEEF, `Err(`[`BeefResourceLimit`](crate::Error::BeefResourceLimit)`)`
+    /// when linking would re-materialize more bytes than the limits allow
+    /// (bsv-rs #749) — a resource decline of its own class, told apart from an
+    /// absent txid and from a malformed BEEF — and `Ok(Some(_))` with the
+    /// linked transaction otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BeefResourceLimit`](crate::Error::BeefResourceLimit) when
+    /// linking `txid`'s ancestry would re-materialize more bytes than `limits`
+    /// allow (bsv-rs #749).
     pub fn find_atomic_transaction_limited(
         &self,
         txid: &str,
@@ -152,16 +144,6 @@ impl Beef {
         };
         self.add_input_proof(&mut tx, limits)?;
         Ok(Some(tx))
-    }
-
-    /// The total number of outputs the BEEF's own transactions carry — the
-    /// measure a [`BeefLinkLimits`] budget is a multiple of.
-    fn total_output_slots(&self) -> u64 {
-        self.txs
-            .iter()
-            .filter_map(BeefTx::tx)
-            .map(|t| t.outputs().len() as u64)
-            .sum()
     }
 
     /// Attach merkle paths and source transactions to `tx` and its whole
@@ -214,6 +196,12 @@ impl Beef {
     /// The reference walks iteratively too (`@bsv/sdk` `Beef.#addInputProof`).
     /// Bumps are looked up through an index built once, so the walk is linear
     /// in the BEEF rather than in transactions times bumps.
+    ///
+    /// The bytes the repeat inputs re-materialize are metered against `limits`
+    /// (the #749 bound; `BeefLinkLimits::unbounded` lifts it), and a BEEF that
+    /// would cross the budget is refused with
+    /// [`Error::BeefResourceLimit`](crate::Error::BeefResourceLimit) BEFORE the
+    /// clone that would allocate past it.
     fn add_input_proof(&self, tx: &mut Transaction, limits: &BeefLinkLimits) -> Result<()> {
         /// One transaction being linked, and the next input to link.
         struct Frame {
@@ -221,13 +209,16 @@ impl Beef {
             next_input: usize,
         }
 
-        // The #749 bound: every repeat input that spends an already-linked
-        // parent is handed a clone of that parent's outputs, so a shared parent
-        // of N outputs spent by M inputs re-materializes M×N output slots. Cap
-        // the running total at the limits' budget; the full links (one per
-        // distinct parent) are the BEEF's own outputs and are not counted.
-        let budget = limits.budget(self.total_output_slots());
-        let mut materialized: u64 = 0;
+        // The #749 bound, in ABSOLUTE BYTES: every repeat input that spends an
+        // already-linked parent is handed a clone of that parent (its outputs
+        // are what the input spends), so the heap the repeats re-materialize is
+        // the sum of each stub's wire size over the repeats. Cap that running
+        // sum at the limits' budget and refuse BEFORE the clone that would
+        // cross it; the full links (one per distinct parent) are the BEEF's own
+        // bytes and are not counted. A byte budget (not a count of slots)
+        // charges a parent of a few large outputs its true weight.
+        let budget = limits.max_link_bytes;
+        let mut materialized_bytes: u64 = 0;
 
         // `find_bump`'s answer for every hash at level 0: the LAST bump whose
         // leaf level carries it, as the reference's index keeps it
@@ -258,9 +249,10 @@ impl Beef {
             Frame { tx, next_input }
         };
 
-        // Keyed by txid, the value being the stub handed to later inputs.
+        // Keyed by txid, the value being the stub handed to later inputs and
+        // its wire-byte weight (computed once, the cost each repeat clone adds).
         // Presence also means "this txid has been linked in full once".
-        let mut stubs: HashMap<String, Transaction> = HashMap::new();
+        let mut stubs: HashMap<String, (Transaction, u64)> = HashMap::new();
         let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
 
         while let Some(top) = stack.last_mut() {
@@ -293,17 +285,19 @@ impl Beef {
                 (None, Some(text)) => text.clone(),
                 (None, None) => continue, // links and names nothing: left as it is
             };
-            if let Some(stub) = stubs.get(&src_txid) {
+            if let Some((stub, stub_bytes)) = stubs.get(&src_txid) {
                 // Already linked in full once: this input gets the stub, which
                 // carries the output being spent (and the proof when there is
-                // one) without repeating the ancestry underneath it.
+                // one) without repeating the ancestry underneath it. Meter the
+                // stub's byte weight and refuse BEFORE the clone that would
+                // allocate past the budget.
                 if let Some(budget) = budget {
-                    materialized = materialized.saturating_add(stub.outputs().len() as u64);
-                    if materialized > budget {
-                        return Err(crate::Error::BeefError(format!(
-                            "BEEF linking would re-materialize more than {budget} output slots: a \
-                             shared parent spent by many inputs (bsv-rs #749). Raise or disable \
-                             the bound with Transaction::from_beef_with_limits / BeefLinkLimits."
+                    materialized_bytes = materialized_bytes.saturating_add(*stub_bytes);
+                    if materialized_bytes > budget {
+                        return Err(crate::Error::BeefResourceLimit(format!(
+                            "linking would re-materialize more than {budget} bytes for a shared \
+                             parent spent by many inputs (bsv-rs #749). Raise or disable the bound \
+                             with Transaction::from_beef_with_limits / BeefLinkLimits::unbounded."
                         )));
                     }
                 }
@@ -326,9 +320,11 @@ impl Beef {
             // Memoize the stub BEFORE descending: a BEEF whose source links
             // form a cycle then terminates instead of walking forever, and for
             // the honest DAG case the order makes no difference (a transaction
-            // is never reachable from inside its own ancestry).
+            // is never reachable from inside its own ancestry). Its wire size,
+            // computed once here, is the byte weight each later repeat adds.
             let stub = Self::bare_stub(&src, find_bump(&src_txid));
-            stubs.insert(src_txid, stub);
+            let stub_bytes = stub.to_binary().len() as u64;
+            stubs.insert(src_txid, (stub, stub_bytes));
             stack.push(enter(src));
         }
         Ok(())
