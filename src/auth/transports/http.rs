@@ -379,15 +379,15 @@ impl HttpResponse {
         cursor += bytes_read;
         let body = if body_len > 0 {
             let len = body_len as usize;
-            if cursor + len <= payload.len() {
-                let body = payload[cursor..cursor + len].to_vec();
-                cursor += len;
-                body
-            } else {
-                // Lenient: a body shorter than claimed consumes the remainder.
-                cursor = payload.len();
-                Vec::new()
+            // Strict (bsv-rs #843): refuse a body shorter than its length prefix.
+            if cursor + len > payload.len() {
+                return Err(Error::AuthError(
+                    "Response payload too short for body".into(),
+                ));
             }
+            let body = payload[cursor..cursor + len].to_vec();
+            cursor += len;
+            body
         } else {
             Vec::new()
         };
