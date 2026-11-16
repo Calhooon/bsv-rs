@@ -64,35 +64,51 @@ async fn raw_fallback_keeps_last_duplicate_fields_with_deep_or_nonfinite_extras(
     }
 }
 
+// Timed rounds per body. The minimum of them is the cost without the host's
+// noise: a pause can only add to a sample, never take from it. Seven because a
+// median of three failed about one leg in three on the slowest hosted runner
+// (a sample disturbed about one time in five); all seven of one body disturbed
+// is then about one in 100,000.
+const TIMED_ROUNDS: usize = 7;
+
 #[tokio::test]
 async fn nested_result_snapshot_scales_with_body_size_on_success_and_error() {
-    let server = MockServer::start().await;
-    let wallet = HttpWalletJson::new(Some("fixtures.invalid".into()), Some(server.uri())).unwrap();
     let mut failures = Vec::new();
     for status in [200, 400] {
-        let mut times = Vec::new();
-        for (index, body) in BODIES.iter().enumerate() {
-            server.reset().await;
+        // One server and one wallet per body, so the rounds interleave the
+        // three depths: a slow stretch of the host falls on all of them alike.
+        let mut doors = Vec::new();
+        for body in BODIES.iter() {
+            let server = MockServer::start().await;
             Mock::given(path("/getVersion"))
                 .respond_with(
                     ResponseTemplate::new(status).set_body_raw(body.as_str(), "application/json"),
                 )
                 .mount(&server)
                 .await;
-            // Median suppresses a single scheduler pause; no absolute time bound.
-            let mut samples = Vec::new();
-            for _ in 0..3 {
+            let wallet =
+                HttpWalletJson::new(Some("fixtures.invalid".into()), Some(server.uri())).unwrap();
+            doors.push((server, wallet));
+        }
+        // The round before the timed ones is the warm-up (the connection, the
+        // allocator's pages); its samples are dropped. No absolute time bound.
+        let mut times = vec![f64::INFINITY; BODIES.len()];
+        for round in 0..=TIMED_ROUNDS {
+            for (index, (_server, wallet)) in doors.iter().enumerate() {
                 let start = Instant::now();
                 let result = wallet.get_version(None).await;
-                samples.push(start.elapsed().as_secs_f64());
+                let elapsed = start.elapsed().as_secs_f64();
                 if status == 200 {
                     assert_eq!(result.unwrap(), "1.0.0.0");
                 } else {
                     assert!(result.is_err());
                 }
+                if round > 0 {
+                    times[index] = times[index].min(elapsed);
+                }
             }
-            samples.sort_by(f64::total_cmp);
-            times.push(samples[1]);
+        }
+        for (index, body) in BODIES.iter().enumerate() {
             println!(
                 "status={status} depth={} bytes={} seconds={:.6}",
                 2_000 << index,
@@ -100,6 +116,9 @@ async fn nested_result_snapshot_scales_with_body_size_on_success_and_error() {
                 times[index]
             );
         }
+        // A linear walk gives 1.0 at these equal sizes; a walk that reads each
+        // subtree again gives the depth ratio, 2.0 and 4.0 (measured 1.990 and
+        // 4.032), so the depth 8,000 leg is the one that refuses it.
         for index in 1..times.len() {
             let size_ratio = BODIES[index].len() as f64 / BODIES[0].len() as f64;
             let time_ratio = times[index] / times[0];
