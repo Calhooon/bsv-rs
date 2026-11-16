@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests: the nested-result linear pin times each body several times and takes the minimum (#432)
+
+- **What was red.** `nested_result_snapshot_scales_with_body_size_on_success_and_error` (`tests/wallet_http_json_linear_432.rs`) failed on two of six `macos-15-intel` legs on 2026-11-16 (`status=400 depth=8000 / depth=2000: time ratio 2.964`, `status=200 depth=4000 / depth=2000: time ratio 3.563`) with no change to the walk. It timed each 4 MiB body three times in a row, with no warm-up, and compared the medians: each sample is a whole HTTP round trip of a few tens of milliseconds, so two disturbed samples of one body moved its median past the bound.
+- **What changed.** The test alone; no code under `src/`. Each status now has a server and a wallet per body, so the rounds interleave the three depths and a slow stretch of the host falls on all of them alike; one warm-up round is dropped, seven rounds are timed, and each body's time is the minimum of its seven (a pause can only add to a sample). The bound is unchanged, 2.5 times the byte-size ratio. What the bound separates, measured on the lane's host in a debug build: the walk as it is gives 0.97 to 1.11 at both depths over 100 runs (0.97 to 1.09 over 50 runs beside two more instances of the test binary); a walk made to parse each subtree again gives 1.990 at depth 4,000 and 4.032 at depth 8,000 (the depth ratios), so the depth 8,000 leg is the one that refuses it and the depth 4,000 leg cannot (stated, not changed). The test takes 3.1 s there where it took 1.2 s. The crate exposes no count of the walk's work to a test, so the pin stays a clock's.
+- **Pinned by.** The test itself: in a scratch copy with each subtree's text read again at its visit (the cheapest such plant, one UTF-8 validation per subtree), RED on 10 of 10 runs by its own message (`depth=8000 / depth=2000: time ratio` 2.92 to 3.25); on the tree green on 100 runs alone and on 50 under the load above. `tests/CLAUDE.md`'s row says how it measures.
+- **Migration.** None.
+
 ## [0.9.0-beta.8] - 2026-11-16
 
 The 0.9.0 line's eighth prerelease (RELEASING.md point 14), cut from `beta` at `98f1800a` after the stable line's 0.8.11 was synced in. 124 entries since beta.7.
