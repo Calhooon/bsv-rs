@@ -8,8 +8,8 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 
 use super::amount::{read_amount, unnamed_source_amounts, written_amount, AmountRule};
-use super::beef::Beef;
-use super::beef_tx::{BEEF_V1, BEEF_V2};
+use super::beef::{Beef, BeefLinkLimits};
+use super::beef_tx::{BeefTx, BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
@@ -446,6 +446,25 @@ impl Transaction {
     ///
     /// The parsed transaction.
     pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self> {
+        Self::from_beef_with_limits(beef, txid, &BeefLinkLimits::default())
+    }
+
+    /// As [`from_beef`](Self::from_beef), but with an explicit
+    /// [`BeefLinkLimits`](crate::transaction::BeefLinkLimits).
+    ///
+    /// The default `from_beef` refuses an answer whose input ancestry would
+    /// re-materialize a shared parent far beyond the BEEF's own size (bsv-rs
+    /// #749, a memory-exhaustion denial of service reached through the overlay
+    /// lookup resolver and every other door that parses a stranger's BEEF). A
+    /// caller linking a large BEEF whose source it TRUSTS passes
+    /// [`BeefLinkLimits::unbounded`](crate::transaction::BeefLinkLimits::unbounded)
+    /// to restore the old, unbounded linking.
+    #[allow(clippy::missing_errors_doc)] // as `from_beef`, its sibling
+    pub fn from_beef_with_limits(
+        beef: &[u8],
+        txid: Option<&str>,
+        limits: &BeefLinkLimits,
+    ) -> Result<Self> {
         let parsed = Beef::from_binary(beef)?;
 
         // Route through `find_atomic_transaction` so the returned transaction
@@ -468,29 +487,71 @@ impl Transaction {
             Some(id) => id.to_string(),
             None => match parsed.atomic_txid.clone() {
                 Some(atomic) => atomic,
-                None => parsed.txs.last().map(|btx| btx.txid()).ok_or_else(|| {
+                None => parsed.txs.last().map(BeefTx::txid).ok_or_else(|| {
                     crate::Error::TransactionError("No transactions in BEEF".to_string())
                 })?,
             },
         };
-        parsed.find_atomic_transaction(&target).ok_or_else(|| {
-            crate::Error::TransactionError(format!("Transaction {} not found in BEEF", target))
-        })
+        parsed
+            .find_atomic_transaction_limited(&target, limits)?
+            .ok_or_else(|| {
+                crate::Error::TransactionError(format!("Transaction {target} not found in BEEF"))
+            })
     }
 
     /// Parses a transaction from Atomic BEEF format.
     ///
     /// The atomic txid in the BEEF header identifies the transaction to return.
     pub fn from_atomic_beef(beef: &[u8]) -> Result<Self> {
+        Self::from_atomic_beef_with_limits(beef, &BeefLinkLimits::default())
+    }
+
+    /// As [`from_atomic_beef`](Self::from_atomic_beef), but with an explicit
+    /// [`BeefLinkLimits`](crate::transaction::BeefLinkLimits); see
+    /// [`from_beef_with_limits`](Self::from_beef_with_limits) for the #749 bound.
+    #[allow(clippy::missing_errors_doc)] // as `from_atomic_beef`, its sibling
+    pub fn from_atomic_beef_with_limits(beef: &[u8], limits: &BeefLinkLimits) -> Result<Self> {
         let parsed = Beef::from_binary(beef)?;
 
         let txid = parsed.atomic_txid.as_ref().ok_or_else(|| {
             crate::Error::TransactionError("Not an Atomic BEEF format".to_string())
         })?;
 
-        parsed.find_atomic_transaction(txid).ok_or_else(|| {
-            crate::Error::TransactionError("Atomic transaction not found".to_string())
-        })
+        parsed
+            .find_atomic_transaction_limited(txid, limits)?
+            .ok_or_else(|| {
+                crate::Error::TransactionError("Atomic transaction not found".to_string())
+            })
+    }
+
+    /// Parses a BEEF and returns its SUBJECT alone — the target transaction
+    /// with its own fields (txid, outputs), WITHOUT linking its input ancestry.
+    ///
+    /// Linking populates each input's `source_transaction`; it never changes
+    /// the subject's own txid or outputs. A door that reads only the subject (a
+    /// lookup resolver caching a txid, or reading an advertisement's output)
+    /// therefore gets the same answer here, without paying — or being refused
+    /// by — the #749 re-materialization bound that [`from_beef`](Self::from_beef)
+    /// applies for the ancestry it does not use. Target resolution is
+    /// `from_beef`'s: `txid ?? atomic_txid ?? the last entry`.
+    #[allow(clippy::missing_errors_doc)] // as `from_beef`, its sibling
+    pub fn from_beef_subject(beef: &[u8], txid: Option<&str>) -> Result<Self> {
+        let parsed = Beef::from_binary(beef)?;
+        let target = match txid {
+            Some(id) => id.to_string(),
+            None => match parsed.atomic_txid.clone() {
+                Some(atomic) => atomic,
+                None => parsed.txs.last().map(BeefTx::txid).ok_or_else(|| {
+                    crate::Error::TransactionError("No transactions in BEEF".to_string())
+                })?,
+            },
+        };
+        parsed
+            .find_txid(&target)
+            .and_then(|b| b.tx().cloned())
+            .ok_or_else(|| {
+                crate::Error::TransactionError(format!("Transaction {target} not found in BEEF"))
+            })
     }
 
     /// Serializes this transaction to BEEF format.

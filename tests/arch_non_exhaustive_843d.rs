@@ -897,13 +897,13 @@ fn the_scan_reads_every_form_by_name_843d8a() {
         set(KEY_ARGS),
         "the key_args! structs"
     );
-    assert_eq!(public.len(), 219, "all-public structs under src/");
+    assert_eq!(public.len(), 220, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
-        12,
+        13,
         "attributed"
     );
-    assert_eq!(ROWS.len() + 12, public.len(), "every other one a row");
+    assert_eq!(ROWS.len() + 13, public.len(), "every other one a row");
 }
 
 fn probe(text: &str) -> (Vec<Found>, Vec<String>) {

@@ -45,6 +45,7 @@ mod collect;
 // The writers' check and `merge_beef`'s verdict (#817), in the same selection.
 mod in_memory;
 mod index;
+mod link;
 mod merge_entry;
 mod merge_graph;
 #[path = "beef_writable.rs"]
@@ -52,6 +53,7 @@ mod writable;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
 use collect::AfterFrame;
+pub use link::BeefLinkLimits;
 
 /// Result of sorting transactions in a BEEF.
 #[derive(Debug, Clone, Default)]
@@ -193,180 +195,6 @@ impl Beef {
             }
         }
         Some(tx)
-    }
-
-    /// Builds the proof tree rooted at a specific transaction.
-    pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction> {
-        let beef_tx = self.find_txid(txid)?;
-        let mut tx = beef_tx.tx().cloned()?;
-        self.add_input_proof(&mut tx);
-        Some(tx)
-    }
-
-    /// Attach merkle paths and source transactions to `tx` and its whole
-    /// input ancestry, LINEARLY: every distinct unproven parent is linked in
-    /// full exactly once (memoized by txid), and every later input that
-    /// sources the same txid gets a BARE STUB of it: the parent transaction
-    /// itself (its outputs are what the input spends), carrying its BUMP when
-    /// this BEEF proves it, with every one of ITS inputs' `source_transaction`
-    /// left `None`.
-    ///
-    /// Port of the TypeScript `Beef.addInputProof` (`@bsv/sdk`
-    /// `transaction/Beef.ts`): a transaction with a BUMP in this BEEF gets it
-    /// as its `merkle_path` and is not descended (a proven transaction needs
-    /// no ancestry); an unproven one has each input's `source_transaction`
-    /// linked from this BEEF and is descended in turn.
-    ///
-    /// The TS walk keeps one `Transaction` object per txid and assigns it to
-    /// every input by reference, so linking it once links it everywhere.
-    /// Rust stores `source_transaction` as an owned `Box`, one copy per input,
-    /// so the reference structure cannot be reproduced exactly and the two
-    /// naive answers are both wrong:
-    ///
-    /// - link only the first occurrence and hand later inputs a bare clone
-    ///   (0.3.20): the structure stays linear, but the old object-graph
-    ///   `Transaction::verify` reached the bare clone and refused a complete
-    ///   BEEF with "Input N has no source transaction", and two inputs
-    ///   sourcing the same unproven parent (a covenant output plus that
-    ///   transaction's own change) is the ordinary shape of a wallet's
-    ///   second spend;
-    /// - link every input in full by cloning the memoized parent (0.3.21):
-    ///   correct for that walk, but EXPONENTIAL. On a diamond chain, where
-    ///   each level spends both outputs of the previous unproven level (a
-    ///   wallet's ordinary change chain), every level then carries two full
-    ///   copies of the level below it: 24 levels = 2^24 subtrees, and
-    ///   `from_beef` died on memory before verification even started.
-    ///
-    /// So the structure stays linear as in 0.3.20 (one full link per txid plus
-    /// one cheap stub per repeat), and [`Transaction::verify`] no longer cares
-    /// which copy it reaches: it gathers the reachable transactions by txid and
-    /// looks every input's source up in that map.
-    ///
-    /// The walk is ITERATIVE (0.3.35, bsv-stack-lean #57): an explicit stack of
-    /// frames replaces the call that recursed once per unproven link, so a
-    /// stranger's chain of unproven transactions costs heap, not stack (a
-    /// 1 MiB stack, the order of a WASM stack in a Worker, overflowed at a few
-    /// hundred links and the abort took every request in flight with it). The
-    /// frames are visited in the recursion's order (depth first, inputs in
-    /// order), so which input gets the full link and which a stub, and the
-    /// resulting `source_transaction` shape, are exactly the recursive walk's.
-    /// The reference walks iteratively too (`@bsv/sdk` `Beef.#addInputProof`).
-    /// Bumps are looked up through an index built once, so the walk is linear
-    /// in the BEEF rather than in transactions times bumps.
-    fn add_input_proof(&self, tx: &mut Transaction) {
-        /// One transaction being linked, and the next input to link.
-        struct Frame {
-            tx: Transaction,
-            next_input: usize,
-        }
-
-        // `find_bump`'s answer for every hash at level 0: the LAST bump whose
-        // leaf level carries it, as the reference's index keeps it
-        // (`Beef.ts:576-585` at `ts-stack@edf6e03`, `Map.set` over the bumps
-        // in order; the earliest until #732).
-        let mut bump_by_txid: HashMap<&str, &MerklePath> = HashMap::new();
-        for bump in &self.bumps {
-            for leaf in bump.path.first().into_iter().flatten() {
-                if let Some(hash) = leaf.hash.as_deref() {
-                    bump_by_txid.insert(hash, bump);
-                }
-            }
-        }
-        let find_bump = |txid: &str| bump_by_txid.get(txid).copied();
-
-        // This BEEF's proof replaces any path the transaction carries, and a
-        // transaction it proves is not descended; one it does not prove is,
-        // a caller's path kept (`Beef.ts:658-666` at `ts-stack@edf6e03`;
-        // until #757 a caller's path was kept and ended the walk).
-        let enter = |mut tx: Transaction| -> Frame {
-            let next_input = match find_bump(&tx.id()) {
-                Some(mp) => {
-                    tx.merkle_path = Some(mp.clone());
-                    tx.inputs().len()
-                }
-                None => 0,
-            };
-            Frame { tx, next_input }
-        };
-
-        // Keyed by txid, the value being the stub handed to later inputs.
-        // Presence also means "this txid has been linked in full once".
-        let mut stubs: HashMap<String, Transaction> = HashMap::new();
-        let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
-
-        while let Some(top) = stack.last_mut() {
-            if top.next_input == top.tx.inputs().len() {
-                // Every input of this transaction is linked: hand it to the
-                // input of its parent that it sources, or back to the caller.
-                let Some(Frame { tx: done, .. }) = stack.pop() else {
-                    break;
-                };
-                // Every link goes through the linking door, which keeps the
-                // caches where the input names its txid (#869's second fold:
-                // `inputs_mut` emptied them, and `verify` re-serialized).
-                match stack.last_mut() {
-                    Some(parent) => {
-                        parent
-                            .tx
-                            .replace_source(parent.next_input - 1, Some(Box::new(done)));
-                    }
-                    None => *tx = done,
-                }
-                continue;
-            }
-            let i = top.next_input;
-            top.next_input += 1;
-            let input = &top.tx.inputs()[i];
-            // Keyed by what the input links, its own source's id, named or not (#869's
-            // fourth fold), else its text (`Beef.ts:649-679` at `ts-stack@edf6e03`).
-            let src_txid = match (&input.source_transaction, &input.source_txid) {
-                (Some(own), _) => own.id(),
-                (None, Some(text)) => text.clone(),
-                (None, None) => continue, // links and names nothing: left as it is
-            };
-            if let Some(stub) = stubs.get(&src_txid) {
-                // Already linked in full once: this input gets the stub, which
-                // carries the output being spent (and the proof when there is
-                // one) without repeating the ancestry underneath it.
-                top.tx.replace_source(i, Some(Box::new(stub.clone())));
-                continue;
-            }
-            // Take the caller's own source when it carries one, else this BEEF's.
-            let own = if top.tx.inputs()[i].source_transaction.is_some() {
-                top.tx.replace_source(i, None)
-            } else {
-                None
-            };
-            let src = match own {
-                Some(own) => *own,
-                None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
-                    Some(found) => found,
-                    None => continue, // not in this BEEF: left unlinked, as before
-                },
-            };
-            // Memoize the stub BEFORE descending: a BEEF whose source links
-            // form a cycle then terminates instead of walking forever, and for
-            // the honest DAG case the order makes no difference (a transaction
-            // is never reachable from inside its own ancestry).
-            let stub = Self::bare_stub(&src, find_bump(&src_txid));
-            stubs.insert(src_txid, stub);
-            stack.push(enter(src));
-        }
-    }
-
-    /// A bare copy of `tx`: the transaction with this BEEF's BUMP in place of
-    /// its own path when the BEEF proves it (#757), and with every input's `source_transaction` dropped, so no ancestry
-    /// is duplicated; building a stub never copies a subtree.
-    fn bare_stub(tx: &Transaction, bump: Option<&MerklePath>) -> Transaction {
-        // `clone_for_beef` copies the transaction without its sources, each
-        // unnamed source's txid written in its place, so the stub's bytes and
-        // id are the transaction's (#843: until then the stub's inputs held
-        // neither, and a copied cache stood in for what its fields wrote).
-        let mut stub = tx.clone_for_beef();
-        if let Some(mp) = bump {
-            stub.merkle_path = Some(mp.clone());
-        }
-        stub
     }
 
     /// Merges a MerklePath into this BEEF.
