@@ -316,8 +316,10 @@ impl LookupResolver {
 
     /// Parse a SLAP token from an output and extract the domain.
     fn parse_slap_token(&self, output: &OutputListItem, expected_service: &str) -> Result<String> {
-        // Parse BEEF to get transaction
-        let tx = Transaction::from_beef(&output.beef, None)
+        // The subject alone (its txid and the output read below): a SLAP
+        // advertisement's ancestry is not used, so link nothing and do not meet
+        // the #749 re-materialization bound on an untrusted answer's ancestry.
+        let tx = Transaction::from_beef_subject(&output.beef, None)
             .map_err(|e| Error::OverlayError(format!("Failed to parse BEEF: {}", e)))?;
 
         // A hint that, lower-cased, is not the subject's txid skips the
@@ -396,8 +398,11 @@ impl LookupResolver {
             }
         }
 
-        // Parse BEEF and cache the result
-        let tx = Transaction::from_beef(beef, None).ok()?;
+        // Parse and cache the subject's txid: the ancestry is not used here, so
+        // link nothing and do not meet the #749 re-materialization bound on an
+        // untrusted answer's ancestry (the subject's txid is the same linked or
+        // not).
+        let tx = Transaction::from_beef_subject(beef, None).ok()?;
         let tx_id = tx.id();
 
         // Update cache
