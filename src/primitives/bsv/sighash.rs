@@ -159,18 +159,8 @@ pub struct RawTransaction {
 ///
 /// # Returns
 ///
-/// The parsed transaction, or an error if parsing fails
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use bsv_rs::primitives::bsv::sighash::parse_transaction;
-///
-/// let raw = hex::decode("0100000001...").unwrap();
-/// let tx = parse_transaction(&raw).unwrap();
-/// println!("Version: {}", tx.version);
-/// println!("Inputs: {}", tx.inputs.len());
-/// ```
+/// The parsed transaction, or an error if parsing fails. A buffer with bytes
+/// after the transaction is refused (it is not exactly one transaction).
 pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
     let mut reader = Reader::new(raw);
 
@@ -224,6 +214,16 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
 
     // Locktime (4 bytes LE)
     let locktime = reader.read_u32_le()?;
+
+    // Consume the whole buffer or refuse: a trailing byte means the input is
+    // not exactly one transaction. The sibling transaction readers already
+    // refuse trailing bytes; this door did not (bsv-rs #843).
+    if !reader.is_empty() {
+        return Err(Error::CryptoError(format!(
+            "trailing bytes after transaction: {} byte(s) remain",
+            reader.remaining()
+        )));
+    }
 
     Ok(RawTransaction {
         version,
