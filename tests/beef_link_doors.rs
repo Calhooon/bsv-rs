@@ -19,14 +19,24 @@
 #![cfg(feature = "full")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bsv_rs::overlay::{create_signed_overlay_admin_token, decode_overlay_admin_token, Protocol};
+use async_trait::async_trait;
+use tokio::sync::RwLock;
+
+use bsv_rs::overlay::{
+    create_signed_overlay_admin_token, decode_overlay_admin_token, LookupAnswer, LookupQuestion,
+    LookupResolver, LookupResolverConfig, NetworkPreset, OutputListItem, OverlayLookupFacilitator,
+    Protocol, RequireAck, TopicBroadcaster, TopicBroadcasterConfig,
+};
 use bsv_rs::primitives::{PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{Beef, MerklePath, Transaction, TransactionInput, TransactionOutput};
-use bsv_rs::Error;
+use bsv_rs::{Error, Result};
 
 const FAN: usize = 120;
 const OUTPUT_BYTES: usize = 2 * 1024;
@@ -58,9 +68,10 @@ fn hostile_answer_with_token(token: LockingScript) -> Vec<u8> {
         spend.unlocking_script = Some(UnlockingScript::new());
         subject.inputs_mut().push(spend);
     }
-    subject
-        .outputs_mut()
-        .push(TransactionOutput::new(1_000, token));
+    // Exactly 1 satoshi: this line's overlay doors admit an advertisement output
+    // only at 1 sat (#786), so the token must sit there for the behavioural
+    // guards to read it (the boundary pins read the script regardless of value).
+    subject.outputs_mut().push(TransactionOutput::new(1, token));
     beef.merge_raw_tx(subject.to_binary(), None).unwrap();
     beef.to_binary().unwrap()
 }
@@ -202,4 +213,169 @@ fn the_registry_door_links_nothing_on_a_hostile_answer() {
     let back = bsv_rs::registry::BasketDefinitionData::from_pushdrop_fields(&pd.fields)
         .expect("the basket definition reads back from the subject output");
     assert_eq!(back.basket_id, "basket749");
+}
+
+// ============================================================================
+// BEHAVIOURAL guards (fold3 ruling 1): beside the parser-boundary pins above, a
+// test that drives the REAL door end to end through a mock facilitator — RED if
+// the production door reverts to `from_beef` (the hostile answer is then refused
+// before its output is read, so the host never surfaces). The mock facilitator +
+// host-override harness is the crate's own hermetic injection point (as
+// `overlay_mock_tests.rs`).
+//
+// SCOPE on this line: the resolver and topic-discovery doors read a SLAP/SHIP
+// admin token, for which `create_signed_overlay_admin_token` is a public writer,
+// so those two gain behavioural guards here. The kvstore, storage and registry
+// doors validate a full #544 signed envelope (canonical protocol JSON, a
+// controller-linked locking key, a controller/operator signature, a bound file
+// hash) whose only writer is the reference writer / conformance vectors — a token
+// hand-built in a test is refused by design, so a behavioural guard cannot
+// surface an entry. Those three keep the parser-boundary pin here (the door's
+// parser choice is what #749 changed), and their end-to-end behavioural coverage
+// is on the stable line, where the doors do not run the #544 envelope validators.
+// ============================================================================
+
+/// A mock lookup facilitator returning canned answers keyed by URL.
+struct MockLookupFacilitator {
+    responses: RwLock<HashMap<String, LookupAnswer>>,
+    call_count: AtomicU32,
+}
+
+impl MockLookupFacilitator {
+    fn new() -> Self {
+        Self {
+            responses: RwLock::new(HashMap::new()),
+            call_count: AtomicU32::new(0),
+        }
+    }
+
+    async fn add_response(&self, url: &str, answer: LookupAnswer) {
+        self.responses.write().await.insert(url.to_string(), answer);
+    }
+}
+
+#[async_trait(?Send)]
+impl OverlayLookupFacilitator for MockLookupFacilitator {
+    async fn lookup(
+        &self,
+        url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        let responses = self.responses.read().await;
+        match responses.get(url) {
+            Some(answer) => Ok(answer.clone()),
+            None => Ok(LookupAnswer::empty_output_list()),
+        }
+    }
+}
+
+/// Confirms the fixture is one the LINKING door refuses but the subject door
+/// reads — so any door that keeps linking drops the answer.
+fn assert_fixture_discriminates(beef: &[u8]) {
+    assert!(
+        matches!(
+            Transaction::from_beef(beef, None),
+            Err(Error::BeefResourceLimit(_))
+        ),
+        "the fixture must trip the link bound so a linking door would drop it"
+    );
+    assert!(
+        Transaction::from_beef_subject(beef, None).is_ok(),
+        "the subject door parses the same answer without linking"
+    );
+}
+
+fn mock_resolver(
+    preset: NetworkPreset,
+    service: &str,
+    mock: Arc<MockLookupFacilitator>,
+) -> LookupResolver {
+    let mut host_overrides = HashMap::new();
+    host_overrides.insert(
+        service.to_string(),
+        vec!["http://mock-749-host:8080".to_string()],
+    );
+    LookupResolver::new(LookupResolverConfig {
+        network_preset: preset,
+        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
+        slap_trackers: Some(vec![]),
+        host_overrides: Some(host_overrides),
+        ..Default::default()
+    })
+}
+
+fn output_list_of(beef: Vec<u8>) -> LookupAnswer {
+    LookupAnswer::OutputList {
+        outputs: vec![OutputListItem {
+            beef,
+            output_index: 0,
+            context: None,
+            txid: None,
+        }],
+    }
+}
+
+#[tokio::test]
+async fn the_resolver_slap_door_links_nothing_behaviourally() {
+    let root = PrivateKey::random();
+    let service = "ls_resolverfold";
+    let token = create_signed_overlay_admin_token(
+        &root,
+        Protocol::Slap,
+        "https://host-749.example",
+        service,
+    );
+    let beef = hostile_answer_with_token(token);
+    assert_fixture_discriminates(&beef);
+
+    let mock = Arc::new(MockLookupFacilitator::new());
+    mock.add_response("http://slap-749-tracker:8080", output_list_of(beef))
+        .await;
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        network_preset: NetworkPreset::Mainnet,
+        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
+        slap_trackers: Some(vec!["http://slap-749-tracker:8080".to_string()]),
+        ..Default::default()
+    });
+
+    let hosts = resolver.find_competent_hosts(service).await.unwrap();
+    assert!(
+        hosts.contains(&"https://host-749.example".to_string()),
+        "the resolver surfaced the SLAP host from an answer a linking door drops: {hosts:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_topic_discovery_door_links_nothing_behaviourally() {
+    let root = PrivateKey::random();
+    let topic = "tm_topicfold";
+    let token =
+        create_signed_overlay_admin_token(&root, Protocol::Ship, "https://host-749.example", topic);
+    let beef = hostile_answer_with_token(token);
+    assert_fixture_discriminates(&beef);
+
+    let mock = Arc::new(MockLookupFacilitator::new());
+    mock.add_response("http://mock-749-host:8080", output_list_of(beef))
+        .await;
+    let resolver = Arc::new(mock_resolver(NetworkPreset::Mainnet, "ls_ship", mock));
+    let broadcaster = TopicBroadcaster::new(
+        vec![topic.to_string()],
+        TopicBroadcasterConfig {
+            network_preset: NetworkPreset::Mainnet,
+            facilitator: None,
+            resolver: Some(resolver),
+            require_ack_from_all_hosts: RequireAck::None,
+            require_ack_from_any_host: RequireAck::None,
+            require_ack_from_specific_hosts: HashMap::new(),
+        },
+    )
+    .unwrap();
+
+    let hosts = broadcaster.find_interested_hosts().await.unwrap();
+    assert!(
+        hosts.contains_key("https://host-749.example"),
+        "topic discovery surfaced the SHIP host from an answer a linking door drops: {hosts:?}"
+    );
 }
