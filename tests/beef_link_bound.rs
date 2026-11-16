@@ -24,7 +24,8 @@
 
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{
-    Beef, BeefLinkLimits, MerklePath, Transaction, TransactionInput, TransactionOutput,
+    Beef, BeefLinkBudget, BeefLinkLimits, MerklePath, Transaction, TransactionInput,
+    TransactionOutput,
 };
 use bsv_rs::Error;
 
@@ -67,9 +68,22 @@ fn shared_parent_beef(
     spends: usize,
     output_script: &LockingScript,
 ) -> (Vec<u8>, String) {
+    let (beef, child, _parent_wire) = shared_parent_beef_wire(outputs, spends, output_script);
+    (beef, child)
+}
+
+/// As [`shared_parent_beef`], also returning the parent's wire size — the exact
+/// bytes each repeat input re-materializes, so a shared-pool test can size the
+/// pool to hold precisely one link's worth and no more.
+fn shared_parent_beef_wire(
+    outputs: usize,
+    spends: usize,
+    output_script: &LockingScript,
+) -> (Vec<u8>, String, u64) {
     assert!(spends <= outputs);
     let parent = spend(&[("aa".repeat(32), 0)], outputs, output_script);
     let parent_txid = parent.id();
+    let parent_wire = parent.to_binary().len() as u64;
     let mut beef = Beef::new();
     let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&parent_txid, 800_000));
     beef.merge_raw_tx(parent.to_binary(), Some(bump));
@@ -79,7 +93,7 @@ fn shared_parent_beef(
     let child = spend(&outpoints, 1, &op_true());
     let child_txid = child.id();
     beef.merge_raw_tx(child.to_binary(), None);
-    (beef.to_binary(), child_txid)
+    (beef.to_binary(), child_txid, parent_wire)
 }
 
 /// How many of the subject's inputs linked to a source transaction.
@@ -212,4 +226,99 @@ fn the_resolver_subject_door_links_nothing_and_is_never_refused() {
         .expect("the subject door parses the same answer without linking");
     assert_eq!(subject.id(), child);
     assert_eq!(linked_inputs(&subject), 0, "the subject door links nothing");
+}
+
+#[test]
+fn the_default_per_link_budget_is_16_mib_with_headroom_above_any_honest_input() {
+    // Ruling 3 (fold2): the per-link default is 16 MiB, pinned exactly — one
+    // named constant, so a change that moves it turns this red.
+    assert_eq!(BeefLinkLimits::DEFAULT_MAX_LINK_BYTES, 16 * 1024 * 1024);
+    assert_eq!(
+        BeefLinkLimits::default().max_link_bytes,
+        Some(16 * 1024 * 1024)
+    );
+    // The headroom it leaves: the largest shared-parent fan any real dependent
+    // BEEF carries is 20, and the default admits a same-parent sweep far above
+    // that. A 500-output OP_TRUE consolidation (25× the largest real fan) links
+    // by default; a default low enough to refuse it would turn this red, so the
+    // single-link headroom cannot be quietly erased.
+    let (bytes, child) = shared_parent_beef(500, 500, &op_true());
+    let tx = Transaction::from_beef(&bytes, None)
+        .expect("the default leaves headroom for a 500-output honest sweep");
+    assert_eq!(tx.id(), child);
+    assert_eq!(linked_inputs(&tx), 500);
+}
+
+#[test]
+fn a_beef_link_budget_has_three_forms_per_link_shared_and_unbounded() {
+    // Ruling 2 (fold2): one value, three forms. The per-link form (the default)
+    // bounds each link on its own; the unbounded form lifts the bound; a hostile
+    // shape the per-link default refuses links when unbounded.
+    let (hostile, _child) = shared_parent_beef(160, 160, &filler_script(2 * 1024));
+    assert!(
+        matches!(
+            Transaction::from_beef_with_budget(&hostile, None, &BeefLinkBudget::per_link()),
+            Err(Error::BeefResourceLimit(_))
+        ),
+        "the per-link default refuses the hostile shared parent"
+    );
+    assert!(
+        Transaction::from_beef_with_budget(&hostile, None, &BeefLinkBudget::unbounded()).is_ok(),
+        "the unbounded form links the same answer"
+    );
+    // A caller that passes nothing keeps the per-link default: a plain from_beef
+    // and the per-link budget agree.
+    let (honest, child) = shared_parent_beef(2, 2, &op_true());
+    assert_eq!(
+        Transaction::from_beef_with_budget(&honest, None, &BeefLinkBudget::per_link())
+            .expect("per-link admits an honest shape")
+            .id(),
+        child
+    );
+    assert!(BeefLinkBudget::per_link().remaining().is_none());
+}
+
+#[test]
+fn a_shared_budget_caps_the_total_across_concurrent_links_and_refills_on_release() {
+    // Ruling 2 (fold2): k near-budget links drawing on ONE shared pool. Each
+    // link re-materializes `(spends - 1)` parent-wide stubs; the pool holds just
+    // over one such link, so the first fits, the second — which would overdraw
+    // it — is refused with the named resource error BEFORE it allocates, and the
+    // first's share returns to the pool when it is dropped, admitting the next.
+    let (bytes, subject, parent_wire) = shared_parent_beef_wire(20, 20, &filler_script(4 * 1024));
+    let one_link = parent_wire * 19; // 20 inputs: 1 full link + 19 metered repeats
+    assert!(
+        one_link < BeefLinkLimits::DEFAULT_MAX_LINK_BYTES,
+        "one link stays under the per-link cap the shared budget also enforces"
+    );
+    // Room for one link and no more (a second needs 19× the slack left over).
+    let pool = BeefLinkBudget::shared(one_link + parent_wire);
+
+    let first = Transaction::from_beef_with_budget(&bytes, None, &pool)
+        .expect("the first link fits the shared pool");
+    assert_eq!(first.id(), subject);
+    assert_eq!(
+        pool.remaining(),
+        Some(parent_wire),
+        "the pool drew down by one link"
+    );
+
+    let err = Transaction::from_beef_with_budget(&bytes, None, &pool)
+        .expect_err("a second concurrent link would overdraw the shared pool");
+    assert!(matches!(err, Error::BeefResourceLimit(_)), "not {err:?}");
+    assert_eq!(
+        pool.remaining(),
+        Some(parent_wire),
+        "the refused link returned its partial reservation; the pool is unchanged"
+    );
+
+    drop(first); // the first link is done: its share returns to the pool
+    assert_eq!(
+        pool.remaining(),
+        Some(one_link + parent_wire),
+        "dropping a linked transaction refills the shared pool by exactly its share"
+    );
+    let second = Transaction::from_beef_with_budget(&bytes, None, &pool)
+        .expect("after the first is dropped, the next link is admitted");
+    assert_eq!(second.id(), subject);
 }
