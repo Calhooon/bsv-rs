@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.11] - 2026-11-16
+
 ### Fixed: linking a BEEF holds one shared parent once per spending input, so an untrusted answer within a resolver's byte bound could force multi-gigabyte heap; a default link bound caps the re-materialization (#749)
 
 - What was wrong. `Beef::add_input_proof` (run by `Transaction::from_beef`, `from_atomic_beef` and `Beef::find_atomic_transaction`) links each distinct parent once and hands every **later** input that spends the same parent a clone of its stub — the parent without its ancestry but **with every output**. A child whose M inputs each spend one output of a single parent of N outputs therefore holds M copies of all N outputs: the cost grows with the **product** M×N, not the sum. The lookup resolver parses an overlay host's answer with `Transaction::from_beef` at intake, before its evidence bounds, and the only pre-parse bound is `LookupLimits::max_response_bytes` (32 MiB). Because the cost is quadratic in the answer's size, that byte bound sits far above the point where the heap demand exceeds a host's memory — an out-of-memory kill on a native host, an uncatchable abort on wasm32 (Cloudflare Workers, the production target), taking every in-flight request with it. Reachable through the resolver and every other door that parses a stranger's BEEF (identity, kvstore, registry, storage, topic-broadcaster discovery, `wallet_retry`). This violates rule 5 (every allocation bounded by the input). The 0.3.21 fix made linking *linear in the number of transactions*; it did not address a single parent of many outputs spent by many inputs, which stayed quadratic.
