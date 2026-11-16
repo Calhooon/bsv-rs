@@ -223,16 +223,20 @@ fn the_registry_door_links_nothing_on_a_hostile_answer() {
 // host-override harness is the crate's own hermetic injection point (as
 // `overlay_mock_tests.rs`).
 //
-// SCOPE on this line: the resolver and topic-discovery doors read a SLAP/SHIP
-// admin token, for which `create_signed_overlay_admin_token` is a public writer,
-// so those two gain behavioural guards here. The kvstore, storage and registry
-// doors validate a full #544 signed envelope (canonical protocol JSON, a
-// controller-linked locking key, a controller/operator signature, a bound file
-// hash) whose only writer is the reference writer / conformance vectors — a token
-// hand-built in a test is refused by design, so a behavioural guard cannot
-// surface an entry. Those three keep the parser-boundary pin here (the door's
-// parser choice is what #749 changed), and their end-to-end behavioural coverage
-// is on the stable line, where the doors do not run the #544 envelope validators.
+// SCOPE on this line (fold4 ruling 3): all FIVE doors now carry a behavioural
+// guard, beside the parser-boundary pins. The resolver and topic-discovery doors
+// read a SLAP/SHIP admin token (`create_signed_overlay_admin_token`, a public
+// writer). The kvstore, storage and registry doors verify a signature the
+// stable line's doors do not — but a token each ACCEPTS is reachable: the crate
+// signs a valid kvstore token itself (the wallet signer, counterparty Anyone —
+// the beta door's `verify_signature` chain is identical to the stable line's),
+// and the shared #544 conformance vector (`tests/vectors/token_envelope_544.json`,
+// the same tokens `registry_envelope_544.rs` and
+// `storage_advertisement_envelope_544.rs` drive those doors with) supplies an
+// accepted registry basket definition and an accepted UHRP advertisement. The
+// fold3 premise that "a hand-built token is refused, so no behavioural guard is
+// possible" was false for all three; each is driven end to end below, RED on a
+// revert to `from_beef`. The parser-boundary pins stay beside them.
 // ============================================================================
 
 /// A mock lookup facilitator returning canned answers keyed by URL.
@@ -377,5 +381,161 @@ async fn the_topic_discovery_door_links_nothing_behaviourally() {
     assert!(
         hosts.contains_key("https://host-749.example"),
         "topic discovery surfaced the SHIP host from an answer a linking door drops: {hosts:?}"
+    );
+}
+
+// ============================================================================
+// The three #543/#544 doors driven end to end (fold4 ruling 3)
+// ============================================================================
+
+/// The #544 conformance vector's locking script for `section`'s case `index`
+/// — the ACCEPTED tokens `registry_envelope_544.rs` /
+/// `storage_advertisement_envelope_544.rs` drive those same doors with.
+fn vector_value() -> serde_json::Value {
+    serde_json::from_str(include_str!("vectors/token_envelope_544.json")).unwrap()
+}
+
+fn vector_script(v: &serde_json::Value, section: &str, index: usize) -> LockingScript {
+    let hex = v[section]["cases"][index]["locking_script"]
+        .as_str()
+        .unwrap();
+    LockingScript::from_hex(hex).unwrap()
+}
+
+#[tokio::test]
+async fn the_kvstore_query_door_links_nothing_behaviourally() {
+    // Drive the REAL kvstore query door (`GlobalKVStore::get` -> `query_overlay`)
+    // end to end. The hostile answer carries a VALIDLY SIGNED kvstore token (the
+    // crate's own wallet signer, counterparty Anyone — this door's
+    // `KVStoreInterpreter::verify_signature` chain is identical to the stable
+    // line's) at its subject output; the door reads it via `from_beef_subject`
+    // and the entry surfaces. Reverting `global.rs`'s `query_overlay` to
+    // `from_beef` drops the whole answer (the amplifying ancestry is refused
+    // before the output is read) -> RED.
+    use bsv_rs::wallet::{
+        Counterparty, CreateSignatureArgs, KeyDeriver, ProtoWallet, Protocol, SecurityLevel,
+    };
+
+    // The token this line's door accepts, built exactly as the crate's own
+    // `tests/kvstore_global_tests.rs::create_signed_token` does: the protocol
+    // field is JSON `[1,"kvstore"]`, the signing key_id is the key, the lock key
+    // is the controller's key derived for the protocol/key/Anyone (what the
+    // door's `verify_signature` checks it is linked to), and the signature over
+    // the four data fields is appended last.
+    let controller = PrivateKey::random();
+    let controller_pub = controller.public_key();
+    let protocol_id = "kvstore";
+    let (key, value) = ("k", "v");
+    let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+    let mut fields = vec![
+        serde_json::to_vec(&(1, protocol_id)).unwrap(),
+        key.as_bytes().to_vec(),
+        value.as_bytes().to_vec(),
+        controller_pub.to_compressed().to_vec(),
+    ];
+    let sig = ProtoWallet::new(Some(controller.clone()))
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            protocol_id: protocol.clone(),
+            key_id: key.into(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    fields.push(sig);
+    let lock = KeyDeriver::new(Some(controller.clone()))
+        .derive_public_key(&protocol, key, &Counterparty::Anyone, true)
+        .unwrap();
+    let token = PushDrop::new(lock, fields).lock();
+
+    let beef = hostile_answer_with_token(token);
+    assert_fixture_discriminates(&beef);
+
+    let service = "ls_kvstore749";
+    let mock = Arc::new(MockLookupFacilitator::new());
+    mock.add_response("http://mock-749-host:8080", output_list_of(beef))
+        .await;
+    let resolver = mock_resolver(NetworkPreset::Local, service, mock);
+    let config = bsv_rs::kvstore::KVStoreConfig {
+        service_name: service.to_string(),
+        protocol_id: protocol_id.to_string(),
+        ..Default::default()
+    };
+    let store = bsv_rs::kvstore::GlobalKVStore::with_resolver(
+        ProtoWallet::new(None),
+        config,
+        NetworkPreset::Local,
+        resolver,
+    );
+
+    let entry =
+        store.get(key, None).await.unwrap().expect(
+            "the kvstore door surfaced the signed entry from an answer a linking door drops",
+        );
+    assert_eq!(entry.key, "k");
+    assert_eq!(entry.value, "v");
+}
+
+#[tokio::test]
+async fn the_registry_door_links_nothing_behaviourally() {
+    // Drive the REAL registry basket door (`RegistryClient::resolve_basket` ->
+    // `parse_basket_from_output` -> `token::data_fields`, the #543 operator-
+    // signature validator) end to end with the #544 vector's ACCEPTED basket
+    // definition (case 0, outcome "resolved"). Revert to `from_beef` -> the
+    // hostile ancestry is refused before the output is read -> RED.
+    let v = vector_value();
+    let token = vector_script(&v, "registry", 0);
+    let beef = hostile_answer_with_token(token);
+    assert_fixture_discriminates(&beef);
+
+    let mock = Arc::new(MockLookupFacilitator::new());
+    mock.add_response("http://mock-749-host:8080", output_list_of(beef))
+        .await;
+    let resolver = Arc::new(mock_resolver(NetworkPreset::Local, "ls_basketmap", mock));
+    let client = bsv_rs::registry::RegistryClient::new(
+        bsv_rs::wallet::ProtoWallet::new(None),
+        bsv_rs::registry::RegistryClientConfig::new().with_resolver(resolver),
+    );
+
+    let found = client
+        .resolve_basket(bsv_rs::registry::BasketQuery::default())
+        .await
+        .unwrap();
+    assert!(
+        !found.is_empty(),
+        "the registry door surfaced the signed basket definition from an answer a linking door \
+         drops: {found:?}"
+    );
+}
+
+#[tokio::test]
+async fn the_storage_downloader_door_links_nothing_behaviourally() {
+    // Drive the REAL storage downloader door (`StorageDownloader::resolve` ->
+    // `advertisement::decode_and_verify`, the #544 host-signature + hash + expiry
+    // validator) end to end with the #544 vector's ACCEPTED advertisement (case
+    // 0) and the vector's own uhrp_url, so the hash binds and the expiry holds.
+    // Revert to `from_beef` -> RED.
+    let v = vector_value();
+    let uhrp_url = v["storage"]["uhrp_url"].as_str().unwrap().to_string();
+    let token = vector_script(&v, "storage", 0);
+    let beef = hostile_answer_with_token(token);
+    assert_fixture_discriminates(&beef);
+
+    let mock = Arc::new(MockLookupFacilitator::new());
+    mock.add_response("http://mock-749-host:8080", output_list_of(beef))
+        .await;
+    let resolver = Arc::new(mock_resolver(NetworkPreset::Local, "ls_uhrp", mock));
+    let downloader =
+        bsv_rs::storage::StorageDownloader::new(bsv_rs::storage::StorageDownloaderConfig {
+            network_preset: NetworkPreset::Local,
+            resolver: Some(resolver),
+            timeout_ms: Some(5_000),
+        });
+
+    let hosts = downloader.resolve(&uhrp_url).await.unwrap();
+    assert!(
+        !hosts.is_empty(),
+        "the storage door surfaced the UHRP host from an answer a linking door drops: {hosts:?}"
     );
 }
