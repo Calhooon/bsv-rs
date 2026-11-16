@@ -172,6 +172,16 @@ pub enum Error {
     #[error("BEEF error: {0}")]
     BeefError(String),
 
+    /// BEEF linking would re-materialize more heap than the configured budget
+    /// allows — a shared parent spent by many inputs (bsv-rs #749). A RESOURCE
+    /// decline of its own class, never read as an invalid or an absent BEEF: a
+    /// door that returns `Result` surfaces this, so a caller tells a refusal
+    /// apart from a malformed answer (`BeefError`) and from a missing txid. The
+    /// bound is lifted with [`BeefLinkLimits::unbounded`](crate::transaction::BeefLinkLimits::unbounded).
+    #[cfg(feature = "transaction")]
+    #[error("BEEF link resource limit: {0}")]
+    BeefResourceLimit(String),
+
     /// Fee model error.
     #[cfg(feature = "transaction")]
     #[error("fee model error: {0}")]
