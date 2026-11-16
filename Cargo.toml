@@ -117,6 +117,14 @@ dbg_macro = "deny"
 criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros", "net"] }
 memory-stats = "1.2"
+# `dhat` as a plain dev-dep (the crate already depends on it, optionally, for the
+# `dhat-profiling` feature) arms a counting global allocator for the #749
+# refuse-before-the-allocation order test (`tests/beef_link_refuse_order.rs`),
+# which the normal gate runs WITHOUT the `dhat-profiling` feature. The crate
+# forbids `unsafe_code`, so the test cannot roll its own allocator; `dhat::Alloc`
+# is the established pattern (the beta line's `script_budget_before_allocation`
+# uses it too). This adds no new crate to the dependency graph.
+dhat = "0.3"
 wiremock = "=0.6.2"
 
 [dependencies.dhat]

@@ -206,12 +206,12 @@ async fn the_resolver_slap_door_links_nothing_on_a_hostile_answer() {
 #[test]
 fn the_kvstore_door_links_nothing_on_a_hostile_answer() {
     // The kvstore query door reads only `tx.outputs[i].locking_script` and now
-    // parses via `from_beef_subject`. Surfacing a kvstore entry past the door
-    // needs a cryptographic signature the mock wallet cannot make, so this pins
-    // the door at its parser boundary: the token the door reads survives at the
-    // subject output of an answer the linking door refuses. The signature path
-    // the door runs after the read is identical whether or not it linked, so
-    // the parser choice is the whole of the #749 behaviour here.
+    // parses via `from_beef_subject`. This pins the door at its parser boundary:
+    // the token the door reads survives at the subject output of an answer the
+    // linking door refuses. (On the standalone fix line a behavioural guard
+    // drives the real door end to end, but this release's kvstore door validates
+    // a full #544 signed envelope no hand-built token satisfies, so the carry
+    // keeps the boundary pin here — fold3 ruling 1.)
     let controller = bsv_rs::wallet::ProtoWallet::new(None).identity_key();
     let token = kvstore_token("kvstore", "k", "v", &controller);
     let beef = hostile_answer_with_token(token);
