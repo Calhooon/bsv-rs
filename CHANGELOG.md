@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.12] - 2026-11-17
+
 ### Fixed: a second, heap bound on linking, beside the wire bound, closes the heap-held sibling of GHSA-gvmh-f5gf-5vjj (bsv-rs #749 fold-c)
 
 - **What was red.** `a_many_output_sweep_whose_heap_passes_the_budget_is_refused_under_the_default_749c` (`tests/beef_link_heap_749c.rs`) and `the_default_bounds_the_heap_held_linking_a_wide_fan_in_749c` (`tests/beef_link_heap_budget_749c.rs`, a `dhat::Alloc` heap measure). The #749 bound (and its proof fold) metered the WIRE a shared parent re-materializes — `stub.to_binary().len()`. But a cloned stub holds far more HEAP than its wire bytes: the struct `Vec` backings of its inputs and outputs, and the proof's leaf structs (each BUMP leaf keeps its hash as a 64-character hex `String`). A one-byte-locked output is ~10 wire bytes yet ~150 heap bytes, so a child of a parent of N one-byte outputs spent M ways held ≈M·N·150 of heap while the wire meter saw ≈M·N·10 — the 16 MiB wire default LINKED, or declined only after holding, ~148–248 MB on a ~57 KB answer, past the 128 MB Worker isolate (a wasm32 abort). Reached through the overlay lookup resolver and every door that parses a stranger's BEEF.
