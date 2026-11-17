@@ -1227,7 +1227,8 @@ mod tests {
 
     #[test]
     fn test_identity_client_config() {
-        let config = IdentityClientConfig::with_originator("test.com")
+        let config = IdentityClientConfig::default()
+            .with_originator("test.com")
             .with_network(crate::overlay::NetworkPreset::Testnet)
             .with_token_amount(10);
 
@@ -1687,7 +1688,8 @@ mod tests {
 
     #[test]
     fn test_identity_client_config_builder_methods() {
-        let config = IdentityClientConfig::with_originator("test-app.example.com")
+        let config = IdentityClientConfig::default()
+            .with_originator("test-app.example.com")
             .with_network(crate::overlay::NetworkPreset::Testnet)
             .with_token_amount(5);
 

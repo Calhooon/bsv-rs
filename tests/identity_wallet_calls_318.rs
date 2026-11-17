@@ -113,7 +113,7 @@ fn vector() -> Vector {
 
 fn config(w: &Witness) -> IdentityClientConfig {
     match &w.configured_originator {
-        Some(o) => IdentityClientConfig::with_originator(o.clone()),
+        Some(o) => IdentityClientConfig::default().with_originator(o.clone()),
         None => IdentityClientConfig::default(),
     }
 }

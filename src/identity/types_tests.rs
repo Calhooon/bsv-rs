@@ -195,7 +195,8 @@ fn test_identity_client_config_default() {
 
 #[test]
 fn test_identity_client_config_builder() {
-    let config = IdentityClientConfig::with_originator("myapp.com")
+    let config = IdentityClientConfig::default()
+        .with_originator("myapp.com")
         .with_network(NetworkPreset::Testnet)
         .with_token_amount(100);
 

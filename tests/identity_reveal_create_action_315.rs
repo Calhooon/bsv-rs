@@ -51,7 +51,7 @@ fn vector() -> Vector {
 /// originator `identity-client` (`new IdentityClient(wallet, {},
 /// 'identity-client')`); this crate sends none by default since #318.
 fn config() -> IdentityClientConfig {
-    IdentityClientConfig::with_originator("identity-client")
+    IdentityClientConfig::default().with_originator("identity-client")
 }
 
 /// The subject's wallet (key 9) revealing the witness's names; the

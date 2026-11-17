@@ -279,9 +279,10 @@ mod identity {
     async fn the_identity_client_passes_none_unless_an_originator_is_configured() {
         let default = identity_client(IdentityClientConfig::default()).await;
         assert_eq!(default, ("get_public_key", None));
-        let named = identity_client(IdentityClientConfig::with_originator("app.example")).await;
+        let named =
+            identity_client(IdentityClientConfig::default().with_originator("app.example")).await;
         assert_eq!(named.1.as_deref(), Some("app.example"));
-        let empty = identity_client(IdentityClientConfig::with_originator("")).await;
+        let empty = identity_client(IdentityClientConfig::default().with_originator("")).await;
         assert_eq!(empty.1.as_deref(), Some(""));
     }
 
@@ -296,7 +297,7 @@ mod identity {
     #[tokio::test]
     async fn the_contacts_manager_passes_none_unless_an_originator_is_configured() {
         assert_eq!(contacts(ContactsManagerConfig::default()).await, None);
-        let named = contacts(ContactsManagerConfig::with_originator("app.example")).await;
+        let named = contacts(ContactsManagerConfig::default().with_originator("app.example")).await;
         assert_eq!(named.as_deref(), Some("app.example"));
     }
 }

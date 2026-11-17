@@ -679,12 +679,12 @@ impl IdentityClientConfig {
 }
 
 impl IdentityClientConfig {
-    /// Create a new configuration with the given originator.
-    pub fn with_originator(originator: impl Into<String>) -> Self {
-        Self {
-            originator: Some(originator.into()),
-            ..Default::default()
-        }
+    /// Sets `originator` (`IdentityClientConfig::default().with_originator(..)`
+    /// for the construction this function gave before 0.9.0).
+    #[must_use]
+    pub fn with_originator(mut self, originator: impl Into<String>) -> Self {
+        self.originator = Some(originator.into());
+        self
     }
 
     /// Set the network preset.
@@ -763,12 +763,12 @@ impl ContactsManagerConfig {
 }
 
 impl ContactsManagerConfig {
-    /// Create a new configuration with the given originator.
-    pub fn with_originator(originator: impl Into<String>) -> Self {
-        Self {
-            originator: Some(originator.into()),
-            ..Default::default()
-        }
+    /// Sets `originator` (`ContactsManagerConfig::default().with_originator(..)`
+    /// for the construction this function gave before 0.9.0).
+    #[must_use]
+    pub fn with_originator(mut self, originator: impl Into<String>) -> Self {
+        self.originator = Some(originator.into());
+        self
     }
 }
 

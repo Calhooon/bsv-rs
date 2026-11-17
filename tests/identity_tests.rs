@@ -474,7 +474,7 @@ fn test_identity_client_config_default() {
 
 #[test]
 fn test_identity_client_config_with_originator() {
-    let config = IdentityClientConfig::with_originator("myapp.example.com");
+    let config = IdentityClientConfig::default().with_originator("myapp.example.com");
 
     assert_eq!(config.originator, Some("myapp.example.com".to_string()));
     assert_eq!(config.network_preset, NetworkPreset::Mainnet);
@@ -483,8 +483,9 @@ fn test_identity_client_config_with_originator() {
 
 #[test]
 fn test_identity_client_config_with_network() {
-    let config =
-        IdentityClientConfig::with_originator("myapp.com").with_network(NetworkPreset::Testnet);
+    let config = IdentityClientConfig::default()
+        .with_originator("myapp.com")
+        .with_network(NetworkPreset::Testnet);
 
     assert_eq!(config.network_preset, NetworkPreset::Testnet);
     assert_eq!(config.originator, Some("myapp.com".to_string()));
@@ -492,14 +493,17 @@ fn test_identity_client_config_with_network() {
 
 #[test]
 fn test_identity_client_config_with_token_amount() {
-    let config = IdentityClientConfig::with_originator("myapp.com").with_token_amount(100);
+    let config = IdentityClientConfig::default()
+        .with_originator("myapp.com")
+        .with_token_amount(100);
 
     assert_eq!(config.token_amount, 100);
 }
 
 #[test]
 fn test_identity_client_config_builder_chaining() {
-    let config = IdentityClientConfig::with_originator("myapp.com")
+    let config = IdentityClientConfig::default()
+        .with_originator("myapp.com")
         .with_network(NetworkPreset::Testnet)
         .with_token_amount(500);
 
@@ -523,7 +527,7 @@ fn test_contacts_manager_config_default() {
 
 #[test]
 fn test_contacts_manager_config_with_originator() {
-    let config = ContactsManagerConfig::with_originator("myapp.example.com");
+    let config = ContactsManagerConfig::default().with_originator("myapp.example.com");
 
     assert_eq!(config.originator, Some("myapp.example.com".to_string()));
     assert_eq!(config.protocol_id, (2, "contact".to_string()));
@@ -1020,7 +1024,8 @@ mod identity_client_tests {
 
     #[test]
     fn test_identity_client_config_builder() {
-        let config = IdentityClientConfig::with_originator("test-app.example.com")
+        let config = IdentityClientConfig::default()
+            .with_originator("test-app.example.com")
             .with_network(NetworkPreset::Testnet)
             .with_token_amount(5);
 
