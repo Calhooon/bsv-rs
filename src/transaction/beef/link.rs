@@ -13,6 +13,12 @@
 //! BEFORE the clone that would cross it. The full links (one per distinct
 //! parent) are the BEEF's own bytes and are not counted; only the repeats, the
 //! bytes materialized beyond the answer's own, are.
+//!
+//! The meter also charges the proof (`MerklePath`) cloned into every proven
+//! transaction and every stub (bsv-rs #749 fold): a transaction's `to_binary`
+//! leaves the attached path out, so a BEEF of K parents sharing one K-leaf BUMP
+//! would otherwise hold ~2K deep copies of that O(K) path, uncounted — the DoS
+//! sibling of the shared-parent output amplification. See [`bump_bytes`].
 
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -99,13 +105,15 @@ impl BeefLinkLimits {
     /// 128 KiB answer re-materializing ~1.69 GB) and far above every honest
     /// BEEF: the largest shared-parent fan any real dependent's BEEF carries is
     /// 20, and the default admits an honest single child sweeping many outputs
-    /// of one parent — up to 702 plain-payment (P2PKH) outputs, 251
+    /// of one parent — up to 701 plain-payment (P2PKH) outputs, 250
     /// data-carrying outputs of 256 B, or 127 of 1 KiB, before one such sweep is
-    /// refused (at 32 MiB: 993 / 354 / 180). There is no single "general"
+    /// refused (at 32 MiB: 992 / 354 / 180). There is no single "general"
     /// figure: the onset falls as the output grows, so the reach is stated per
     /// output size. The default refuses no honest input while leaving generous
     /// single-link headroom above anything a wallet or the overlay engine
-    /// builds. Raising it erases that headroom; the headroom pin in
+    /// builds (the figures fell by one output — 702→701, 251→250, 993→992 — when
+    /// the #749 fold began charging the proof a stub carries too). Raising it
+    /// erases that headroom; the headroom pin in
     /// `tests/beef_link_bound.rs`, which fixes those per-output-size cells, turns
     /// red if this value moves.
     pub const DEFAULT_MAX_LINK_BYTES: u64 = 16 * 1024 * 1024;
@@ -350,6 +358,20 @@ fn per_link_limit_error(budget: u64) -> crate::Error {
     ))
 }
 
+/// The wire-byte weight of a BUMP — the heap each clone of it re-materializes.
+///
+/// Linking clones the proof (`MerklePath`) into every proven transaction it
+/// links and into every stub a repeat input spends, but [`Transaction`]'s
+/// `to_binary` serializes only its four fields, never the attached path, so the
+/// stub byte-meter did not weigh the BUMP: a BEEF of K parents sharing one
+/// K-leaf BUMP holds ~2K copies of that O(K) path, uncounted, the DoS sibling
+/// of the shared-parent output amplification (bsv-rs #749 fold). Charging this
+/// weight at each BUMP clone brings the proof under the same [`BeefLinkLimits`]
+/// bound.
+fn bump_bytes(mp: &MerklePath) -> u64 {
+    mp.to_binary().len() as u64
+}
+
 /// A transaction linked under a [`BeefLinkBudget`], holding its claim on the
 /// budget's shared pool (when it has one) until it is dropped.
 ///
@@ -575,9 +597,14 @@ impl Beef {
 
         // Attach a transaction's own proof; a proven transaction is not
         // descended (its frame starts with no input left to link).
-        let enter = |mut tx: Transaction| -> Frame {
+        let enter = |mut tx: Transaction, meter: &mut LinkMeter| -> Result<Frame> {
             if tx.merkle_path.is_none() {
                 if let Some(mp) = find_bump(&tx.id()) {
+                    // The BUMP is cloned into this proven transaction, one deep
+                    // copy per distinct proven txid; its bytes are
+                    // re-materialized heap the #749 bound must see, which the
+                    // stub byte-meter did not weigh (bsv-rs #749 fold).
+                    meter.charge(bump_bytes(mp))?;
                     tx.merkle_path = Some(mp.clone());
                 }
             }
@@ -586,14 +613,14 @@ impl Beef {
             } else {
                 0
             };
-            Frame { tx, next_input }
+            Ok(Frame { tx, next_input })
         };
 
         // Keyed by txid, the value being the stub handed to later inputs and
         // its wire-byte weight (computed once, the cost each repeat clone adds).
         // Presence also means "this txid has been linked in full once".
         let mut stubs: HashMap<String, (Transaction, u64)> = HashMap::new();
-        let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
+        let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx), meter)?];
 
         while let Some(top) = stack.last_mut() {
             if top.next_input == top.tx.inputs.len() {
@@ -639,10 +666,26 @@ impl Beef {
             // the honest DAG case the order makes no difference (a transaction
             // is never reachable from inside its own ancestry). Its wire size,
             // computed once here, is the byte weight each later repeat adds.
-            let stub = Self::bare_stub(&mut src, find_bump(&src_txid));
-            let stub_bytes = stub.to_binary().len() as u64;
+            let bump = find_bump(&src_txid);
+            // The stub carries a proof — the source's own path when it has one,
+            // else this BEEF's BUMP (as `bare_stub` attaches it) — which
+            // `to_binary` leaves out. That path is cloned into the map-held stub
+            // here and again into every repeat input that spends it,
+            // re-materialized heap the #749 bound must see. Charge it once for
+            // the map-held copy (refuse BEFORE the clone) and fold its bytes into
+            // `stub_bytes`, so each later repeat is charged the proof too
+            // (bsv-rs #749 fold).
+            let path_weight = src
+                .merkle_path
+                .as_ref()
+                .map(bump_bytes)
+                .or_else(|| bump.map(bump_bytes))
+                .unwrap_or(0);
+            meter.charge(path_weight)?;
+            let stub = Self::bare_stub(&mut src, bump);
+            let stub_bytes = stub.to_binary().len() as u64 + path_weight;
             stubs.insert(src_txid, (stub, stub_bytes));
-            stack.push(enter(src));
+            stack.push(enter(src, meter)?);
         }
         Ok(())
     }
