@@ -763,7 +763,7 @@ const DOC_PINS: [&str; 25] = [
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupLimits",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupRequestOptions",
     "src/script/not_judged.rs - script::not_judged::NotJudgedCause",
-    "src/transaction/beef/link.rs - transaction::beef::link::BeefLinkLimits",
+    "src/transaction/beef/link_limits.rs - transaction::beef::link_limits::BeefLinkLimits",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Kind",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Reason",
     "src/transaction/chain_tracker.rs - transaction::chain_tracker::ChainTrackerError",
