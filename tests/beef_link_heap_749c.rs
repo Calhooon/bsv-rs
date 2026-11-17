@@ -64,12 +64,13 @@ fn fanin_beef(n: u32, m: u32) -> (Vec<u8>, String) {
 
 #[test]
 fn a_many_output_sweep_whose_heap_passes_the_budget_is_refused_under_the_default_749c() {
-    // 600 outputs spent 600 ways: ~599 repeat clones. On the wire-only meter
-    // each repeat weighs ~6 KB, ~3.6 MB total — well under the 16 MiB default,
-    // so it LINKED while holding tens of MB of heap. Weighing the clone's heap
-    // (its output/input struct backings) crosses the budget, so the default now
-    // refuses it as a resource limit of its own class.
-    let (bytes, subject) = fanin_beef(600, 600);
+    // 700 outputs spent 700 ways: ~699 repeat clones. On the wire meter each
+    // repeat weighs ~7 KB, ~4.9 MB total — well under the 16 MiB wire default,
+    // so it LINKED while holding ~70 MB of heap. The new heap bound weighs the
+    // clone's heap (its output/input struct backings), ~72 MB here, crossing the
+    // 56 MiB default, so the default now refuses it as a resource limit of its
+    // own class — the shape the wire count alone did not catch.
+    let (bytes, subject) = fanin_beef(700, 700);
     let err = Transaction::from_beef(&bytes, Some(&subject))
         .expect_err("a 600-way sweep of one parent re-materializes past the default heap budget");
     assert!(

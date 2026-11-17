@@ -263,30 +263,77 @@ fn the_default_headroom_is_stated_per_output_size() {
     // change that eroded any of them turns this red. The link.rs doc, the
     // CHANGELOG, the advisory and the relay figures state the same numbers.
     //
-    // (output-script bytes, 16 MiB default onset, 32 MiB onset). 25 B is a
+    // (output-script bytes, default onset, 32 MiB-wire onset). 25 B is a
     // plain-payment (P2PKH) locking script's exact size; 256 B and 1 KiB are
-    // data-carrying outputs.
-    // The #749 fold-c meters the HEAP a repeat clone holds — the output and input
-    // struct `Vec` backings, and the proof's leaf structs — not its wire bytes
-    // alone, so the budget now bounds the heap the link re-materializes (it held
-    // ~248 MB on a ~57 KB answer before, past the 128 MB Worker isolate; ~18 MB
-    // now). A one-byte-locked output is ~10 wire bytes but ~150 heap bytes, so
-    // the onsets fell well below their wire-meter values (P2PKH 701→313, 992→443)
-    // — the honest reach is still ≥15× the largest shared-parent fan (20) any
-    // real dependent BEEF carries, but the heap a hostile answer can hold is now
-    // a small multiple of the budget, not hundreds of MB. These cells are
-    // measured by this crate's own writer and pinned EXACTLY; the link.rs doc,
-    // the CHANGELOG and the advisory state the same numbers.
-    let cells: &[(usize, usize, usize)] = &[(25, 313, 443), (256, 203, 288), (1024, 119, 169)];
-    for &(script_bytes, onset16, onset32) in cells {
+    // data-carrying outputs. The #749 fold-c splits the one bound in two: the
+    // published `max_link_bytes` keeps its exact WIRE meaning (it meters the stub
+    // `to_binary` length each repeat re-materializes, as 0.8.11 did — see
+    // `the_wire_onsets_are_the_published_0811_figures` below, which fixes
+    // 702 / 251 / 127 and 993 / 354 / 180 unchanged), and a NEW
+    // `max_link_heap_bytes` (default 56 MiB) bounds the HEAP a link holds — the
+    // output and input struct `Vec` backings, and the proof's leaf structs — the
+    // shape the wire count alone did not catch (a wide fan-in of tiny-locked
+    // outputs held hundreds of MB past the 128 MB isolate under a small wire
+    // count). With both default bounds active, the data-carrying onsets (251,
+    // 127; 354, 180 at 32 MiB wire) are WIRE-bound and unchanged, and only the
+    // plain-payment onset — the lowest heap density, so the highest wire reach —
+    // is capped by the heap bound (702 → 586; the memory a 586-output sweep holds
+    // is the 56 MiB envelope). No real dependent builds a sweep this wide (the
+    // largest shared-parent fan any dependent BEEF carries is 20). These cells
+    // are measured by this crate's own writer and pinned EXACTLY; the link.rs
+    // doc, the CHANGELOG and the advisory state the same numbers.
+    let cells: &[(usize, usize, usize)] = &[(25, 586, 586), (256, 251, 354), (1024, 127, 180)];
+    for &(script_bytes, onset_default, onset32) in cells {
         let script = filler_script(script_bytes);
-        // The shipped default (16 MiB) admits exactly `onset16` and refuses one
-        // more.
-        assert_onset(&script, None, onset16);
-        // An explicit 32 MiB budget admits exactly `onset32` and refuses one
-        // more — the other column of the owner's 16-vs-32 table.
+        // The shipped default (16 MiB wire + 56 MiB heap) admits exactly
+        // `onset_default` and refuses one more.
+        assert_onset(&script, None, onset_default);
+        // An explicit 32 MiB WIRE budget (heap at its default) admits exactly
+        // `onset32` and refuses one more.
         assert_onset(&script, Some(32 * 1024 * 1024), onset32);
     }
+}
+
+#[test]
+fn the_wire_onsets_are_the_published_0811_figures() {
+    // The #749 fold-c keeps `max_link_bytes` metering WIRE bytes exactly as
+    // 0.8.11 did, so a caller that set it to cap an answer's reach by wire size
+    // keeps that exact meaning (and no onset the published record states moves on
+    // the wire axis). Isolate the wire bound by lifting the heap bound, and the
+    // onsets are the published 0.8.11 figures to the output: 702 / 251 / 127 at
+    // the 16 MiB default, 993 / 354 / 180 at 32 MiB. These turn red if the wire
+    // meter is ever changed from what 0.8.11 counted.
+    let cells: &[(usize, usize, usize)] = &[(25, 702, 993), (256, 251, 354), (1024, 127, 180)];
+    for &(script_bytes, onset16, onset32) in cells {
+        let script = filler_script(script_bytes);
+        let wire_only = |wire: u64| {
+            BeefLinkLimits::default()
+                .with_max_link_bytes(Some(wire))
+                .with_max_link_heap_bytes(None)
+        };
+        assert_onset_with(&script, &wire_only(16 * 1024 * 1024), onset16);
+        assert_onset_with(&script, &wire_only(32 * 1024 * 1024), onset32);
+    }
+}
+
+#[test]
+fn the_default_heap_bound_is_56_mib_and_additive() {
+    // The new heap bound: a named constant, pinned exactly (a move turns this
+    // red), present on the default and lifted by `unbounded`.
+    assert_eq!(
+        BeefLinkLimits::DEFAULT_MAX_LINK_HEAP_BYTES,
+        56 * 1024 * 1024
+    );
+    assert_eq!(
+        BeefLinkLimits::default().max_link_heap_bytes,
+        Some(56 * 1024 * 1024)
+    );
+    assert_eq!(BeefLinkLimits::unbounded().max_link_heap_bytes, None);
+    // The wire bound is untouched by the heap setter and vice versa.
+    let only_heap = BeefLinkLimits::default().with_max_link_heap_bytes(Some(1));
+    assert_eq!(only_heap.max_link_bytes, Some(16 * 1024 * 1024));
+    let only_wire = BeefLinkLimits::default().with_max_link_bytes(Some(1));
+    assert_eq!(only_wire.max_link_heap_bytes, Some(56 * 1024 * 1024));
 }
 
 /// Asserts the largest same-parent sweep that links is exactly `onset`: the
@@ -307,6 +354,29 @@ fn assert_onset(script: &LockingScript, budget: Option<u64>, onset: usize) {
     };
     let tx = link(onset)
         .unwrap_or_else(|e| panic!("the default admits an {onset}-output honest sweep, got {e:?}"));
+    assert_eq!(
+        linked_inputs(&tx),
+        onset,
+        "every swept output of the onset linked"
+    );
+    let err = link(onset + 1).expect_err("one output past the onset is refused");
+    assert!(
+        matches!(err, Error::BeefResourceLimit(_)),
+        "the refusal past the onset is a resource limit, not {err:?}"
+    );
+}
+
+/// As [`assert_onset`], but under an explicit [`BeefLinkLimits`] (both bounds),
+/// so a caller can isolate the wire bound by lifting the heap bound.
+fn assert_onset_with(script: &LockingScript, limits: &BeefLinkLimits, onset: usize) {
+    let link = |n: usize| -> Result<Transaction, Error> {
+        let (bytes, child) = shared_parent_beef(n, n, script);
+        let tx = Transaction::from_beef_with_limits(&bytes, None, limits)?;
+        assert_eq!(tx.id(), child, "the linked subject is the child");
+        Ok(tx)
+    };
+    let tx = link(onset)
+        .unwrap_or_else(|e| panic!("the limits admit an {onset}-output honest sweep, got {e:?}"));
     assert_eq!(
         linked_inputs(&tx),
         onset,

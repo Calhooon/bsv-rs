@@ -164,9 +164,12 @@ impl Beef {
 
     /// Finds a transaction and populates its input source transactions from this BEEF.
     pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction> {
+        // On the 0.8.x line this convenience clones the found transaction
+        // WITHOUT linking its inputs' source transactions (the #603 source
+        // linking is the 0.9 line's), so the #749 fold-c signing-door
+        // re-materialization (row 6) is not reachable here — nothing to meter.
         let beef_tx = self.find_txid(txid)?;
         let tx = beef_tx.tx()?.clone();
-        // Would need to populate source transactions - simplified for now
         Some(tx)
     }
 
