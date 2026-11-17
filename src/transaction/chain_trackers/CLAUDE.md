@@ -194,11 +194,11 @@ let tracker = BlockHeadersServiceTracker::default();
 let tracker = BlockHeadersServiceTracker::with_url("https://custom.headers.com");
 
 // Or with full configuration (including auth token)
-let config = BlockHeadersServiceConfig {
-    base_url: DEFAULT_HEADERS_URL.to_string(),
-    auth_token: Some("my-api-token".to_string()),
-    timeout_ms: 60_000,  // 60 second timeout
-};
+// `#[non_exhaustive]` since #843d8c: `default()` and a setter per field
+let config = BlockHeadersServiceConfig::default()
+    .with_base_url(DEFAULT_HEADERS_URL.to_string())
+    .with_auth_token(Some("my-api-token".to_string()))
+    .with_timeout_ms(60_000); // 60 second timeout
 let tracker = BlockHeadersServiceTracker::with_config(config);
 
 // Verify a merkle root

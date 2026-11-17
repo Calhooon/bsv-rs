@@ -12,7 +12,8 @@ This module provides Time-based One-Time Password (TOTP) functionality following
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | ~42 | Module root with documentation and re-exports |
-| `core.rs` | ~934 | Core TOTP implementation with extensive tests |
+| `core.rs` | ~859 | Core TOTP implementation with extensive tests |
+| `options.rs` | ~158 | `TotpOptions` and `TotpValidateOptions`, moved from `core.rs` by #843d8c for its line ceiling: both `#[non_exhaustive]`, built from `default()` and a `with_<field>` setter per field (`with_digits`, `with_algorithm`, `with_period`, `with_timestamp`; `with_options`, `with_skew`), the fields `pub`; a struct literal outside the crate does not compile (each one's `compile_fail,E0639` doc block) |
 
 ## Key Exports
 
@@ -79,11 +80,9 @@ use bsv_rs::totp::{Totp, TotpOptions, Algorithm};
 let secret = b"12345678901234567890123456789012"; // Longer secret for SHA-256
 
 // SHA-256 with 8 digits
-let options = TotpOptions {
-    digits: 8,
-    algorithm: Algorithm::Sha256,
-    ..Default::default()
-};
+let options = TotpOptions::default()
+    .with_digits(8)
+    .with_algorithm(Algorithm::Sha256);
 let code = Totp::generate(secret, Some(options));
 assert_eq!(code.len(), 8);
 ```
@@ -96,11 +95,9 @@ use bsv_rs::totp::{Totp, TotpOptions};
 let secret = b"12345678901234567890";
 
 // RFC 6238 test vector at time=59 seconds
-let options = TotpOptions {
-    digits: 8,
-    timestamp: Some(59),
-    ..Default::default()
-};
+let options = TotpOptions::default()
+    .with_digits(8)
+    .with_timestamp(Some(59));
 let code = Totp::generate(secret, Some(options));
 assert_eq!(code, "94287082");
 ```
@@ -114,10 +111,9 @@ let secret = b"12345678901234567890";
 let code = Totp::generate(secret, None);
 
 // Accept codes from 2 periods before/after (60 seconds of drift)
-let validate_options = TotpValidateOptions {
-    options: TotpOptions::default(),
-    skew: 2,
-};
+let validate_options = TotpValidateOptions::default()
+    .with_options(TotpOptions::default())
+    .with_skew(2);
 assert!(Totp::validate(secret, &code, Some(validate_options)));
 ```
 

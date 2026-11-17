@@ -15,7 +15,8 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | 123 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | 787 |
+| `types.rs` | Core types (Config, Entry, Token, Query, KvProtocolFields, TTL encoding); `KVStoreConfig` `#[non_exhaustive]` since #843d8c (built by `new()`/`default()` and its six setters, as before) | 685 |
+| `options.rs` | `KVStoreGetOptions`, `KVStoreSetOptions`, `KVStoreRemoveOptions`, moved from `types.rs` by #843d8c for its line ceiling and re-exported there; each `#[non_exhaustive]`, built by `new()`/`default()` and the setters it had | 179 |
 | `local.rs` | LocalKVStore with single-attempt mutations; tests in local_tests.rs | 538 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building; `set` refuses an empty value (`KvStoreInvalidValue`), and a key, value or tags its reader would refuse (`token_validation::writable`), before the wallet is asked | 634 |
 | `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | 50 / 177 / 204 |

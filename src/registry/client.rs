@@ -38,7 +38,23 @@ use std::sync::Arc;
 // =============================================================================
 
 /// Configuration for RegistryClient.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::registry::RegistryClientConfig) -> bsv_rs::registry::RegistryClientConfig {
+///     bsv_rs::registry::RegistryClientConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::registry::RegistryClientConfig) -> bsv_rs::registry::RegistryClientConfig {
+///     value
+/// }
+/// ```
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct RegistryClientConfig {
     /// Network preset (Mainnet, Testnet, Local).
     pub network_preset: NetworkPreset,
@@ -49,6 +65,11 @@ pub struct RegistryClientConfig {
     /// Whether to accept delayed broadcast.
     pub accept_delayed_broadcast: bool,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    RegistryClientConfig,
+    bsv_rs::registry::RegistryClientConfig
+);
 
 impl Default for RegistryClientConfig {
     fn default() -> Self {

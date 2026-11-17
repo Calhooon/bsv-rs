@@ -1042,10 +1042,7 @@ async fn test_downloader_resolve_rejects_bad_checksum() {
 /// Test downloader configuration with custom timeout.
 #[tokio::test]
 async fn test_downloader_config_custom_timeout() {
-    let config = StorageDownloaderConfig {
-        timeout_ms: Some(5000),
-        ..Default::default()
-    };
+    let config = StorageDownloaderConfig::default().with_timeout_ms(Some(5000));
     let downloader = StorageDownloader::new(config);
 
     // Verify the downloader was created (no public timeout getter, but creation succeeds)
@@ -1055,10 +1052,7 @@ async fn test_downloader_config_custom_timeout() {
 /// Test downloader configuration with no timeout.
 #[tokio::test]
 async fn test_downloader_config_no_timeout() {
-    let config = StorageDownloaderConfig {
-        timeout_ms: None,
-        ..Default::default()
-    };
+    let config = StorageDownloaderConfig::default().with_timeout_ms(None);
     let downloader = StorageDownloader::new(config);
 
     // The downloader with no timeout should still be usable

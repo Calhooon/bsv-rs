@@ -614,11 +614,9 @@ fn an_arc_config_debug_prints_no_api_key() {
 fn a_teranode_config_debug_prints_no_api_key() {
     use bsv_rs::transaction::TeranodeConfig;
     let key = credential("teranode api key");
-    let config = TeranodeConfig {
-        url: "https://teranode.invalid".into(),
-        api_key: Some(key.clone()),
-        timeout_ms: 7,
-    };
+    let config = TeranodeConfig::new("https://teranode.invalid")
+        .with_api_key(Some(key.clone()))
+        .with_timeout_ms(7);
     assert_credential_hidden("TeranodeConfig", &config, &key);
     assert_eq!(
         format!("{config:?}"),
@@ -630,11 +628,9 @@ fn a_teranode_config_debug_prints_no_api_key() {
 fn a_whatsonchain_config_debug_prints_no_api_key() {
     use bsv_rs::transaction::WocBroadcastConfig;
     let key = credential("woc api key");
-    let config = WocBroadcastConfig {
-        api_key: Some(key.clone()),
-        base_url: Some("https://woc.invalid".into()),
-        ..WocBroadcastConfig::default()
-    };
+    let config = WocBroadcastConfig::default()
+        .with_api_key(Some(key.clone()))
+        .with_base_url(Some("https://woc.invalid".into()));
     assert_credential_hidden("WocBroadcastConfig", &config, &key);
     assert!(format!("{config:?}").contains("https://woc.invalid"));
 }
@@ -643,11 +639,9 @@ fn a_whatsonchain_config_debug_prints_no_api_key() {
 fn a_live_policy_config_debug_prints_no_api_key() {
     use bsv_rs::transaction::LivePolicyConfig;
     let key = credential("live policy api key");
-    let config = LivePolicyConfig {
-        policy_url: "https://policy.invalid/v1/policy".into(),
-        api_key: Some(key.clone()),
-        ..LivePolicyConfig::default()
-    };
+    let config = LivePolicyConfig::default()
+        .with_policy_url("https://policy.invalid/v1/policy".into())
+        .with_api_key(Some(key.clone()));
     assert_credential_hidden("LivePolicyConfig", &config, &key);
     assert!(format!("{config:?}").contains("cache_ttl: 300s"));
 }
@@ -656,10 +650,7 @@ fn a_live_policy_config_debug_prints_no_api_key() {
 fn a_block_headers_service_config_debug_prints_no_auth_token() {
     use bsv_rs::transaction::BlockHeadersServiceConfig;
     let token = credential("headers auth token");
-    let config = BlockHeadersServiceConfig {
-        auth_token: Some(token.clone()),
-        ..BlockHeadersServiceConfig::default()
-    };
+    let config = BlockHeadersServiceConfig::default().with_auth_token(Some(token.clone()));
     assert_credential_hidden("BlockHeadersServiceConfig", &config, &token);
     let none = format!("{:#?}", BlockHeadersServiceConfig::default());
     assert!(none.contains("auth_token: None"), "{none}");
@@ -823,37 +814,24 @@ fn the_service_configurations_print_no_credential_in_their_url() {
     };
     assert_url_hidden("ArcConfig", &arc, &secrets);
     let (url, secrets) = credential_url("teranode");
-    let teranode = TeranodeConfig {
-        url,
-        api_key: None,
-        timeout_ms: 7,
-    };
+    let teranode = TeranodeConfig::new(url)
+        .with_api_key(None)
+        .with_timeout_ms(7);
     assert_url_hidden("TeranodeConfig", &teranode, &secrets);
     let (url, secrets) = credential_url("woc");
-    let woc = WocBroadcastConfig {
-        base_url: Some(url),
-        ..WocBroadcastConfig::default()
-    };
+    let woc = WocBroadcastConfig::default().with_base_url(Some(url));
     assert_url_hidden("WocBroadcastConfig", &woc, &secrets);
     let (url, secrets) = credential_url("policy");
-    let policy = LivePolicyConfig {
-        policy_url: url,
-        ..LivePolicyConfig::default()
-    };
+    let policy = LivePolicyConfig::default().with_policy_url(url);
     assert_url_hidden("LivePolicyConfig", &policy, &secrets);
     let (url, secrets) = credential_url("headers");
-    let headers = BlockHeadersServiceConfig {
-        base_url: url,
-        ..BlockHeadersServiceConfig::default()
-    };
+    let headers = BlockHeadersServiceConfig::default().with_base_url(url);
     assert_url_hidden("BlockHeadersServiceConfig", &headers, &secrets);
     // Text that is no URL prints nothing of itself.
     let junk = credential("not a url");
-    let teranode = TeranodeConfig {
-        url: format!("{junk}@host"),
-        api_key: None,
-        timeout_ms: 7,
-    };
+    let teranode = TeranodeConfig::new(format!("{junk}@host"))
+        .with_api_key(None)
+        .with_timeout_ms(7);
     let out = format!("{teranode:?}");
     assert!(shared_window(&out, &junk).is_none(), "{out}");
     assert!(out.contains("url: <unparsed url>"), "{out}");

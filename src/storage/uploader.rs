@@ -13,13 +13,34 @@ use super::types::{UploadInfo, STATUS_ERROR};
 use super::utils::get_url_for_file;
 
 /// Configuration for StorageUploader.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::storage::StorageUploaderConfig) -> bsv_rs::storage::StorageUploaderConfig {
+///     bsv_rs::storage::StorageUploaderConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::storage::StorageUploaderConfig) -> bsv_rs::storage::StorageUploaderConfig {
+///     value
+/// }
+/// ```
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct StorageUploaderConfig {
     /// Base URL of the storage service.
     pub storage_url: String,
     /// Default retention period in minutes.
     pub default_retention_minutes: u32,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    StorageUploaderConfig,
+    bsv_rs::storage::StorageUploaderConfig
+);
 
 impl StorageUploaderConfig {
     /// Create a new uploader configuration.

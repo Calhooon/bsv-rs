@@ -33,7 +33,24 @@ use crate::transaction::{
 };
 
 /// Teranode broadcaster configuration.
-#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::TeranodeConfig) -> bsv_rs::transaction::TeranodeConfig {
+///     bsv_rs::transaction::TeranodeConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::TeranodeConfig) -> bsv_rs::transaction::TeranodeConfig {
+///     value
+/// }
+/// ```
+// Debug redacts the key (credential_debug.rs)
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct TeranodeConfig {
     /// Teranode API URL (no default - must be provided)
     pub url: String,
@@ -41,6 +58,35 @@ pub struct TeranodeConfig {
     pub api_key: Option<String>,
     /// Request timeout in milliseconds
     pub timeout_ms: u64,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(TeranodeConfig, bsv_rs::transaction::TeranodeConfig);
+
+impl TeranodeConfig {
+    /// A configuration for the Teranode API at `url`: no API key and a
+    /// timeout of 30,000 ms, [`TeranodeBroadcaster::new`]'s figure.
+    #[must_use]
+    pub fn new(url: impl Into<String>) -> Self {
+        Self {
+            url: url.into(),
+            api_key: None,
+            timeout_ms: 30_000,
+        }
+    }
+
+    /// Sets `api_key`.
+    #[must_use]
+    pub fn with_api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
+        self
+    }
+
+    /// Sets `timeout_ms`.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
 }
 
 /// Teranode broadcaster implementation.

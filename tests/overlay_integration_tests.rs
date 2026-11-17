@@ -547,15 +547,14 @@ fn test_host_reputation_tracker_ranking() {
 
 #[test]
 fn test_host_reputation_tracker_config() {
-    let config = ReputationConfig {
-        latency_smoothing: 0.5,
-        grace_failures: 3,
-        backoff_base_ms: 2000,
-        backoff_max_ms: 120_000,
-        default_latency_ms: 2000.0,
-        failure_penalty_ms: 500.0,
-        success_bonus_ms: 50.0,
-    };
+    let config = ReputationConfig::default()
+        .with_latency_smoothing(0.5)
+        .with_grace_failures(3)
+        .with_backoff_base_ms(2000)
+        .with_backoff_max_ms(120_000)
+        .with_default_latency_ms(2000.0)
+        .with_failure_penalty_ms(500.0)
+        .with_success_bonus_ms(50.0);
 
     let tracker = HostReputationTracker::with_config(config);
 

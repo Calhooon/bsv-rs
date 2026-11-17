@@ -456,11 +456,9 @@ async fn the_kvstore_query_door_links_nothing_behaviourally() {
     mock.add_response("http://mock-749-host:8080", output_list_of(beef))
         .await;
     let resolver = mock_resolver(NetworkPreset::Local, service, mock);
-    let config = bsv_rs::kvstore::KVStoreConfig {
-        service_name: service.to_string(),
-        protocol_id: protocol_id.to_string(),
-        ..Default::default()
-    };
+    let config = bsv_rs::kvstore::KVStoreConfig::new()
+        .with_service_name(service)
+        .with_protocol_id(protocol_id);
     let store = bsv_rs::kvstore::GlobalKVStore::with_resolver(
         ProtoWallet::new(None),
         config,
@@ -525,12 +523,12 @@ async fn the_storage_downloader_door_links_nothing_behaviourally() {
     mock.add_response("http://mock-749-host:8080", output_list_of(beef))
         .await;
     let resolver = Arc::new(mock_resolver(NetworkPreset::Local, "ls_uhrp", mock));
-    let downloader =
-        bsv_rs::storage::StorageDownloader::new(bsv_rs::storage::StorageDownloaderConfig {
-            network_preset: NetworkPreset::Local,
-            resolver: Some(resolver),
-            timeout_ms: Some(5_000),
-        });
+    let downloader = bsv_rs::storage::StorageDownloader::new(
+        bsv_rs::storage::StorageDownloaderConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_resolver(Some(resolver))
+            .with_timeout_ms(Some(5_000)),
+    );
 
     let hosts = downloader.resolve(&uhrp_url).await.unwrap();
     assert!(

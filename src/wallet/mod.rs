@@ -81,7 +81,7 @@
 //! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create with custom cache size
-//! let config = CacheConfig { max_size: 500 };
+//! let config = CacheConfig::default().with_max_size(500);
 //! let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), Some(config));
 //!
 //! // Use like KeyDeriver - results are cached automatically

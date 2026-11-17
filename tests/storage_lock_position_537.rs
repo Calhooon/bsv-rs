@@ -19,10 +19,10 @@ use serde_json::Value;
 
 /// The hosts the downloader resolves for the case's URL from `script`.
 async fn hosts(case: &Value, script: LockingScript) -> Vec<String> {
-    let downloader = StorageDownloader::new(StorageDownloaderConfig {
-        resolver: Some(lock_position::answering("ls_uhrp", script)),
-        ..Default::default()
-    });
+    let downloader = StorageDownloader::new(
+        StorageDownloaderConfig::default()
+            .with_resolver(Some(lock_position::answering("ls_uhrp", script))),
+    );
     downloader
         .resolve(case["uhrp_url"].as_str().unwrap())
         .await

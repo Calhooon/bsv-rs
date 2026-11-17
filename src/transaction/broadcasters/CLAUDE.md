@@ -324,11 +324,10 @@ match broadcaster.broadcast(&tx).await {
 ```rust
 use bsv_rs::transaction::{TeranodeBroadcaster, TeranodeConfig};
 
-let config = TeranodeConfig {
-    url: "https://teranode.example.com".to_string(),
-    api_key: Some("my-api-key".to_string()),
-    timeout_ms: 60_000,  // 60 second timeout
-};
+// `#[non_exhaustive]` since #843d8c: `new(url)` carries no key and 30,000 ms
+let config = TeranodeConfig::new("https://teranode.example.com")
+    .with_api_key(Some("my-api-key".to_string()))
+    .with_timeout_ms(60_000); // 60 second timeout
 
 let broadcaster = TeranodeBroadcaster::with_config(config);
 ```

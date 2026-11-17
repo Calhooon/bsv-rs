@@ -81,10 +81,7 @@ async fn written(value: &str) -> LockingScript {
 async fn an_empty_value_is_refused_before_the_wallet_is_asked() {
     for options in [
         None,
-        Some(KVStoreSetOptions {
-            tags: Some(vec!["a".into()]),
-            ..Default::default()
-        }),
+        Some(KVStoreSetOptions::new().with_tags(vec!["a".into()])),
     ] {
         let wallet = Counting::of_scalar(9);
         let result = store(&wallet).set("alpha", "", options).await;

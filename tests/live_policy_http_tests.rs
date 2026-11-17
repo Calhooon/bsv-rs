@@ -111,13 +111,12 @@ async fn test_live_policy_refresh_with_api_key() {
         .mount(&mock_server)
         .await;
 
-    let config = LivePolicyConfig {
-        policy_url: format!("{}/v1/policy", mock_server.uri()),
-        api_key: Some("test-api-key".to_string()),
-        cache_ttl: Duration::from_secs(DEFAULT_CACHE_TTL_SECS),
-        fallback_rate: DEFAULT_FALLBACK_RATE,
-        timeout_ms: 10_000,
-    };
+    let config = LivePolicyConfig::default()
+        .with_policy_url(format!("{}/v1/policy", mock_server.uri()))
+        .with_api_key(Some("test-api-key".to_string()))
+        .with_cache_ttl(Duration::from_secs(DEFAULT_CACHE_TTL_SECS))
+        .with_fallback_rate(DEFAULT_FALLBACK_RATE)
+        .with_timeout_ms(10_000);
 
     let fee_model = LivePolicy::with_config(config);
     let rate = fee_model.refresh().await.unwrap();
@@ -264,13 +263,12 @@ async fn test_live_policy_set_rate_overrides_fallback() {
 
 #[tokio::test]
 async fn test_live_policy_cache_expiry() {
-    let config = LivePolicyConfig {
-        policy_url: "https://not-used.example.com/v1/policy".to_string(),
-        api_key: None,
-        cache_ttl: Duration::from_millis(50), // Very short TTL for testing
-        fallback_rate: 100,
-        timeout_ms: 10_000,
-    };
+    let config = LivePolicyConfig::default()
+        .with_policy_url("https://not-used.example.com/v1/policy".to_string())
+        .with_api_key(None)
+        .with_cache_ttl(Duration::from_millis(50)) // Very short TTL for testing
+        .with_fallback_rate(100)
+        .with_timeout_ms(10_000);
 
     let fee_model = LivePolicy::with_config(config);
     fee_model.set_rate(500);
@@ -313,13 +311,12 @@ async fn test_live_policy_refresh_updates_cache() {
 
 #[tokio::test]
 async fn test_live_policy_custom_fallback_rate() {
-    let config = LivePolicyConfig {
-        policy_url: "https://not-used.example.com/v1/policy".to_string(),
-        api_key: None,
-        cache_ttl: Duration::from_secs(300),
-        fallback_rate: 250,
-        timeout_ms: 10_000,
-    };
+    let config = LivePolicyConfig::default()
+        .with_policy_url("https://not-used.example.com/v1/policy".to_string())
+        .with_api_key(None)
+        .with_cache_ttl(Duration::from_secs(300))
+        .with_fallback_rate(250)
+        .with_timeout_ms(10_000);
 
     let fee_model = LivePolicy::with_config(config);
     assert_eq!(fee_model.effective_rate(), 250);
@@ -351,10 +348,8 @@ async fn a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc()
     assert_eq!(fee_model.effective_rate(), DEFAULT_FALLBACK_RATE);
 
     // A config filled from the Default with only an API key is refused the same.
-    let fee_model = LivePolicy::with_config(LivePolicyConfig {
-        api_key: Some("key".to_string()),
-        ..Default::default()
-    });
+    let fee_model =
+        LivePolicy::with_config(LivePolicyConfig::default().with_api_key(Some("key".to_string())));
     assert!(fee_model.refresh().await.is_err());
 }
 

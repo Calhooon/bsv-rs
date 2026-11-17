@@ -605,7 +605,23 @@ impl IdentityCertificate {
 // ============================================================================
 
 /// Configuration for the IdentityClient.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::identity::IdentityClientConfig) -> bsv_rs::identity::IdentityClientConfig {
+///     bsv_rs::identity::IdentityClientConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::identity::IdentityClientConfig) -> bsv_rs::identity::IdentityClientConfig {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct IdentityClientConfig {
     /// Network preset for overlay operations.
     pub network_preset: NetworkPreset,
@@ -621,6 +637,11 @@ pub struct IdentityClientConfig {
     pub originator: Option<String>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    IdentityClientConfig,
+    bsv_rs::identity::IdentityClientConfig
+);
+
 impl Default for IdentityClientConfig {
     fn default() -> Self {
         Self {
@@ -631,6 +652,29 @@ impl Default for IdentityClientConfig {
             output_index: 0,
             originator: None,
         }
+    }
+}
+
+impl IdentityClientConfig {
+    /// Sets `protocol_id`.
+    #[must_use]
+    pub fn with_protocol_id(mut self, protocol_id: (u8, String)) -> Self {
+        self.protocol_id = protocol_id;
+        self
+    }
+
+    /// Sets `key_id`.
+    #[must_use]
+    pub fn with_key_id(mut self, key_id: String) -> Self {
+        self.key_id = key_id;
+        self
+    }
+
+    /// Sets `output_index`.
+    #[must_use]
+    pub fn with_output_index(mut self, output_index: u32) -> Self {
+        self.output_index = output_index;
+        self
     }
 }
 
@@ -661,7 +705,23 @@ impl IdentityClientConfig {
 // ============================================================================
 
 /// Configuration for the ContactsManager.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::identity::ContactsManagerConfig) -> bsv_rs::identity::ContactsManagerConfig {
+///     bsv_rs::identity::ContactsManagerConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::identity::ContactsManagerConfig) -> bsv_rs::identity::ContactsManagerConfig {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ContactsManagerConfig {
     /// Protocol ID for contacts encryption.
     pub protocol_id: (u8, String),
@@ -671,6 +731,11 @@ pub struct ContactsManagerConfig {
     pub originator: Option<String>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    ContactsManagerConfig,
+    bsv_rs::identity::ContactsManagerConfig
+);
+
 impl Default for ContactsManagerConfig {
     fn default() -> Self {
         Self {
@@ -678,6 +743,22 @@ impl Default for ContactsManagerConfig {
             basket: "contacts".to_string(),
             originator: None,
         }
+    }
+}
+
+impl ContactsManagerConfig {
+    /// Sets `protocol_id`.
+    #[must_use]
+    pub fn with_protocol_id(mut self, protocol_id: (u8, String)) -> Self {
+        self.protocol_id = protocol_id;
+        self
+    }
+
+    /// Sets `basket`.
+    #[must_use]
+    pub fn with_basket(mut self, basket: String) -> Self {
+        self.basket = basket;
+        self
     }
 }
 

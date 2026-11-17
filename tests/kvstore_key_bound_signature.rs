@@ -290,10 +290,8 @@ async fn set_refuses_tags_its_reader_refuses_before_the_wallet_is_asked() {
         );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
-        let options = bsv_rs::kvstore::KVStoreSetOptions {
-            tags: Some(tags.iter().map(|t| t.to_string()).collect()),
-            ..Default::default()
-        };
+        let options = bsv_rs::kvstore::KVStoreSetOptions::new()
+            .with_tags(tags.iter().map(|t| t.to_string()).collect());
         let result = store.set("k1", "v", Some(options)).await;
         assert_eq!(result, Err(bsv_rs::Error::KvStoreError(words.into())));
         assert!(wallet.calls().is_empty(), "{:?}", wallet.calls());
