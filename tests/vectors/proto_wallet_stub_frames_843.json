@@ -1,0 +1,75 @@
+{
+  "description": "The response frames of WalletWireProcessor over a ProtoWallet for the fourteen calls a ProtoWallet does not serve, recorded by this crate's own processor at 4c5454be, before the stubs became WalletRefusal { class: NotImplemented } (#843).",
+  "frames": [
+    {
+      "call": "createAction",
+      "request_hex": "010474657374",
+      "response_hex": "0132637265617465416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "signAction",
+      "request_hex": "020474657374",
+      "response_hex": "01307369676e416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "abortAction",
+      "request_hex": "030474657374726566",
+      "response_hex": "011757616c6c6574206f7065726174696f6e206661696c656400"
+    },
+    {
+      "call": "listActions",
+      "request_hex": "040474657374",
+      "response_hex": "01316c697374416374696f6e7320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "internalizeAction",
+      "request_hex": "050474657374",
+      "response_hex": "0137696e7465726e616c697a65416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "listOutputs",
+      "request_hex": "060474657374",
+      "response_hex": "01316c6973744f75747075747320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "relinquishOutput",
+      "request_hex": "070474657374",
+      "response_hex": "013672656c696e71756973684f757470757420726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "acquireCertificate",
+      "request_hex": "110474657374",
+      "response_hex": "013861637175697265436572746966696361746520726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "listCertificates",
+      "request_hex": "120474657374",
+      "response_hex": "01366c69737443657274696669636174657320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "proveCertificate",
+      "request_hex": "130474657374",
+      "response_hex": "013670726f7665436572746966696361746520726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "relinquishCertificate",
+      "request_hex": "140474657374",
+      "response_hex": "013b72656c696e7175697368436572746966696361746520726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "discoverByIdentityKey",
+      "request_hex": "150474657374",
+      "response_hex": "013b646973636f76657242794964656e746974794b657920726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "discoverByAttributes",
+      "request_hex": "160474657374",
+      "response_hex": "013a646973636f76657242794174747269627574657320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00"
+    },
+    {
+      "call": "getHeaderForHeight",
+      "request_hex": "1a047465737401",
+      "response_hex": "011757616c6c6574206f7065726174696f6e206661696c656400"
+    }
+  ]
+}

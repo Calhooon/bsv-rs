@@ -100,10 +100,38 @@ pub struct RevealSpecificKeyLinkageArgs {
 /// other. The binary wire has one form for both, the length-0 originator,
 /// read back as `None`.
 ///
-/// # Implementation Notes
+/// # A call a wallet does not serve
 ///
-/// Implementations that don't support certain operations should return
-/// `Err(Error::WalletError("method not supported".to_string()))`.
+/// An implementation that does not serve a call answers the typed refusal
+/// of the reference's class for it, `WERR_NOT_IMPLEMENTED`
+/// (`packages/wallet/wallet-toolbox/src/sdk/WERR_errors.ts:8` at
+/// `ts-stack@11faa7d1`), with words of its own that name the call:
+///
+/// ```
+/// use bsv_rs::{Error, WalletRefusalClass};
+///
+/// fn list_outputs_is_not_served<T>() -> bsv_rs::Result<T> {
+///     Err(Error::WalletRefusal {
+///         class: WalletRefusalClass::NotImplemented,
+///         message: "listOutputs is not served by this wallet".to_string(),
+///     })
+/// }
+///
+/// // A caller tells "not served" from a fault by the class, never the text:
+/// let answer = list_outputs_is_not_served::<()>();
+/// assert!(matches!(
+///     answer,
+///     Err(Error::WalletRefusal { class: WalletRefusalClass::NotImplemented, .. })
+/// ));
+/// ```
+///
+/// [`ProtoWallet`](crate::wallet::ProtoWallet) answers so for the fourteen
+/// calls it does not serve (#843; `Error::WalletError(String)` until then,
+/// which a caller could only tell from a fault by comparing its text). The
+/// class has no SDK code, so [`WalletWireProcessor`](crate::wallet::wire::WalletWireProcessor)
+/// frames it as it frames any error without one: code 1, `Wallet operation
+/// failed`, the words kept off the wire. `Error::WalletError` stays the
+/// answer for a failure that has no class.
 #[async_trait]
 pub trait WalletInterface: Send + Sync {
     // =========================================================================
