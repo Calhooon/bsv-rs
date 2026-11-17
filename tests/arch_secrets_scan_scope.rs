@@ -8,8 +8,8 @@
 #![allow(clippy::expect_used, clippy::panic)]
 
 fn ci_yml() -> String {
-    // A Windows checkout converts the workflows to CRLF (`.gitattributes` keeps only the
-    // vectors, fixtures and corpora byte for byte); the needles are written with `\n`.
+    // A Windows checkout made before `.gitattributes`' `* text=auto eol=lf`, or with the
+    // rule removed, holds the workflows in CRLF; the needles are written with `\n`.
     std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/.github/workflows/ci.yml"
