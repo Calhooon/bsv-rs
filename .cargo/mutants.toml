@@ -15,7 +15,7 @@ exclude_re = [
   # adversarial read with every length 0 to 80 and the PUSHDATA edges probed (0.98), the rule
   # read (0.97).
   '^src/script/templates/rpuzzle\.rs:354:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
-  # src/script/template.rs:210:36, `|` to `^` in compute_sighash_scope (#603, PR #624). The
+  # src/script/template.rs:233:36, `|` to `^` in compute_sighash_scope (#603, PR #624). The
   # operands' bits are disjoint under the sighash rule (a base type 1 to 3 against FORKID 0x40), so
   # `^` and `|` give the same word for every SignOutputs (bitcoin-sv v1.2.3 sighashtype.h:16-21,43,
   # 73-74,87; TransactionSignature.ts:240-245 and SignatureUtils.ts:44-62 at ts-stack@edf6e03;
@@ -24,8 +24,8 @@ exclude_re = [
   # and twelve signed and verified transactions byte-identical (EQUIVALENT, 0.97), the rule read
   # with the six scopes 0x41, 0xc1, 0x42, 0xc2, 0x43, 0xc3 equal on the tree and the mutant
   # (EQUIVALENT, 0.97).
-  '^src/script/template\.rs:210:36: replace \| with \^ in compute_sighash_scope$',
-  # src/transaction/beef.rs:857:29, `<` to `<=` in `dependency_order` (#603, PR #632, at
+  '^src/script/template\.rs:233:36: replace \| with \^ in compute_sighash_scope$',
+  # src/transaction/beef.rs:949:29, `<` to `<=` in `dependency_order` (#603, PR #632, at
   # 869:33 in `Beef::sort_txs` until #621's second fold moved the sort's body into the free
   # function `dependency_order` beside it, the line unchanged; 1204 until #817's edit door
   # moved `push_tx` into `beef/index.rs`; 1201 until its second fold added the `holds_twins`
@@ -44,7 +44,7 @@ exclude_re = [
   # reads: the cold read (MERGE, 0.9), the adversarial read with self-referencing, merged
   # raw/txid-only, self-caching and ring shapes probed byte-identical (EQUIVALENT, 0.95), the
   # rule read (EQUIVALENT, 0.96).
-  '^src/transaction/beef\.rs:857:29: replace < with <= in dependency_order$',
+  '^src/transaction/beef\.rs:949:29: replace < with <= in dependency_order$',
   # src/transaction/merkle_path_walk.rs:142:27 replaced by true, 142:27 replaced by false and
   # 142:33 `!=` to `==`, with 73:13 (the `shared` field deleted from `RootWalker::shared`) (#603,
   # PR #628; merkle_path.rs:652:27, 652:33 and 584:13 until the walker moved, #93 P0; 141 until
@@ -60,8 +60,8 @@ exclude_re = [
   '''^src/transaction/merkle_path_walk\.rs:142:27: replace match guard \*root != working_hash with true in RootWalker<'a>::root_from$''',
   '''^src/transaction/merkle_path_walk\.rs:142:27: replace match guard \*root != working_hash with false in RootWalker<'a>::root_from$''',
   '''^src/transaction/merkle_path_walk\.rs:142:33: replace != with == in RootWalker<'a>::root_from$''',
-  # src/transaction/beef_stream.rs:502:28 (the guard `*p == parent` replaced by true), 507:42 (`+`
-  # to `-`) and 507:42 (`+` to `*`), the mismatch arm of bump_root's walk (#603, PR #644). The arm
+  # src/transaction/beef_stream.rs:524:28 (the guard `*p == parent` replaced by true), 529:42 (`+`
+  # to `-`) and 529:42 (`+` to `*`), the mismatch arm of bump_root's walk (#603, PR #644). The arm
   # is dead: each level keeps one value per offset, each node is agreement-checked before its own
   # parent comparison, and one node is pushed per parent offset, so sibling parents agree by
   # construction (beef_stream.rs:444-447, 458-470, 513-519; bsv-stack-lean@9a69056
@@ -73,9 +73,9 @@ exclude_re = [
   # (EQUIVALENT x3, 0.96; with the arm a panic, 9.65 million height-2 BUMPs, 2 million random to
   # height 5 and the ts-stack corpus never reached it, the callers' pre-checks removed too), the
   # rule read (EQUIVALENT x3, 0.95).
-  '^src/transaction/beef_stream\.rs:502:28: replace match guard \*p == parent with true in bump_root$',
-  '^src/transaction/beef_stream\.rs:507:42: replace \+ with - in bump_root$',
-  '^src/transaction/beef_stream\.rs:507:42: replace \+ with \* in bump_root$',
+  '^src/transaction/beef_stream\.rs:524:28: replace match guard \*p == parent with true in bump_root$',
+  '^src/transaction/beef_stream\.rs:529:42: replace \+ with - in bump_root$',
+  '^src/transaction/beef_stream\.rs:529:42: replace \+ with \* in bump_root$',
   # src/transaction/beef_stream.rs:2360:66, `<` to `<=` in atomic_unreached (#603, shard S4, PR
   # #645). Every table the comparison walks holds one entry per txid, and the trie order's key
   # (each byte's bits reversed) is one-to-one, so the two keys compared are never equal and `<`
@@ -89,7 +89,7 @@ exclude_re = [
   # every feed split of a streamed BEEF probed (EQUIVALENT, 0.98), the rule read (EQUIVALENT,
   # 0.98). At :2348:55 since the seed fold (#645): the comparison walks the unreached txids in a
   # `BTreeSet`, still one per map key, so the reason stands.
-  '^src/transaction/beef_stream\.rs:2360:55: replace < with <= in atomic_unreached$',
+  '^src/transaction/beef_stream\.rs:2355:55: replace < with <= in atomic_unreached$',
   # src/script/script.rs:186:30, 209:31, 209:43, 209:56, `|` to `^` in Script::parse_chunks (#603,
   # shard B). The size of OP_PUSHDATA2 and OP_PUSHDATA4 is the little-endian sum of its size
   # bytes, `a + 256 * b` and `a + 256 * (b + 256 * (c + 256 * d))` (bsv-script-lean@5dc337e1
@@ -154,7 +154,7 @@ exclude_re = [
   # length 0 to 80 and 255, 256, 65535, 65536 through from_asm, to_binary, to_asm and the
   # interpreter byte-identical (EQUIVALENT, 0.99), the rule read (EQUIVALENT, 0.97).
   '^src/script/script_asm\.rs:73:37: replace < with <= in Script::from_asm$',
-  # src/transaction/beef_stream.rs:788:9, `BeefDecoder::take_deferred` replaced by `None` (#603,
+  # src/transaction/beef_stream.rs:810:9, `BeefDecoder::take_deferred` replaced by `None` (#603,
   # shard S1, PR #647; the line unmoved by #643 to #648). Only the collecting decoder fills
   # `deferred` and only `Beef::collect` reads it; under the mutant the fold reaches the pure
   # `check_transaction` with the same arguments, the same refusal, name and offset, the earliest
@@ -167,7 +167,7 @@ exclude_re = [
   # (MERGE, 0.95), the adversarial read with 325,122 inputs compared on seven entries, the tree's
   # and the mutant's tables with the same SHA-256 and 10,773 reaching the arm with identical
   # errors (EQUIVALENT, 0.96), the rule read (EQUIVALENT, 0.96).
-  '^src/transaction/beef_stream\.rs:788:9: replace BeefDecoder::take_deferred -> Option<Refusal> with None$',
+  '^src/transaction/beef_stream\.rs:810:9: replace BeefDecoder::take_deferred -> Option<Refusal> with None$',
   # src/script/spend/key_point.rs:39:9, `Spend::check_public_key_point` replaced by `Ok(())` (#681,
   # PR #684; 37:9 before the fold's rustdoc note). The switch `reads_the_reference_point` is the
   # literal `false` (key_point.rs:26-28), the node's reading in every mode (#660: bitcoin-sv

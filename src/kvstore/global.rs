@@ -459,9 +459,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                         continue;
                     }
 
-                    // Interpret the output: the query's key and protocol; the
-                    // controller the token's own, so this read filters by
-                    // none (the lookup service filtered by the query's).
+                    // Interpret the output
                     let ctx = query.key.as_ref().map(|k| {
                         KVStoreContext::new(
                             k,
