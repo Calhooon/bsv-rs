@@ -46,6 +46,7 @@ mod collect;
 mod in_memory;
 mod index;
 mod link;
+mod link_limits;
 mod merge_entry;
 mod merge_graph;
 #[path = "beef_writable.rs"]
@@ -53,7 +54,8 @@ mod writable;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
 use collect::AfterFrame;
-pub use link::{BeefLinkBudget, BeefLinkLimits, LinkedTransaction};
+pub use link::{BeefLinkBudget, LinkedTransaction};
+pub use link_limits::BeefLinkLimits;
 
 /// Result of sorting transactions in a BEEF.
 #[derive(Debug, Clone, Default)]
