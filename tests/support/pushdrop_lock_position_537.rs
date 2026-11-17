@@ -71,7 +71,7 @@ pub fn output_of(script: LockingScript) -> OutputListItem {
 /// A facilitator answering every question with the outputs given.
 struct Answering(Vec<OutputListItem>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Answering {
     async fn lookup(
         &self,
@@ -106,7 +106,7 @@ struct BesideFreeform {
     outputs: Vec<OutputListItem>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for BesideFreeform {
     async fn lookup(
         &self,

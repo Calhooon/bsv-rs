@@ -129,7 +129,7 @@ struct Lookup {
     beef: Vec<u8>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,

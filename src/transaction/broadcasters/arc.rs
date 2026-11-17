@@ -397,7 +397,7 @@ impl ArcBroadcaster {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for ArcBroadcaster {
     #[cfg(feature = "http")]
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {

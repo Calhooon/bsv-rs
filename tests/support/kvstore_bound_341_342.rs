@@ -17,7 +17,7 @@ use std::sync::{
 static NEXT_LOOKUP: AtomicUsize = AtomicUsize::new(0);
 
 struct Lookup(Arc<Mutex<Option<Vec<u8>>>>);
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,

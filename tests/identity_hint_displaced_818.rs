@@ -63,7 +63,7 @@ struct ByHost(
     Arc<Mutex<Vec<String>>>,
 );
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for ByHost {
     async fn lookup(
         &self,

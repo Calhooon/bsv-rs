@@ -165,7 +165,7 @@ async fn the_https_facilitator_sends_the_query_text_it_is_given() {
 #[derive(Default)]
 struct Recording(Mutex<Vec<LookupQuestion>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Recording {
     async fn lookup(
         &self,

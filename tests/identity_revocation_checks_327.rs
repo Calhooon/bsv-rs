@@ -100,7 +100,7 @@ fn run<'a>(v: &'a Vector, name: &str) -> &'a Run {
 /// Each lookup host's answer, by its URL.
 struct Lookup(HashMap<String, LookupAnswer>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,
@@ -116,7 +116,7 @@ impl OverlayLookupFacilitator for Lookup {
 #[derive(Clone, Default)]
 struct Ship(Arc<Mutex<Vec<String>>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Ship {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         assert_eq!(tagged.topics, ["tm_identity"]);

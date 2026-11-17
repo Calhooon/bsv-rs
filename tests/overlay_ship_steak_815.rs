@@ -47,7 +47,7 @@ const TOPIC: &str = "tm_ship_steak";
 /// A lookup facilitator answering every question with its one answer.
 struct Scripted(LookupAnswer);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Scripted {
     async fn lookup(
         &self,
@@ -66,7 +66,7 @@ struct Answering {
     sent: Mutex<Vec<Vec<String>>>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Answering {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         self.sent.lock().unwrap().push(tagged.topics.clone());

@@ -50,7 +50,7 @@ struct Counting {
     calls: AtomicUsize,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Counting {
     async fn lookup(
         &self,
@@ -66,7 +66,7 @@ impl OverlayLookupFacilitator for Counting {
 /// A broadcast facilitator acknowledging every topic it is sent.
 struct Acknowledging(Mutex<usize>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Acknowledging {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         *self.0.lock().unwrap() += 1;

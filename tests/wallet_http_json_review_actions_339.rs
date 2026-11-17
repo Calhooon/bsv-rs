@@ -409,7 +409,7 @@ async fn a_review_body_whose_code_is_not_a_safe_integer_is_the_class_refusal() {
 
 struct Lookup(LookupAnswer);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,
@@ -425,7 +425,7 @@ impl OverlayLookupFacilitator for Lookup {
 #[derive(Clone, Default)]
 struct Ship(Arc<Mutex<Vec<String>>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Ship {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         let tx = Transaction::from_beef(&tagged.beef, None).unwrap();

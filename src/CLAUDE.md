@@ -14,6 +14,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `error.rs` | Unified `Error` enum and `Result` type alias; `EciesInvalidPlaintext` carries the plaintext validation words alone before encryption (#333) |
 | `error/wallet_fault.rs` | `WalletFaultFamily`, `WalletFault`, `AbortAcceptance`: port extensions beyond the reference; original strings and refusal classes retained (#439); `AbortKind` (`OnChain`, `AcceptedInStore`, `Other` by default), the record's typed `kind` (#604) |
 | `error/wallet_refusal.rs` | The reference's twenty `WalletRefusalClass` values and impls, re-exported at `error::WalletRefusalClass` |
+| `send_rule.rs`, `send_rule/` | The `Send` rule's compile-time witnesses (#843, the captain's ruling 1 of 2026-11-17): a private module under `transaction`, one file per feature module (`transaction`, `wallet`, `auth`, `overlay`, `storage`, `registry`, `kvstore`, `identity`), each function never called and compiling only while the future it hands to `send` is `Send`: every method of the eight public async traits and every `pub async fn` of the crate (240 witnesses), generic over the implementor where the door is, so the claim holds for every implementor by the trait's signature; `Values`, a source of arguments no type implements, so a witness is type-checked and never instantiated. Built with the library, so the wasm32 slices hold the same claims. `tests/arch_send_rule_843.rs` holds the census (a `// src/<file>` heading above each file's `send(..)` lines) |
 
 ## Subdirectories
 

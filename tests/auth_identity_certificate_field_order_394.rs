@@ -337,7 +337,7 @@ async fn certificate_fields_name_the_first_oversized_plaintext_in_insertion_orde
 /// Answers every lookup with the outputs it holds.
 struct Outputs(Vec<OutputListItem>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Outputs {
     async fn lookup(
         &self,

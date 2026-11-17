@@ -24,7 +24,9 @@ mod steak_body; // a `/submit` answer read as the reference reads it: size, UTF-
 ///
 /// Implementations send lookup queries to overlay service hosts and
 /// parse the responses.
-#[async_trait(?Send)]
+///
+/// Each method's future is `Send` on every target, as `send`'s below (#843).
+#[async_trait]
 pub trait OverlayLookupFacilitator: Send + Sync {
     /// Execute a lookup query against a host.
     ///
@@ -90,7 +92,7 @@ pub trait OverlayLookupFacilitator: Send + Sync {
 ///
 /// Implementations send tagged BEEF transactions to overlay service hosts
 /// and parse the STEAK responses.
-#[async_trait(?Send)]
+#[async_trait]
 pub trait OverlayBroadcastFacilitator: Send + Sync {
     /// Send a tagged BEEF to a host.
     ///
@@ -137,7 +139,7 @@ impl Default for HttpsOverlayLookupFacilitator {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
     async fn lookup(
         &self,
@@ -336,7 +338,7 @@ impl Default for HttpsOverlayBroadcastFacilitator {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl OverlayBroadcastFacilitator for HttpsOverlayBroadcastFacilitator {
     async fn send(&self, url: &str, tagged_beef: &TaggedBEEF) -> Result<Steak> {
         #[cfg(not(feature = "http"))]

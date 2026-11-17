@@ -15,7 +15,7 @@
 //!     endpoint: String,
 //! }
 //!
-//! #[async_trait(?Send)]
+//! #[async_trait]
 //! impl Broadcaster for MyBroadcaster {
 //!     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
 //!         // Async HTTP POST to endpoint
@@ -158,6 +158,19 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 /// - ARC (deprecated since 0.9.0: ARC is deprecated, ARCade is the standard, bsv-rs#350)
 /// - Custom node endpoints
 ///
+/// # `Send`
+///
+/// The future of each method is `Send`, on native and on wasm32 alike (#843:
+/// every public async trait of this crate is, with no `cfg` in a public
+/// signature), so a broadcast is spawned on a multi-threaded runtime and
+/// awaited inside another `Send` trait's method, as a `verify` is. An
+/// implementation is written under plain `#[async_trait]` and holds nothing
+/// that is not `Send` across an `.await`; one over a host's JS handles (a
+/// Worker's `fetch`) wraps the handle and the call in its platform's bridge
+/// (`worker::send::SendWrapper`, `worker::send::SendFuture`). The reference
+/// has no such notion: its `broadcast` returns a promise (`ts-stack@edf6e03`
+/// `Broadcaster.ts:148-151`).
+///
 /// # Example
 ///
 /// ```rust,ignore
@@ -168,7 +181,7 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 ///     endpoint: String,
 /// }
 ///
-/// #[async_trait(?Send)]
+/// #[async_trait]
 /// impl Broadcaster for MyBroadcaster {
 ///     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
 ///         // Async HTTP POST to endpoint
@@ -176,7 +189,7 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 ///     // broadcast_many() has a default sequential implementation
 /// }
 /// ```
-#[async_trait(?Send)]
+#[async_trait]
 pub trait Broadcaster: Send + Sync {
     /// Broadcasts a transaction to the network asynchronously.
     ///

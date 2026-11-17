@@ -55,7 +55,7 @@ use std::sync::Arc;
 /// this facilitator through `GlobalKVStore::with_resolver`.
 struct FailingLookupFacilitator;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for FailingLookupFacilitator {
     async fn lookup(
         &self,

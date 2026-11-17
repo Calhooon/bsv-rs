@@ -132,7 +132,7 @@ fn shapes(v: &Value, token: &LockingScript) -> Vec<(&'static str, Vec<u8>)> {
 /// A facilitator answering every question with one output.
 struct Answering(OutputListItem);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Answering {
     async fn lookup(
         &self,

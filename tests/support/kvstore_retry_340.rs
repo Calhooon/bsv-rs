@@ -102,7 +102,7 @@ struct Lookup {
     advertisement: OutputListItem,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Lookup {
     async fn lookup(
         &self,
@@ -137,7 +137,7 @@ struct Ship {
     host: String,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Ship {
     async fn send(&self, url: &str, tagged: &TaggedBEEF) -> Result<Steak> {
         assert_eq!(url, self.host);

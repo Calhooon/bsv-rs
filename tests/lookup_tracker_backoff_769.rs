@@ -50,7 +50,7 @@ struct Recording {
     script: Mutex<VecDeque<bsv_rs::Result<LookupAnswer>>>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Recording {
     async fn lookup(
         &self,

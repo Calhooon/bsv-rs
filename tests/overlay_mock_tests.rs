@@ -53,7 +53,7 @@ impl MockLookupFacilitator {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl OverlayLookupFacilitator for MockLookupFacilitator {
     async fn lookup(
         &self,
@@ -118,7 +118,7 @@ impl MockBroadcastFacilitator {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl OverlayBroadcastFacilitator for MockBroadcastFacilitator {
     async fn send(&self, url: &str, _tagged_beef: &TaggedBEEF) -> Result<Steak> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
@@ -532,9 +532,11 @@ async fn test_request_coalescing() {
     // how many times the mock facilitator is called when 5 sequential
     // queries are made for the same service.
     //
-    // Note: The OverlayLookupFacilitator trait uses `async_trait(?Send)`,
-    // so we cannot use `tokio::spawn` with it. We test sequential queries
-    // instead, which still validates the caching and coalescing mechanism.
+    // Note: when this test was written the OverlayLookupFacilitator trait was
+    // `async_trait(?Send)`, so a query could not be handed to `tokio::spawn`
+    // (it can since #843: `tests/send_rule_843.rs` spawns one). The queries
+    // here stay sequential, which still validates the caching and coalescing
+    // mechanism.
 
     let mock = Arc::new(MockLookupFacilitator::new());
 

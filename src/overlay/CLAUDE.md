@@ -116,7 +116,7 @@ pub use facilitators::{
 
 ## Facilitators
 
-Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls. Both traits use `#[async_trait(?Send)]` (not `Send`-bound), allowing non-Send futures.
+Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls. Both traits are plain `#[async_trait]` over `Send + Sync` implementors since #843 (the captain's ruling 1 of 2026-11-17: every public async trait is `Send` on every target, no `cfg` in a public signature): the future of each method is `Send` on native and on wasm32, so `LookupResolver::query`, `TopicBroadcaster::broadcast_tx` and every client over them (the identity, registry, kvstore and storage doors) return futures a multi-threaded runtime spawns and another `Send` trait's method awaits; until then both carried `#[async_trait(?Send)]` and none of those futures could be spawned. An implementation is written under plain `#[async_trait]` and holds nothing that is not `Send` across an `.await`; one over a host's JS handles wraps the handle and the call in its platform's bridge (`worker::send::SendWrapper`, `worker::send::SendFuture`; compiled against this crate for native and wasm32, `docs/lanes/fix-843-send-rule.md`). Held by the compiler in `src/send_rule/overlay.rs` (a witness per door, built with the library on both targets) and lexically by `tests/arch_send_rule_843.rs` (no `?Send` under `src/`, the census of the witnesses); seen from outside by `tests/send_rule_843.rs`.
 
 - **`OverlayLookupFacilitator`** trait: `async fn lookup(&self, url, question, timeout_ms) -> Result<LookupAnswer>`; provided `lookup_ordered(url, question, query_text, timeout_ms)` (#394): the query sent as `query_text` when given, its keys in the order built where the `Value` sorts them, the default ignoring it and calling `lookup`; provided `lookup_bounded(url, question, query_text, timeout_ms, options)` (#775): the resolver's call, under `LookupRequestOptions`; the default ignores the options and calls `lookup_ordered`, so a custom facilitator is bounded by the resolver's check of its answer alone
 - **`OverlayBroadcastFacilitator`** trait: `async fn send(&self, url, tagged_beef) -> Result<Steak>`
@@ -266,7 +266,7 @@ pub struct RankChangeEvent {
 
 Traverses transaction ancestry to build chronological history. Follows `input.source_transaction` references depth first on an explicit stack (0.3.35: the recursive walk overflowed a 1 MiB stack at a few thousand links).
 
-- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching via `tokio::sync::RwLock`, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`
+- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching via `tokio::sync::RwLock`, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`. The interpreter's future is `Send` since #843 (`Pin<Box<dyn Future<Output = Option<T>> + Send>>`; the alias named no bound until then, so `build_history`'s future could not be spawned): `Box::pin(async move { .. })` over `Send` captures is written as before
 - **`SyncHistorian<T, C>`** - Synchronous version with builder methods `with_debug()` and `with_version()`
 
 ```rust

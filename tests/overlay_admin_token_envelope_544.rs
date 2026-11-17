@@ -85,7 +85,7 @@ fn this_crates_advertisements_are_verified_by_the_reference_544() {
 /// script (held as bytes).
 struct Answering(Vec<u8>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Answering {
     async fn lookup(
         &self,

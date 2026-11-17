@@ -88,7 +88,7 @@ async fn the_local_store_pushes_the_wallet_key_as_returned_545() {
 struct NothingFound;
 
 #[cfg(feature = "kvstore")]
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl bsv_rs::overlay::OverlayLookupFacilitator for NothingFound {
     async fn lookup(
         &self,
