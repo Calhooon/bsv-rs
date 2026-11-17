@@ -124,15 +124,9 @@ async fn through(door: Door, hosts: &[(&str, Option<String>)]) -> (Vec<String>, 
     let asked = Arc::new(Mutex::new(Vec::new()));
     for (name, hint) in hosts {
         let url = format!("https://{name}-818.invalid");
-        answers.insert(
-            url.clone(),
-            vec![OutputListItem {
-                beef: built.beef.clone(),
-                output_index: 0,
-                context: None,
-                txid: hint.clone(),
-            }],
-        );
+        let mut item = OutputListItem::new(built.beef.clone(), 0);
+        item.txid = hint.clone();
+        answers.insert(url.clone(), vec![item]);
         urls.push(url);
     }
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {

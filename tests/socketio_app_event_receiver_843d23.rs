@@ -135,11 +135,7 @@ async fn the_app_event_listener_hands_back_this_crates_receiver_843d23() {
         .expect("the listener is alive");
     assert_eq!(
         event,
-        AppEvent {
-            sender: key(7).public_key(),
-            event_name: "payment".into(),
-            data: data.clone(),
-        }
+        AppEvent::new(key(7).public_key(), "payment", data.clone())
     );
     assert_eq!(events.try_recv(), None, "one message, one event");
 

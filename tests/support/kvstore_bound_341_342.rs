@@ -31,12 +31,7 @@ impl OverlayLookupFacilitator for Lookup {
                 .lock()
                 .unwrap()
                 .iter()
-                .map(|bytes| OutputListItem {
-                    beef: bytes.clone(),
-                    output_index: 0,
-                    context: None,
-                    txid: None,
-                })
+                .map(|bytes| OutputListItem::new(bytes.clone(), 0))
                 .collect(),
         })
     }

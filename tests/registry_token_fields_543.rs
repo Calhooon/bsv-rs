@@ -77,6 +77,7 @@ async fn read(kind: DefinitionType, script: LockingScript) -> (Vec<Vec<Vec<u8>>>
             .into_iter()
             .map(Into::into)
             .collect(),
+        other => panic!("unknown variant: {other:?}"),
     };
     let listed = client.list_own_registry_entries(kind).await.unwrap().len();
     let fields = resolved

@@ -171,12 +171,7 @@ fn proven(seed: u32, output: TransactionOutput) -> (String, OutputListItem) {
         .expect("the bytes are one transaction");
     (
         txid,
-        OutputListItem {
-            beef: beef.to_binary().expect("the BEEF is writable"),
-            output_index: 0,
-            context: None,
-            txid: None,
-        },
+        OutputListItem::new(beef.to_binary().expect("the BEEF is writable"), 0),
     )
 }
 
@@ -523,12 +518,9 @@ fn recorded_output(v: &Value) -> OutputListItem {
     let tx = Transaction::from_beef(&beef, None).unwrap();
     assert_eq!(tx.id(), v["txid"].as_str().unwrap());
     assert_eq!(tx.outputs()[0].satoshis, v["satoshis"].as_u64());
-    OutputListItem {
-        beef,
-        output_index: v["output_index"].as_u64().unwrap() as u32,
-        context: None,
-        txid: v["hint"].as_str().map(str::to_string),
-    }
+    let mut item = OutputListItem::new(beef, v["output_index"].as_u64().unwrap() as u32);
+    item.txid = v["hint"].as_str().map(str::to_string);
+    item
 }
 
 /// The recorded outputs, the four 16 MiB paddings of one answer each a

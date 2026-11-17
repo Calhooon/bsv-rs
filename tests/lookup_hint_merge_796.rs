@@ -175,14 +175,15 @@ fn hint_text(hint: &Value) -> Option<String> {
 
 /// The output a shape's entry describes, its BEEF this crate's writer's.
 fn item(entry: &Value) -> OutputListItem {
-    OutputListItem {
-        beef: beef_of(entry["tx"].as_str().unwrap()).0,
-        output_index: entry["outputIndex"].as_u64().unwrap() as u32,
-        context: entry["context"]
-            .as_array()
-            .map(|c| c.iter().map(|b| b.as_u64().unwrap() as u8).collect()),
-        txid: hint_text(&entry["hint"]),
-    }
+    let mut item = OutputListItem::new(
+        beef_of(entry["tx"].as_str().unwrap()).0,
+        entry["outputIndex"].as_u64().unwrap() as u32,
+    );
+    item.context = entry["context"]
+        .as_array()
+        .map(|c| c.iter().map(|b| b.as_u64().unwrap() as u8).collect());
+    item.txid = hint_text(&entry["hint"]);
+    item
 }
 
 /// A facilitator answering each host with its scripted outputs.

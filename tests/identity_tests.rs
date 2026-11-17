@@ -10,8 +10,8 @@
 #![cfg(feature = "identity")]
 
 use bsv_rs::identity::{
-    BroadcastFailure, BroadcastResult, BroadcastSuccess, CertifierInfo, Contact,
-    ContactsManagerConfig, DefaultIdentityValues, DisplayableIdentity, IdentityClientConfig,
+    BroadcastFailure, BroadcastResult, BroadcastSuccess, Contact, ContactsManagerConfig,
+    DefaultIdentityValues, DisplayableIdentity, IdentityCertifier, IdentityClientConfig,
     IdentityQuery, KnownCertificateType, StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
 use bsv_rs::overlay::NetworkPreset;
@@ -531,22 +531,13 @@ fn test_contacts_manager_config_with_originator() {
 }
 
 // =================
-// CertifierInfo Tests
+// IdentityCertifier Tests (the wallet's record, re-exported; `CertifierInfo`
+// and its `Default` went with #843: the wallet's certifier record has none)
 // =================
 
 #[test]
-fn test_certifier_info_default() {
-    let info = CertifierInfo::default();
-
-    assert_eq!(info.name, "Unknown Certifier");
-    assert_eq!(info.icon_url, DefaultIdentityValues::BADGE_ICON_URL);
-    assert_eq!(info.description, "No information available");
-    assert_eq!(info.trust, 0);
-}
-
-#[test]
 fn test_certifier_info_creation() {
-    let info = CertifierInfo {
+    let info = IdentityCertifier {
         name: "SocialCert".to_string(),
         icon_url: "https://socialcert.net/icon.png".to_string(),
         description: "Social media certificate authority".to_string(),
@@ -559,7 +550,7 @@ fn test_certifier_info_creation() {
 
 #[test]
 fn test_certifier_info_json_serialization() {
-    let info = CertifierInfo {
+    let info = IdentityCertifier {
         name: "TestCert".to_string(),
         icon_url: "https://example.com/icon.png".to_string(),
         description: "Test certifier".to_string(),
@@ -571,7 +562,7 @@ fn test_certifier_info_json_serialization() {
     // Verify camelCase
     assert!(json.contains("\"iconUrl\":"));
 
-    let decoded: CertifierInfo = serde_json::from_str(&json).unwrap();
+    let decoded: IdentityCertifier = serde_json::from_str(&json).unwrap();
     assert_eq!(decoded.name, "TestCert");
     assert_eq!(decoded.trust, 5);
 }
@@ -1038,9 +1029,10 @@ mod identity_client_tests {
         assert_eq!(config.protocol_id.1, "identity"); // Protocol name
     }
 
-    // Test parse_identity static method using a mock IdentityCertificate
-    // Note: This requires constructing a full IdentityCertificate which needs auth module types
-    // For now, we test the configuration and type exports
+    // `parse_identity` takes the wallet's `IdentityCertificate` since #843:
+    // a wallet's discovery answer is parsed in
+    // `tests/identity_parse_identity_843.rs` (untested until then, the
+    // identity module's own record needing auth types no test built).
 }
 
 // =================

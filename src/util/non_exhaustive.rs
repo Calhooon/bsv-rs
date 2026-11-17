@@ -171,6 +171,27 @@ macro_rules! non_exhaustive_twin_block {
 /// # fn main() {}
 /// ```
 ///
+/// A variant's explicit discriminant is passed through (#843d9, `WalletCall`):
+/// the blocks name the variant alone, and `as` reads the value written.
+///
+/// ```
+/// # mod util { pub mod non_exhaustive {
+/// #     include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/util/non_exhaustive.rs"));
+/// # } }
+/// pub mod sample {
+///     crate::util::non_exhaustive::non_exhaustive_enum! {
+///         path = crate::sample::Coded;
+///     #[repr(u8)]
+///     pub enum Coded { One = 1, Seven = 7, Eight }
+///     }
+/// }
+/// # fn main() {
+/// assert_eq!(sample::Coded::One as u8, 1);
+/// assert_eq!(sample::Coded::Seven as u8, 7);
+/// assert_eq!(sample::Coded::Eight as u8, 8);
+/// # }
+/// ```
+///
 /// What it cannot hold: a variant under `cfg` (its arm would be written
 /// whether or not the variant exists; `tests/arch_non_exhaustive_pins_819.rs`
 /// refuses one inside an invocation).
@@ -183,6 +204,7 @@ macro_rules! non_exhaustive_enum {
             $(
                 $(#[$variant_meta:meta])*
                 $variant:ident $({ $($named:tt)* })? $(( $($unnamed:tt)* ))?
+                $(= $discriminant:expr)?
             ),* $(,)?
         }
     ) => {
@@ -207,6 +229,7 @@ macro_rules! non_exhaustive_enum {
             $(
                 $(#[$variant_meta])*
                 $variant $({ $($named)* })? $(( $($unnamed)* ))?
+                $(= $discriminant)?
             ),*
         }
 
@@ -300,7 +323,9 @@ macro_rules! non_exhaustive_enum {
 ///
 /// and on a type without one, named by its own path, it compiles, a generic
 /// struct named at one instantiation by its arguments after its name and in
-/// its path (#843d8a's fold, `PeerOptions`):
+/// its path (#843d8a's fold, `PeerOptions`), a lifetime among them (#843,
+/// `SigningContext<'static>`: the name is read as a type, where an identifier
+/// and type arguments could name no lifetime):
 ///
 /// ```
 /// # mod util { pub mod non_exhaustive {
@@ -320,12 +345,16 @@ macro_rules! non_exhaustive_enum {
 ///         Pair<String, Other>,
 ///         crate::sample::Pair<String, Other>
 ///     );
+///     pub struct Lent<'a> {
+///         pub one: &'a str,
+///     }
+///     crate::util::non_exhaustive::assert_no_drop!(Lent<'static>, crate::sample::Lent<'static>);
 /// }
 /// # fn main() {}
 /// ```
 #[allow(unused_macros)]
 macro_rules! assert_no_drop {
-    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {
+    ($name:ty, $path:path) => {
         const _: fn() = || {
             trait AmbiguousIfDrop<A> {
                 fn some_item() {}
@@ -335,9 +364,9 @@ macro_rules! assert_no_drop {
             struct ImplementsDrop;
             #[allow(drop_bounds)]
             impl<T: ?::core::marker::Sized + ::core::ops::Drop> AmbiguousIfDrop<ImplementsDrop> for T {}
-            let _ = <$name $(< $($arg),+ >)? as AmbiguousIfDrop<_>>::some_item;
+            let _ = <$name as AmbiguousIfDrop<_>>::some_item;
         };
-        const _: fn($name $(< $($arg),+ >)?) -> $path = |value| value;
+        const _: fn($name) -> $path = |value| value;
     };
 }
 

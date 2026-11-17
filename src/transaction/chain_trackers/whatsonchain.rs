@@ -39,14 +39,18 @@ use async_trait::async_trait;
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::transaction::{ChainTracker, ChainTrackerError};
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::chain_trackers::WocNetwork;
 /// WhatsOnChain network selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum WocNetwork {
     /// BSV Mainnet
     #[default]
     Mainnet,
     /// BSV Testnet
     Testnet,
+}
 }
 
 impl WocNetwork {

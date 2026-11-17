@@ -91,12 +91,7 @@ fn a_callers_32_000_000_byte_budget_declines_the_33rd_copy() {
         verify(&the_38_shape(), Some(32_000_000)),
         Err(Error::ScriptEvaluationDeclined {
             input_index: 0,
-            limit: ScriptResourceLimit {
-                resource: ScriptResource::Stack,
-                limit: 32_000_000,
-                attempted: 33_000_000,
-                work_spent: None,
-            },
+            limit: ScriptResourceLimit::new(ScriptResource::Stack, 32_000_000, 33_000_000),
         })
     );
 }

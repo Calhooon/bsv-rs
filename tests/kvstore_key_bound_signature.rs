@@ -206,12 +206,7 @@ impl OverlayLookupFacilitator for TokenLookup {
         _timeout_ms: Option<u64>,
     ) -> bsv_rs::Result<LookupAnswer> {
         Ok(LookupAnswer::OutputList {
-            outputs: vec![OutputListItem {
-                beef: self.0.clone(),
-                output_index: 0,
-                context: None,
-                txid: None,
-            }],
+            outputs: vec![OutputListItem::new(self.0.clone(), 0)],
         })
     }
 }
@@ -263,7 +258,7 @@ async fn the_store_reads_the_key_bound_form_alone() {
         read_by_the_store(&moved, "k", "kv-bound-4mcm-3").await,
         None
     );
-    let ctx = KVStoreContext::new("k1", "kvstore");
+    let ctx = KVStoreContext::new("k1", "kvstore", controller.public_key().to_hex());
     assert!(KVStoreInterpreter::interpret_script(&script(&honest), Some(&ctx)).is_some());
 }
 

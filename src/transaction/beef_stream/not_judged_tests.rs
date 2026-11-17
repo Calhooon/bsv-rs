@@ -40,14 +40,7 @@ fn stop_with_evaluation(evaluation: Evaluation, coin: u32, tip_height: u32) -> S
         LockingScript::from_hex("51").unwrap(),
     ))
     .unwrap();
-    #[allow(deprecated)] // Populate the compatibility field; only ChainParams is read (#451).
-    let tip = Some(ChainTip {
-        height: tip_height,
-        median_time_past: 0,
-        genesis_height: 1,
-        csv_height: 0,
-        next_block_time: None,
-    });
+    let tip = Some(ChainTip::new(tip_height, 0).with_csv_height(0));
     let mut index = BeefIndex::new();
     for element in BeefStream::new(tx.to_beef(false).unwrap().as_slice()) {
         let result = match element.unwrap() {

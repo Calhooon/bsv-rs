@@ -332,5 +332,6 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
             json!({}),
             json!({"version": if full {"fixture-1.2.3"} else {"fixture-0.0.0"}}),
         ),
+        other => panic!("unknown variant: {other:?}"),
     }
 }

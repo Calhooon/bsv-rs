@@ -26,9 +26,9 @@ use bsv_rs::primitives::{hash160, PrivateKey};
 use bsv_rs::script::{LockingScript, ProtocolEra, Script, SigningContext, UnlockingScript};
 use bsv_rs::transaction::beef_stream::{ChainTip, SpendRefusal};
 use bsv_rs::transaction::{
-    verify_input, verify_stream, verify_stream_two_pass, AsyncByteSource, AsyncStreamVerifier,
-    InputRules, MerklePath, MockChainTracker, StreamVerifier, Transaction, TransactionInput,
-    TransactionOutput, Verdict, WorkBudget,
+    verify_input, verify_stream, verify_stream_two_pass, verify_stream_two_pass_with_chain_params,
+    AsyncByteSource, AsyncStreamVerifier, InputRules, MerklePath, MockChainTracker, StreamVerifier,
+    Transaction, TransactionInput, TransactionOutput, Verdict, WorkBudget,
 };
 
 const COIN_HEIGHT: u32 = 600_000;
@@ -382,17 +382,11 @@ fn unlocking_of(size: usize) -> Cell {
     }
 }
 
-/// The tip, its network named by its Genesis height (a field deprecated on
-/// the 0.9.0 line, which serves the default doors until the api-break).
-#[allow(deprecated)]
-fn tip(genesis_height: u32) -> ChainTip {
-    ChainTip {
-        height: NEXT_BLOCK - 1,
-        median_time_past: 1_700_000_000,
-        genesis_height,
-        csv_height: 419_328,
-        next_block_time: None,
-    }
+/// The tip of every door given one: its next block is `NEXT_BLOCK`. A tip
+/// names no Genesis height (the field deprecated on the 0.9.0 line is
+/// removed, #843): the default doors judge by mainnet's.
+fn tip() -> ChainTip {
+    ChainTip::new(NEXT_BLOCK - 1, 1_700_000_000)
 }
 
 /// The first transaction up the chain of first inputs that carries a proof.
@@ -405,8 +399,9 @@ fn parent_of(tx: &Transaction) -> &Transaction {
 }
 
 /// The tracker and headers of every door: the parent's root, and the tip
-/// named (none: no tip). The way out for a caller on a test chain is the
-/// tip's Genesis height (the migration line of the CHANGELOG, compiled here).
+/// named (none: no tip). The way out for a caller on a test chain is its
+/// chain parameters, at a door that takes them (the migration line of the
+/// CHANGELOG, compiled in `chain_answer`).
 fn tracker(tx: &Transaction, tip: Option<ChainTip>) -> MockChainTracker {
     let parent = parent_of(tx);
     let proof = parent.merkle_path.as_ref().unwrap();
@@ -429,6 +424,8 @@ impl AsyncByteSource for Chunk {
 enum Answer {
     Valid,
     Refused,
+    /// A coin outside the chain parameters' scope (a door given them alone).
+    NotJudged,
     Other(String),
 }
 
@@ -524,7 +521,7 @@ async fn the_rules_of_the_era_hold_at(door: Door) {
     let mut wrong = Vec::new();
     for cell in refused_by_the_rules_of_the_era() {
         let tx = spend(&cell);
-        let got = answer(door, &tx, Some(tip(MAINNET_GENESIS))).await;
+        let got = answer(door, &tx, Some(tip())).await;
         if got != Answer::Refused {
             wrong.push(format!("{} through {door:?}: {got:?}", cell.name));
         }
@@ -580,7 +577,7 @@ async fn a_coin_from_after_genesis_keeps_the_default_answer_at_every_door_h4m7()
     {
         let tx = spend_at(&cell, MAINNET_GENESIS);
         for door in DOORS {
-            let got = answer(door, &tx, Some(tip(MAINNET_GENESIS))).await;
+            let got = answer(door, &tx, Some(tip())).await;
             if got != Answer::Valid {
                 wrong.push(format!("{} through {door:?}: {got:?}", cell.name));
             }
@@ -597,7 +594,7 @@ async fn an_honest_spend_of_a_coin_from_before_genesis_stays_valid_at_every_door
     for cell in accepted_by_the_rules_of_the_era() {
         let tx = spend(&cell);
         for door in DOORS {
-            for named in [Some(tip(MAINNET_GENESIS)), None] {
+            for named in [Some(tip()), None] {
                 // Without a tip a lock time is not judged final: the streaming
                 // doors decline it (`MiningCheck::Finality`), on every line.
                 if named.is_none() && cell.lock_time != 0 {
@@ -636,13 +633,101 @@ async fn without_a_tip_the_doors_take_mainnets_genesis_height_h4m7() {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// The six doors that take chain parameters: the three whole-transaction
+/// forms and the three readers that are built (the one-shot `verify_stream`
+/// takes none).
+const CHAIN_DOORS: [Door; 6] = [
+    Door::Verify,
+    Door::Budget,
+    Door::Budgets,
+    Door::TwoPass,
+    Door::Stepping,
+    Door::Async,
+];
+
+/// A test chain's parameters: Genesis at `genesis`, Chronicle the block
+/// after it.
+fn chain(genesis: u32) -> ChainParams {
+    ChainParams::regtest()
+        .with_activation_heights(genesis, genesis + 1)
+        .unwrap()
+}
+
+fn chain_stream_answer(verdict: &Verdict, tx: &Transaction) -> Answer {
+    match verdict {
+        Verdict::NotJudged { .. } => Answer::NotJudged,
+        other => stream_answer(other, tx),
+    }
+}
+
+/// `door`'s answer on `tx` read from `beef`, under `chain` and the tip.
+async fn chain_answer(door: Door, tx: &Transaction, chain: &ChainParams, beef: Vec<u8>) -> Answer {
+    let headers = tracker(tx, Some(tip()));
+    let whole = |result: bsv_rs::Result<bool>| match result {
+        Err(bsv_rs::Error::TransactionNotJudged { .. }) => Answer::NotJudged,
+        other => whole_answer(other),
+    };
+    match door {
+        Door::Verify => whole(
+            tx.verify_with_chain_params(&headers, None, None, chain)
+                .await,
+        ),
+        Door::Budget => whole(
+            tx.verify_with_chain_params_and_work_budget(
+                &headers,
+                None,
+                None,
+                Some(u64::MAX),
+                chain,
+            )
+            .await,
+        ),
+        Door::Budgets => whole(
+            tx.verify_with_chain_params_and_work_budgets(
+                &headers,
+                None,
+                None,
+                WorkBudget::new(),
+                chain,
+            )
+            .await,
+        ),
+        Door::TwoPass => chain_stream_answer(
+            &verify_stream_two_pass_with_chain_params(Cursor::new(&beef), &headers, None, chain)
+                .unwrap(),
+            tx,
+        ),
+        Door::Stepping => chain_stream_answer(
+            &StreamVerifier::new(beef.as_slice(), &headers, None)
+                .with_chain_params(chain.clone())
+                .run()
+                .unwrap(),
+            tx,
+        ),
+        Door::Async => {
+            let mut verifier = AsyncStreamVerifier::new(None).with_chain_params(chain.clone());
+            let verdict = verifier
+                .run(&mut Chunk(Some(beef)), &headers)
+                .await
+                .unwrap();
+            chain_stream_answer(&verdict, tx)
+        }
+        Door::Stream => unreachable!("the one-shot reader takes no chain parameters"),
+    }
+}
+
 /// A test chain: a coin proven at a low height that uses a post-Genesis size.
-/// By default (no tip, or a tip naming mainnet) the doors judge it by the
-/// older rules and refuse it; a tip naming the chain's own Genesis height
-/// (here 1, as a regtest run with `-genesisactivationheight=1`) is the way
-/// out, and the coin is judged by the post-Genesis rules again.
+/// The default doors judge by mainnet's heights, with a tip or with none (a
+/// tip names no Genesis height since #843; until then a tip naming the
+/// chain's own was the way out), so they judge the coin by the older rules
+/// and refuse its spend. The way out is the chain's parameters, at a door
+/// that takes them: with Genesis at 1 (a regtest run with
+/// `-genesisactivationheight=1`) or at the coin's own height the spend is
+/// judged under the chain's word and valid; with Genesis one block above the
+/// coin the parameters decline it, a coin from before Genesis being outside
+/// their scope.
 #[tokio::test]
-async fn a_test_chain_names_its_genesis_height_by_its_tip_h4m7() {
+async fn a_test_chain_names_its_genesis_height_by_its_chain_parameters_h4m7() {
     let cell = signed(
         "a 521-byte field on a test chain",
         p2pkh(),
@@ -652,16 +737,22 @@ async fn a_test_chain_names_its_genesis_height_by_its_tip_h4m7() {
     let tx = spend_at(&cell, 800);
     let mut wrong = Vec::new();
     for door in DOORS {
-        for (named, expected) in [
-            (None, Answer::Refused),
-            (Some(tip(MAINNET_GENESIS)), Answer::Refused),
-            (Some(tip(1)), Answer::Valid),
-            (Some(tip(800)), Answer::Valid),
-            (Some(tip(801)), Answer::Refused),
-        ] {
+        for named in [None, Some(tip())] {
             let got = answer(door, &tx, named).await;
-            if got != expected {
+            if got != Answer::Refused {
                 wrong.push(format!("{door:?} ({named:?}): {got:?}"));
+            }
+        }
+    }
+    for door in CHAIN_DOORS {
+        for (genesis, expected) in [
+            (1, Answer::Valid),
+            (800, Answer::Valid),
+            (801, Answer::NotJudged),
+        ] {
+            let got = chain_answer(door, &tx, &chain(genesis), tx.to_beef(false).unwrap()).await;
+            if got != expected {
+                wrong.push(format!("{door:?} (Genesis at {genesis}): {got:?}"));
             }
         }
     }
@@ -693,7 +784,7 @@ async fn a_coin_whose_creating_transaction_is_unproven_is_judged_by_the_post_gen
     let mut wrong = Vec::new();
     for door in DOORS {
         for (tx, expected) in [(&unproven, Answer::Valid), (&proven, Answer::Refused)] {
-            let got = answer(door, tx, Some(tip(MAINNET_GENESIS))).await;
+            let got = answer(door, tx, Some(tip())).await;
             if got != expected {
                 wrong.push(format!("{door:?} (expected {expected:?}): {got:?}"));
             }
@@ -720,8 +811,10 @@ fn held_order(tx: &Transaction) -> Vec<u8> {
 
 /// A child written ahead of the parent that proves its coin is judged when
 /// the parent arrives, by its coin's era: refused at the four stream doors
-/// with mainnet's tip and with none, valid with a tip naming the chain's
-/// Genesis height 1 (the way out reaches the held path too).
+/// with mainnet's tip and with none. The way out reaches the held path too:
+/// under a test chain's parameters naming Genesis at 1, the 521-byte push
+/// written the same way is judged under the chain's word and valid at the
+/// three readers that take them (a tip naming Genesis at 1 until #843).
 #[tokio::test]
 async fn a_child_held_for_its_parent_is_judged_by_its_coins_era_h4m7() {
     let mut wrong = Vec::new();
@@ -731,11 +824,7 @@ async fn a_child_held_for_its_parent_is_judged_by_its_coins_era_h4m7() {
     {
         let tx = spend(&cell);
         for door in [Door::Stream, Door::TwoPass, Door::Stepping, Door::Async] {
-            for (named, expected) in [
-                (Some(tip(MAINNET_GENESIS)), Answer::Refused),
-                (None, Answer::Refused),
-                (Some(tip(1)), Answer::Valid),
-            ] {
+            for (named, expected) in [(Some(tip()), Answer::Refused), (None, Answer::Refused)] {
                 let got = answer_on(door, &tx, named, held_order(&tx)).await;
                 if got != expected {
                     wrong.push(format!(
@@ -744,6 +833,16 @@ async fn a_child_held_for_its_parent_is_judged_by_its_coins_era_h4m7() {
                     ));
                 }
             }
+        }
+    }
+    let cell = signed("a push above 520 bytes", p2pkh(), 2, push(&[7u8; 521]));
+    let tx = spend(&cell);
+    for door in [Door::TwoPass, Door::Stepping, Door::Async] {
+        let got = chain_answer(door, &tx, &chain(1), held_order(&tx)).await;
+        if got != Answer::Valid {
+            wrong.push(format!(
+                "the held child under Genesis at 1, {door:?}: {got:?}"
+            ));
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
@@ -778,7 +877,7 @@ async fn a_caller_of_the_doors_given_no_height_screens_a_coin_from_before_genesi
     );
     assert!(answered.is_ok(), "{answered:?}");
     // Chain parameters decline the coin at the whole-transaction door.
-    let tracker = tracker(&tx, Some(tip(MAINNET_GENESIS)));
+    let tracker = tracker(&tx, Some(tip()));
     let declined = tx
         .verify_with_chain_params(&tracker, None, None, &main)
         .await;

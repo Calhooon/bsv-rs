@@ -71,7 +71,25 @@ impl SignOutputs {
 ///   (`interpreter.cpp:1474-1481`, CHECKMULTISIG `:1569-1576`, gated on
 ///   `IsChronicle(flags)`; `VerifyScript` passes the scriptPubKey as
 ///   `checksigData`, `:2336-2342`): pass [`chronicle_unlocking_script_code`].
+///
+/// A context block that grows (it gained `script_code` in 0.7.0), so it is
+/// `#[non_exhaustive]` (#843): build it with [`SigningContext::new`] and
+/// [`SigningContext::with_script_code`]; the fields stay readable, and a
+/// pattern over it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::script::SigningContext<'static>) -> bsv_rs::script::SigningContext<'static> {
+///     bsv_rs::script::SigningContext { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::script::SigningContext<'static>) -> bsv_rs::script::SigningContext<'static> {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SigningContext<'a> {
     /// The raw transaction bytes being signed.
     pub raw_tx: &'a [u8],
@@ -86,6 +104,11 @@ pub struct SigningContext<'a> {
     /// over `locking_script`.
     pub script_code: Option<&'a Script>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    SigningContext<'static>,
+    bsv_rs::script::SigningContext<'static>
+);
 
 impl<'a> SigningContext<'a> {
     /// Creates a new signing context, its scriptCode the locking script.

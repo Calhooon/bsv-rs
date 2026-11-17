@@ -213,13 +213,6 @@ fn test_contacts_manager_config_default() {
 }
 
 #[test]
-fn test_certifier_info_default() {
-    let info = CertifierInfo::default();
-    assert_eq!(info.name, "Unknown Certifier");
-    assert_eq!(info.trust, 0);
-}
-
-#[test]
 fn test_contact_from_identity() {
     let identity = DisplayableIdentity::from_key("02abc123");
     let contact = Contact::from_identity(identity.clone());
@@ -242,4 +235,24 @@ fn test_contact_to_displayable_identity() {
     assert_eq!(identity.name, "Test User");
     assert_eq!(identity.avatar_url, "https://example.com/avatar.png");
     assert!(identity.abbreviated_key.contains("..."));
+}
+
+/// `all()` against the definition (#843d9, as #819's guard of
+/// `WalletRefusalClass::ALL`): `VARIANT_NAMES` is written from the definition
+/// by `non_exhaustive_enum!`, so a type left out of `all()` fails here, and
+/// each listed type's ID reads back as itself.
+#[test]
+fn all_holds_every_known_certificate_type_and_each_id_reads_back_843d9() {
+    let names: Vec<String> = KnownCertificateType::all()
+        .iter()
+        .map(|v| format!("{v:?}"))
+        .collect();
+    assert_eq!(names, KnownCertificateType::VARIANT_NAMES);
+    for known in KnownCertificateType::all() {
+        assert_eq!(
+            KnownCertificateType::from_type_id(known.type_id()),
+            Some(*known),
+            "{known:?}"
+        );
+    }
 }

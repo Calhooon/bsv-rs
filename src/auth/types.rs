@@ -17,9 +17,12 @@ pub const AUTH_VERSION: &str = "0.1";
 /// This is used with security level 2 for BRC-42 key derivation.
 pub const AUTH_PROTOCOL_ID: &str = "auth message signature";
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::auth::MessageType;
 /// Message types in the BRC-31 authentication protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum MessageType {
     /// Initial authentication request from initiator.
     InitialRequest,
@@ -31,6 +34,7 @@ pub enum MessageType {
     CertificateResponse,
     /// General authenticated message.
     General,
+}
 }
 
 impl MessageType {
@@ -667,5 +671,27 @@ mod tests {
         assert!(!req.is_certifier_trusted("02def456"));
         assert!(req.is_type_requested("type1"));
         assert!(!req.is_type_requested("type2"));
+    }
+
+    /// `from_str` against the definition (#843d9): the list is held to the
+    /// definition by `VARIANT_NAMES`, which `non_exhaustive_enum!` writes from
+    /// it, and each listed type's text reads back as itself.
+    #[test]
+    fn every_message_type_of_the_definition_reads_back_from_its_text_843d9() {
+        let every = [
+            MessageType::InitialRequest,
+            MessageType::InitialResponse,
+            MessageType::CertificateRequest,
+            MessageType::CertificateResponse,
+            MessageType::General,
+        ];
+        let names: Vec<String> = every.iter().map(|v| format!("{v:?}")).collect();
+        assert_eq!(names, MessageType::VARIANT_NAMES);
+        for message_type in every {
+            assert_eq!(
+                MessageType::from_str(message_type.as_str()),
+                Some(message_type)
+            );
+        }
     }
 }

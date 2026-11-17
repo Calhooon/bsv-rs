@@ -57,12 +57,7 @@ impl OverlayLookupFacilitator for TokenLookup {
         _timeout_ms: Option<u64>,
     ) -> bsv_rs::Result<LookupAnswer> {
         let token = self.0.lock().unwrap().clone();
-        let outputs = token.into_iter().map(|beef| OutputListItem {
-            beef,
-            output_index: 0,
-            context: None,
-            txid: None,
-        });
+        let outputs = token.into_iter().map(|beef| OutputListItem::new(beef, 0));
         Ok(LookupAnswer::OutputList {
             outputs: outputs.collect(),
         })

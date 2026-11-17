@@ -130,12 +130,7 @@ fn test_lookup_question_from_string() {
 
 #[test]
 fn test_lookup_answer_output_list() {
-    let outputs = vec![OutputListItem {
-        beef: vec![1, 2, 3, 4],
-        output_index: 0,
-        context: Some(vec![0xAB]),
-        txid: None,
-    }];
+    let outputs = vec![OutputListItem::new(vec![1, 2, 3, 4], 0).with_context(vec![0xAB])];
 
     let answer = LookupAnswer::OutputList {
         outputs: outputs.clone(),

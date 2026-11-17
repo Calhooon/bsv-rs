@@ -380,7 +380,7 @@ impl KVStoreInterpreter {
     pub fn interpret(
         tx: &Transaction,
         output_index: u32,
-        ctx: Option<&KVStoreContext>,
+        ctx: Option<&KVStoreContext>,  // key, protocol and controller matched (#843); None reads any token
     ) -> Option<KVStoreEntry>;
 
     /// Interpret a locking script directly
@@ -826,9 +826,23 @@ signature), a refused token no value, as `kvStoreInterpreter.ts:48` answers;
 the raw-protocol form is no value there, and so in the global store's reads.
 A string context names an App protocol, matching the reference's `[1, name]`;
 the default `kvstore` configuration reads the reference's `[1,"kvstore"]`.
-The reference interpreter's controller context is not implemented
-(`KVStoreContext` has no controller, a public shape), and a `None` context
-reads any key where the reference answers nothing: stated in the #544 row.
+Since #843's structs lane `KVStoreContext` is the reference's `KVContext`
+(`kvStoreInterpreter.ts:6-10`): `#[non_exhaustive]`, built by
+`KVStoreContext::new(key, protocol_id, controller)`, the controller the hex
+of the token's controller key. `interpret` and `interpret_script` answer a
+value only for a token whose key, protocol and controller are the context's,
+the controller compared without regard to case (`:39-46`), and the store's
+history walk hands the entry's own `{ key, protocol, controller }`, as the
+reference hands its historian (`GlobalKVStore.ts:648-656`); `cache_key()`
+holds all three (`protocol:key:controller`, the controller in lower case).
+A `None` context still reads any key, where the reference answers nothing:
+this crate's own door, the one residue of the #544 row. Pinned by
+`tests/kvstore_context_controller_843.rs` (the recorded `kvstore` group of
+`vectors/token_envelope_544.json`, whose context names the controller) and
+the unit test `the_history_walk_keeps_to_the_entrys_controller_843`. The
+store's query reads its subject unlinked (`from_beef_subject`, #749's fold2),
+so at that door the walk reaches the subject alone today (read, not run:
+a note for the captain, `docs/lanes/fix-843-structs.md`).
 
 ### History Building
 

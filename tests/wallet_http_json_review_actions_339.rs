@@ -511,12 +511,7 @@ async fn the_revocation_retries_a_double_spend_answered_over_the_json_substrate(
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         network_preset: NetworkPreset::Local,
         facilitator: Some(Arc::new(Lookup(LookupAnswer::OutputList {
-            outputs: vec![OutputListItem {
-                beef: lookup,
-                output_index: 0,
-                context: None,
-                txid: None,
-            }],
+            outputs: vec![OutputListItem::new(lookup, 0)],
         })) as Arc<dyn OverlayLookupFacilitator>),
         slap_trackers: Some(vec![]),
         host_overrides: Some(host_overrides),

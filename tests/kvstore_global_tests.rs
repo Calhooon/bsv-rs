@@ -909,7 +909,7 @@ fn test_interpreter_context_key_match() {
     let script = create_signed_token("kvstore", "my_key", "my_value", &privkey, None);
 
     // Matching context
-    let ctx = KVStoreContext::new("my_key", "kvstore");
+    let ctx = KVStoreContext::new("my_key", "kvstore", privkey.public_key().to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_some());
 }
@@ -926,7 +926,7 @@ fn test_interpreter_context_key_mismatch() {
 
     let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
 
-    let ctx = KVStoreContext::new("other_key", "kvstore");
+    let ctx = KVStoreContext::new("other_key", "kvstore", pubkey.to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_none());
 }
@@ -943,7 +943,7 @@ fn test_interpreter_context_protocol_mismatch() {
 
     let script = create_test_token("kvstore", "my_key", "my_value", &pubkey, None);
 
-    let ctx = KVStoreContext::new("my_key", "different_protocol");
+    let ctx = KVStoreContext::new("my_key", "different_protocol", pubkey.to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_none());
 }
@@ -1350,8 +1350,8 @@ fn test_kvstore_remove_options_builder() {
 
 #[test]
 fn test_kvstore_context_cache_key_format() {
-    let ctx = KVStoreContext::new("user:123", "app_storage");
-    assert_eq!(ctx.cache_key(), "app_storage:user:123");
+    let ctx = KVStoreContext::new("user:123", "app_storage", "02AB");
+    assert_eq!(ctx.cache_key(), "app_storage:user:123:02ab");
 }
 
 // =============================================================================

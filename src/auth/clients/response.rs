@@ -9,7 +9,25 @@ pub(super) const MAX_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 /// An owned, buffered equivalent of the reference's Fetch `Response`.
 /// Headers use lowercase names; the body can be read repeatedly as bytes.
 /// No browser stream, status text, response URL or redirect metadata is implied.
-#[derive(Clone, PartialEq, Eq)] // Debug redacts every header value but the public names (header_debug.rs)
+///
+/// A record this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test double's)
+/// with [`Response::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::Response) -> bsv_rs::auth::Response {
+///     bsv_rs::auth::Response { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::Response) -> bsv_rs::auth::Response {
+///     value
+/// }
+/// ```
+// Debug redacts every header value but the public names (header_debug.rs).
+#[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Response {
     /// HTTP status code.
     pub status: u16,
@@ -20,7 +38,24 @@ pub struct Response {
     pub body: Vec<u8>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(Response, bsv_rs::auth::Response);
+
 impl Response {
+    /// A response of `status` with `headers` (lowercase names, held in the
+    /// order given) and `body`.
+    #[must_use]
+    pub fn new(
+        status: u16,
+        headers: impl IntoIterator<Item = (String, String)>,
+        body: Vec<u8>,
+    ) -> Self {
+        Self {
+            status,
+            headers: headers.into_iter().collect(),
+            body,
+        }
+    }
+
     /// Returns a header without requiring the caller to lowercase its name.
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers

@@ -535,18 +535,37 @@ impl Certificate {
         self.fields.keys().collect()
     }
 
-    /// Converts to wallet certificate format, each field its text (#261), in
-    /// this certificate's order (the wallet's map and this one keep
-    /// insertion order, the reference's `Record`; #385, #394).
-    pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
-        crate::wallet::types::Certificate {
+    /// Converts to the wallet's certificate record (`WalletCertificate`, the
+    /// reference's `Wallet.interfaces.ts:851` at `ts-stack@edf6e03`): the type
+    /// and the serial number in base64, the two keys in compressed hex, the
+    /// revocation outpoint as `txid.vout` and the signature in hex, each
+    /// field its text (#261), in this certificate's order (the wallet's map
+    /// and this one keep insertion order, the reference's `Record`; #385,
+    /// #394). A certificate holding no revocation outpoint or no signature
+    /// writes the empty text there (the wallet's record requires both).
+    ///
+    /// The reference has no twin: its `Certificate` class carries the
+    /// wallet record's own members. Until #843 this returned
+    /// `wallet::Certificate`, a third certificate shape no wallet call
+    /// carried, removed with it.
+    #[must_use]
+    pub fn to_wallet_certificate(&self) -> crate::wallet::WalletCertificate {
+        crate::wallet::WalletCertificate {
             certificate_type: self.type_base64(),
-            subject: self.subject.clone(),
+            subject: self.subject.to_hex(),
             serial_number: self.serial_number_base64(),
-            certifier: self.certifier.clone(),
-            revocation_outpoint: self.revocation_outpoint.clone(),
+            certifier: self.certifier.to_hex(),
+            revocation_outpoint: self
+                .revocation_outpoint
+                .as_ref()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
+            signature: self
+                .signature
+                .as_deref()
+                .map(crate::primitives::to_hex)
+                .unwrap_or_default(),
             fields: self.fields.clone(),
-            signature: self.signature.clone(),
         }
     }
 }

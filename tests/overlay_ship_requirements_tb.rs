@@ -123,12 +123,7 @@ fn resolver() -> Arc<LookupResolver> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|a| OutputListItem {
-            beef: hex::decode(a["beef"].as_str().unwrap()).unwrap(),
-            output_index: 0,
-            context: None,
-            txid: None,
-        })
+        .map(|a| OutputListItem::new(hex::decode(a["beef"].as_str().unwrap()).unwrap(), 0))
         .collect();
     resolver_answering(outputs)
 }

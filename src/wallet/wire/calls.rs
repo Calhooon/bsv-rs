@@ -5,12 +5,15 @@
 
 use crate::Error;
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::wallet::wire::WalletCall;
 /// WalletWire call codes (1-28).
 ///
 /// These codes are used as the first byte in a WalletWire message to identify
 /// which wallet method is being called.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum WalletCall {
     /// Create a new transaction action.
     CreateAction = 1,
@@ -68,6 +71,7 @@ pub enum WalletCall {
     GetNetwork = 27,
     /// Get the wallet version.
     GetVersion = 28,
+}
 }
 
 impl WalletCall {
@@ -196,6 +200,52 @@ mod tests {
         for code in 1..=28u8 {
             let call = WalletCall::try_from(code).unwrap();
             assert_eq!(call.as_u8(), code);
+        }
+    }
+
+    /// Every call, in the definition's order: held against the definition by
+    /// `VARIANT_NAMES`, which `non_exhaustive_enum!` writes from it (#843d9).
+    const EVERY_CALL: [WalletCall; 28] = [
+        WalletCall::CreateAction,
+        WalletCall::SignAction,
+        WalletCall::AbortAction,
+        WalletCall::ListActions,
+        WalletCall::InternalizeAction,
+        WalletCall::ListOutputs,
+        WalletCall::RelinquishOutput,
+        WalletCall::GetPublicKey,
+        WalletCall::RevealCounterpartyKeyLinkage,
+        WalletCall::RevealSpecificKeyLinkage,
+        WalletCall::Encrypt,
+        WalletCall::Decrypt,
+        WalletCall::CreateHmac,
+        WalletCall::VerifyHmac,
+        WalletCall::CreateSignature,
+        WalletCall::VerifySignature,
+        WalletCall::AcquireCertificate,
+        WalletCall::ListCertificates,
+        WalletCall::ProveCertificate,
+        WalletCall::RelinquishCertificate,
+        WalletCall::DiscoverByIdentityKey,
+        WalletCall::DiscoverByAttributes,
+        WalletCall::IsAuthenticated,
+        WalletCall::WaitForAuthentication,
+        WalletCall::GetHeight,
+        WalletCall::GetHeaderForHeight,
+        WalletCall::GetNetwork,
+        WalletCall::GetVersion,
+    ];
+
+    /// `TryFrom<u8>` against the definition: a call added to the enum fails the
+    /// list until it is on it, and a listed call the table does not read back
+    /// fails the round trip.
+    #[test]
+    fn every_call_of_the_definition_reads_back_from_its_code_843d9() {
+        let names: Vec<String> = EVERY_CALL.iter().map(|v| format!("{v:?}")).collect();
+        assert_eq!(names, WalletCall::VARIANT_NAMES);
+        for call in EVERY_CALL {
+            assert_eq!(WalletCall::try_from(call.as_u8()).unwrap(), call);
+            assert_eq!(WalletCall::try_from(call as u8).unwrap(), call);
         }
     }
 }

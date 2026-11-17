@@ -1,10 +1,63 @@
 //! The queue `HostReputationTracker::subscribe` hands back (#843dforeign).
 
-use super::host_reputation_tracker::RankChangeEvent;
 use tokio::sync::broadcast::{
     self,
     error::{RecvError, TryRecvError},
 };
+
+/// Event emitted when a host's reputation score changes.
+///
+/// Subscribers receive this event whenever `record_success()` or `record_failure()`
+/// causes a change in a host's computed reputation score.
+///
+/// A record this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test's) with
+/// [`RankChangeEvent::new`]. Declared beside its receiver since #843 (the
+/// tracker's file may only shrink); `overlay::RankChangeEvent` as before.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::RankChangeEvent) -> bsv_rs::overlay::RankChangeEvent {
+///     bsv_rs::overlay::RankChangeEvent { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::RankChangeEvent) -> bsv_rs::overlay::RankChangeEvent {
+///     value
+/// }
+/// ```
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub struct RankChangeEvent {
+    /// The host whose rank changed.
+    pub host: String,
+    /// The previous reputation score (lower = better).
+    pub old_rank: f64,
+    /// The new reputation score (lower = better).
+    pub new_rank: f64,
+    /// Human-readable reason for the change.
+    pub reason: String,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(RankChangeEvent, bsv_rs::overlay::RankChangeEvent);
+
+impl RankChangeEvent {
+    /// The change of `host`'s score from `old_rank` to `new_rank` for `reason`.
+    #[must_use]
+    pub fn new(
+        host: impl Into<String>,
+        old_rank: f64,
+        new_rank: f64,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            host: host.into(),
+            old_rank,
+            new_rank,
+            reason: reason.into(),
+        }
+    }
+}
 
 /// The queue [`HostReputationTracker::subscribe`] hands back: this crate's
 /// type (#843dforeign), so no public signature names another crate's channel

@@ -858,20 +858,20 @@ fn test_kvstore_remove_options_builder() {
 
 #[test]
 fn test_kvstore_context_creation() {
-    let ctx = KVStoreContext::new("my_key", "my_protocol");
+    let ctx = KVStoreContext::new("my_key", "my_protocol", "02AB");
     assert_eq!(ctx.key, "my_key");
     assert_eq!(ctx.protocol_id, "my_protocol");
 }
 
 #[test]
 fn test_kvstore_context_cache_key() {
-    let ctx = KVStoreContext::new("user:123", "app_storage");
-    assert_eq!(ctx.cache_key(), "app_storage:user:123");
+    let ctx = KVStoreContext::new("user:123", "app_storage", "02AB");
+    assert_eq!(ctx.cache_key(), "app_storage:user:123:02ab");
 }
 
 #[test]
 fn test_kvstore_context_clone() {
-    let ctx = KVStoreContext::new("key", "proto");
+    let ctx = KVStoreContext::new("key", "proto", "02AB");
     let cloned = ctx.clone();
     assert_eq!(cloned.key, "key");
     assert_eq!(cloned.protocol_id, "proto");
@@ -928,7 +928,7 @@ fn test_interpreter_with_matching_context() {
 
     let script = create_signed_token("kvstore", "ctx_key", "ctx_value", &privkey, None);
 
-    let ctx = KVStoreContext::new("ctx_key", "kvstore");
+    let ctx = KVStoreContext::new("ctx_key", "kvstore", privkey.public_key().to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_some());
 }
@@ -940,7 +940,7 @@ fn test_interpreter_with_non_matching_context_key() {
 
     let script = create_test_token("kvstore", "actual_key", "value", &pubkey, None);
 
-    let ctx = KVStoreContext::new("different_key", "kvstore");
+    let ctx = KVStoreContext::new("different_key", "kvstore", pubkey.to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_none());
 }
@@ -952,7 +952,7 @@ fn test_interpreter_with_non_matching_context_protocol() {
 
     let script = create_test_token("kvstore", "key", "value", &pubkey, None);
 
-    let ctx = KVStoreContext::new("key", "different_protocol");
+    let ctx = KVStoreContext::new("key", "different_protocol", pubkey.to_hex());
     let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
     assert!(entry.is_none());
 }

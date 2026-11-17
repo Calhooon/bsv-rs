@@ -85,12 +85,7 @@ fn a_decline_leaves_verify_as_its_own_class() {
         err,
         Error::ScriptEvaluationDeclined {
             input_index: 0,
-            limit: ScriptResourceLimit {
-                resource: ScriptResource::Stack,
-                limit: 32_000_000,
-                attempted: 33_000_000,
-                work_spent: None,
-            },
+            limit: ScriptResourceLimit::new(ScriptResource::Stack, 32_000_000, 33_000_000),
         }
     );
     assert!(!matches!(err, Error::TransactionError(_)));

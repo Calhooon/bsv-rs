@@ -265,11 +265,12 @@ fn the_wallet_certificate_writer_refuses_the_first_bad_field_given_not_the_first
 }
 
 // ---------------------------------------------------------------------------
-// JSON: each of the nine maps read and written in the order given
+// JSON: each of the eight maps read and written in the order given
 // ---------------------------------------------------------------------------
 
-/// Each of the nine maps read from JSON keeps the order of the text and is
-/// written back in it, as `JSON.parse` and `JSON.stringify` keep a record's.
+/// Each of the eight maps read from JSON keeps the order of the text and is
+/// written back in it, as `JSON.parse` and `JSON.stringify` keep a record's
+/// (nine until #843 removed `wallet::Certificate`, whose `fields` was one).
 #[test]
 fn every_certificate_map_keeps_its_json_order_on_read_and_write() {
     let fields = pairs(&NAMES, |n| format!("value of {n}"));
@@ -341,12 +342,6 @@ fn every_certificate_map_keeps_its_json_order_on_read_and_write() {
     let by_attributes: DiscoverByAttributesArgs =
         serde_json::from_str(&format!(r#"{{"attributes":{f}}}"#)).unwrap();
     assert_eq!(serde_json::to_string(&by_attributes.attributes).unwrap(), f);
-
-    let plain: bsv_rs::wallet::Certificate = serde_json::from_str(&format!(
-        r#"{{"certificateType":"t","subject":"{G}","serialNumber":"s","certifier":"{TWO_G}","fields":{f}}}"#
-    ))
-    .unwrap();
-    assert_eq!(serde_json::to_string(&plain.fields).unwrap(), f);
 }
 
 // ---------------------------------------------------------------------------

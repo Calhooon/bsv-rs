@@ -9,7 +9,9 @@
 //! `#[non_exhaustive]` or is a row of [`ROWS`], `file:Name` with a class and
 //! a reason. A row naming no such struct, or an attributed one, fails; the
 //! `Pending` and `Unruled` classes take no new row (their lengths are pinned
-//! and only lowered). Each `pub` field of an attributed struct has a
+//! and only lowered; since #843's structs lane the `Unruled` rows are seven,
+//! named, each waiting on a ruling its reason names, and the structs built
+//! by literal on purpose are rows of `Literal`, each with its ground). Each `pub` field of an attributed struct has a
 //! `with_<field>` method in an inherent `impl` of its name, or is a
 //! parameter of its `new`, else the struct is a row of [`ASSIGNED`] with its
 //! reason.
@@ -28,6 +30,13 @@
 //! struct a macro builds without the `struct` keyword in the source, a setter
 //! defined by a macro or a trait, a `new` in another impl of a same-named
 //! type in another module (setters are matched by the type's name alone).
+//!
+//! Since #843d9 (the freeze plan's row 9) the same holds of enums: every
+//! `pub enum` under `src/` carries `#[non_exhaustive]` or is a row of
+//! [`CLOSED_ENUMS`], `file:Name` with a reason opening `closed: ` (its set is
+//! fixed by what the thing is, or a caller's exhaustive match is the safety
+//! property) or `held for row 4: `; a row naming no enum, or an attributed
+//! one, fails. An attributed enum's pin is `arch_non_exhaustive_pins_819.rs`'s.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 mod arch_support;
@@ -402,7 +411,12 @@ enum Class {
     /// The freeze plan's row 8b or 8c: opened by a later part. Takes no new
     /// row; [`PENDING_LEN`] only lowers.
     Pending,
-    /// No class holds it and no ruling names it. Takes no new row;
+    /// Built by literal on purpose (the captain's rulings of 2026-11-17 on
+    /// #843): its fields are a wire or byte format, it is a value type, or a
+    /// caller builds it to call a public door; the reason says which.
+    Literal,
+    /// No class holds it yet: each waits on a ruling its reason names (the
+    /// one broadcast answer type, another lane's items). Takes no new row;
     /// [`UNRULED_LEN`] only lowers.
     Unruled,
 }
@@ -410,8 +424,23 @@ enum Class {
 /// The rows of `Pending`: only lowered, as each struct is opened.
 const PENDING_LEN: usize = 20;
 /// The rows of `Unruled`: only lowered, as each struct takes a class or the
-/// attribute.
-const UNRULED_LEN: usize = 57;
+/// attribute. 57 until #843's structs lane ruled 50 of them (22 opened,
+/// 27 literal on purpose, `wallet::Certificate` removed and identity's
+/// `CertifierInfo` unified into the wallet's `IdentityCertifier`); the 7
+/// left are [`UNRULED`], by name.
+const UNRULED_LEN: usize = 7;
+
+/// The seven `Unruled` rows, by name: none may join and none may leave
+/// unsaid.
+const UNRULED: [&str; UNRULED_LEN] = [
+    "src/identity/types.rs:BroadcastSuccess",
+    "src/registry/types.rs:BroadcastSuccess",
+    "src/registry/types.rs:RegisterDefinitionResult",
+    "src/registry/types.rs:RevokeDefinitionResult",
+    "src/registry/types.rs:UpdateDefinitionResult",
+    "src/script/transaction.rs:SimpleUtxo",
+    "src/transaction/input.rs:Utxo",
+];
 
 /// `file:Name`, the class, the reason: every all-public struct under `src/`
 /// without `#[non_exhaustive]`.
@@ -422,7 +451,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/auth/types.rs:RequestedCertificateSet", Class::Record, "`RequestedCertificateSet`, `packages/sdk/src/auth/types.ts:21` at `edf6e03`"),
     ("src/identity/types.rs:DisplayableIdentity", Class::Record, "`DisplayableIdentity`, `packages/sdk/src/identity/types/index.ts:29` at `edf6e03`"),
     ("src/identity/types.rs:IdentityQuery", Class::Record, "`IdentityQuery`, `packages/overlays/topics/src/identity/types.ts:28` at `edf6e03`"),
-    ("src/identity/types.rs:IdentityCertificate", Class::Record, "`IdentityCertificate`, `packages/sdk/src/wallet/Wallet.interfaces.ts:877` at `edf6e03`"),
     ("src/identity/types.rs:BroadcastFailure", Class::Record, "`BroadcastFailure`, `packages/sdk/src/transaction/Broadcaster.ts:130` at `edf6e03`"),
     ("src/kvstore/types.rs:KVStoreToken", Class::Record, "`KVStoreToken`, `packages/sdk/src/kvstore/types.ts:149` at `edf6e03`"),
     ("src/kvstore/types.rs:KVStoreEntry", Class::Record, "`KVStoreEntry`, `packages/sdk/src/kvstore/types.ts:123` at `edf6e03`"),
@@ -448,7 +476,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/registry/types.rs:CertificateQuery", Class::Record, "`CertificateQuery`, `packages/sdk/src/registry/types/index.ts:116` at `edf6e03`"),
     ("src/registry/types.rs:BroadcastFailure", Class::Record, "`BroadcastFailure`, `packages/sdk/src/transaction/Broadcaster.ts:130` at `edf6e03`"),
     ("src/script/chunk.rs:ScriptChunk", Class::Record, "`ScriptChunk`, `packages/sdk/src/script/ScriptChunk.ts:4` at `edf6e03`"),
-    ("src/script/evaluation_error.rs:ScriptEvaluationError", Class::Record, "`ScriptEvaluationError`, `packages/sdk/src/script/ScriptEvaluationError.ts:9` at `edf6e03`"),
     ("src/script/templates/pushdrop.rs:PushDrop", Class::Record, "`PushDrop`, `packages/sdk/src/script/templates/PushDrop.ts:53` at `edf6e03`"),
     ("src/script/templates/rpuzzle.rs:RPuzzle", Class::Record, "`RPuzzle`, `packages/sdk/src/script/templates/RPuzzle.ts:20` at `edf6e03`"),
     ("src/storage/types.rs:UploadableFile", Class::Record, "`UploadableFile`, `packages/sdk/src/storage/StorageUploader.ts:38` at `edf6e03`"),
@@ -566,63 +593,40 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/transaction/chain_trackers/block_headers_service.rs:BlockHeadersServiceConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/transaction/fee_models/live_policy.rs:LivePolicyConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/wallet/cached_key_deriver.rs:CacheConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/auth/clients/response.rs:Response", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/auth/transports/http.rs:HttpRequest", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/auth/transports/http.rs:HttpResponse", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/auth/transports/socketio/mod.rs:AppEvent", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/block/difficulty.rs:HeaderLink", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/block/header.rs:BlockHeader", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/block/merkle.rs:MerkleRoot", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/block/target.rs:CompactTarget", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/identity/types.rs:IdentityResolutionResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/identity/types.rs:CertifierInfo", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/identity/types.rs:BroadcastSuccess", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/kvstore/interpreter.rs:KVStoreContext", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/kvstore/interpreter.rs:KVStoreFields", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/overlay/host_reputation_tracker.rs:RankChangeEvent", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/overlay/overlay_admin_token_template.rs:OverlayAdminTokenData", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/overlay/types.rs:OutputListItem", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/overlay/types.rs:HostResponse", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/overlay/types.rs:ServiceMetadata", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/primitives/bsv/schnorr.rs:SchnorrProof", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/primitives/bsv/sighash.rs:TxInput", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/primitives/bsv/sighash.rs:TxOutput", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/primitives/bsv/sighash.rs:RawTransaction", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/registry/types.rs:RegisterDefinitionResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/registry/types.rs:BroadcastSuccess", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/registry/types.rs:RevokeDefinitionResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/registry/types.rs:UpdateDefinitionResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/script/evaluation_error.rs:ScriptResourceLimit", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/script/template.rs:SigningContext", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/script/templates/multisig.rs:Multisig", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/script/transaction.rs:SimpleUtxo", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/storage/types.rs:UploadMetadata", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef.rs:SortResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef.rs:BeefValidationResult", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:Refusal", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:Leaf", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:Bump", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:InputRef", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:OutputRef", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:TxBody", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:ChainTip", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/beef_stream.rs:HeadersFn", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/chain_tracker.rs:AlwaysValidChainTracker", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/input.rs:Utxo", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/transaction.rs:ScriptOffsets", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/transaction.rs:ScriptOffset", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/transaction/fields.rs:TransactionParts", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/transaction/transaction/fields.rs:TransactionPartsMut", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/review_actions.rs:ReviewActionsRefusal", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/types.rs:Protocol", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/types.rs:Outpoint", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/types.rs:Certificate", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:CreateActionInputRaw", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:CreateActionOutputRaw", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:CreateActionOptionsRaw", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:CreateActionArgsRaw", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:SignActionSpendRaw", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/wallet/validation.rs:ValidSignActionSpend", Class::Unruled, "no class holds it and no ruling names it"),
+    ("src/auth/transports/http.rs:HttpRequest", Class::Literal, "its fields are the BRC-104 general payload's request frame (request ID, method, path, search, headers, body), which a caller builds to send"),
+    ("src/auth/transports/http.rs:HttpResponse", Class::Literal, "its fields are the BRC-104 general payload's response frame (request ID, status, headers, body), which a caller builds to answer"),
+    ("src/block/difficulty.rs:HeaderLink", Class::Literal, "a value: a header's height, time and bits, which a caller builds to call `next_work_required`"),
+    ("src/block/header.rs:BlockHeader", Class::Literal, "its fields are the 80-byte block header, field for field"),
+    ("src/block/merkle.rs:MerkleRoot", Class::Literal, "a value: a root and the node's mutation flag"),
+    ("src/block/target.rs:CompactTarget", Class::Literal, "a value: the node's decoded compact target and its two flags"),
+    ("src/identity/types.rs:BroadcastSuccess", Class::Unruled, "waits for the one broadcast answer type (the freeze plan's row 4)"),
+    ("src/kvstore/interpreter.rs:KVStoreFields", Class::Literal, "its fields are a KVStore token's fields by position (the reference's `kvProtocol` indices) and its locking key"),
+    ("src/overlay/overlay_admin_token_template.rs:OverlayAdminTokenData", Class::Literal, "its fields are a SHIP or SLAP advertisement token's four data fields, as the reference's `decodeAdvertisement` returns them"),
+    ("src/overlay/types.rs:ServiceMetadata", Class::Literal, "a caller builds it to describe its own service (a dependent builds 65 by literal); its members are the overlay's metadata record"),
+    ("src/primitives/bsv/schnorr.rs:SchnorrProof", Class::Literal, "a value: the proof's three members (R, S', z), which a verifier builds from received bytes to call `verify_proof`"),
+    ("src/primitives/bsv/sighash.rs:TxInput", Class::Literal, "its fields are a serialized input (outpoint, script, sequence); a caller builds it for `SighashParams` and `SpendParams`"),
+    ("src/primitives/bsv/sighash.rs:TxOutput", Class::Literal, "its fields are a serialized output (amount, script); a caller builds it for `SighashParams` and `SpendParams`"),
+    ("src/primitives/bsv/sighash.rs:RawTransaction", Class::Literal, "its fields are a serialized transaction (version, inputs, outputs, lock time)"),
+    ("src/registry/types.rs:RegisterDefinitionResult", Class::Unruled, "waits for the one broadcast answer type (the freeze plan's row 4)"),
+    ("src/registry/types.rs:BroadcastSuccess", Class::Unruled, "waits for the one broadcast answer type (the freeze plan's row 4)"),
+    ("src/registry/types.rs:RevokeDefinitionResult", Class::Unruled, "waits for the one broadcast answer type (the freeze plan's row 4)"),
+    ("src/registry/types.rs:UpdateDefinitionResult", Class::Unruled, "waits for the one broadcast answer type (the freeze plan's row 4)"),
+    ("src/script/templates/multisig.rs:Multisig", Class::Literal, "a value: the template is its threshold M, as the Record rows `RPuzzle` and `PushDrop` are their members"),
+    ("src/script/transaction.rs:SimpleUtxo", Class::Unruled, "another lane's: the `script::transaction` items no dependent uses, to be read before they are ruled"),
+    ("src/transaction/beef_stream.rs:Leaf", Class::Literal, "a BUMP leaf as read from the wire; a caller builds it for the public `fold_bump` (the captain's ruling of 2026-11-17 on #1033: the element records stay as they are)"),
+    ("src/transaction/beef_stream.rs:Bump", Class::Literal, "a BUMP as read from the wire; a caller builds it for the public `fold_bump` (#1033's ruling)"),
+    ("src/transaction/beef_stream.rs:InputRef", Class::Literal, "an input's place in a streamed transaction's bytes; a caller builds it for the public `fold` (#1033's ruling)"),
+    ("src/transaction/beef_stream.rs:OutputRef", Class::Literal, "an output's place in a streamed transaction's bytes; a caller builds it for the public `fold` (#1033's ruling)"),
+    ("src/transaction/beef_stream.rs:TxBody", Class::Literal, "a raw transaction as read from the wire; a caller builds it for the public `fold` (#1033's ruling)"),
+    ("src/transaction/beef_stream.rs:HeadersFn", Class::Literal, "a callback newtype: a caller wraps its own function, `HeadersFn(f)`"),
+    ("src/transaction/input.rs:Utxo", Class::Unruled, "another lane's: its `txid` is typed with the merkle and id doors (the rulings of 2026-11-17, item 2)"),
+    ("src/transaction/transaction.rs:ScriptOffsets", Class::Literal, "a value: the reference's `parseScriptOffsets` answer is exactly its two lists"),
+    ("src/transaction/transaction.rs:ScriptOffset", Class::Literal, "a value: a script's index, offset and length in a transaction's bytes"),
+    ("src/transaction/transaction/fields.rs:TransactionParts", Class::Literal, "a caller builds it to call `Transaction::from_parts`: a transaction's six fields"),
+    ("src/transaction/transaction/fields.rs:TransactionPartsMut", Class::Literal, "a transaction's six fields lent at once by `parts_mut`: the same six as `TransactionParts`"),
+    ("src/wallet/types.rs:Protocol", Class::Literal, "a value: the reference's `WalletProtocol` pair, level and name; declared beside `overlay::Protocol` on purpose (the reference's `OverlayDiscoveryProtocol`, `'SHIP' | 'SLAP'`; go-sdk keeps the two apart by package, `wallet/wallet.go:26`, `overlay/overlay.go:15` at `2ca481c`)"),
+    ("src/wallet/types.rs:Outpoint", Class::Literal, "a value: a txid and an output index, the wire's outpoint"),
+    ("src/wallet/validation.rs:ValidSignActionSpend", Class::Literal, "a value: the validated form of the reference's `SignActionSpend` (`Wallet.interfaces.ts:404`), beside the `ValidCreateAction*` Record rows"),
 ];
 
 /// The parameter blocks' field names, in declaration order.
@@ -686,6 +690,10 @@ const ASSIGNED: &[(&str, &str)] = &[
     (
         "src/error/wallet_fault.rs:AbortAcceptance",
         "built by `new(reference, class, message)`; `txid`, `status`, `accepting_word` and `kind` set on the record when known, as its docs say (#439, #604)",
+    ),
+    (
+        "src/overlay/types.rs:HostResponse",
+        "built by `success(host, steak)` and `failure(host, error)`, the two answers a host gives (#843)",
     ),
     (
         "src/overlay/lookup_limits.rs:LookupLimits",
@@ -840,6 +848,50 @@ fn the_pending_and_unruled_classes_take_no_new_row_843d8a() {
         UNRULED_LEN,
         "Unruled takes no new row; lower UNRULED_LEN when a struct leaves it"
     );
+    let unruled: BTreeSet<&str> = ROWS
+        .iter()
+        .filter(|(_, c, _)| *c == Class::Unruled)
+        .map(|(row, _, _)| *row)
+        .collect();
+    assert_eq!(
+        unruled,
+        UNRULED.into_iter().collect::<BTreeSet<_>>(),
+        "the Unruled rows are the seven named"
+    );
+}
+
+/// The captain's rulings of 2026-11-17 on the 57 structs no ruling covered
+/// (#843): the 27 literal on purpose each say which ground holds them, and
+/// no row still says that no ruling names it.
+#[test]
+fn every_literal_row_says_its_ground_843() {
+    let grounds = [
+        "its fields are",
+        "a value: ",
+        "a caller builds it",
+        "a caller wraps",
+        "as read from the wire",
+        "in a streamed transaction's bytes",
+        "lent at once",
+    ];
+    let literal: Vec<&Row<'_>> = ROWS
+        .iter()
+        .filter(|(_, c, _)| *c == Class::Literal)
+        .collect();
+    assert_eq!(literal.len(), 27, "the rows literal on purpose");
+    for (row, _, why) in literal {
+        assert!(
+            grounds.iter().any(|ground| why.contains(ground)),
+            "{row}: a Literal row's reason names its ground (a wire or byte format, a value, \
+             or a caller building it for a public door): {why}"
+        );
+    }
+    for (row, _, why) in ROWS {
+        assert!(
+            !why.contains("no ruling names it"),
+            "{row}: every struct is ruled or waits on a named ruling"
+        );
+    }
 }
 
 #[test]
@@ -897,13 +949,13 @@ fn the_scan_reads_every_form_by_name_843d8a() {
         set(KEY_ARGS),
         "the key_args! structs"
     );
-    assert_eq!(public.len(), 220, "all-public structs under src/");
+    assert_eq!(public.len(), 217, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
-        13,
+        35,
         "attributed"
     );
-    assert_eq!(ROWS.len() + 13, public.len(), "every other one a row");
+    assert_eq!(ROWS.len() + 35, public.len(), "every other one a row");
 }
 
 fn probe(text: &str) -> (Vec<Found>, Vec<String>) {
@@ -1074,6 +1126,296 @@ fn the_rule_refuses_each_case_on_a_probe_843d8a() {
     ];
     for (rows, assigned, words) in cases {
         let got = errors(&found, &refused, &impls, rows, assigned);
+        assert_eq!(got.len(), 1, "{words}: {got:?}");
+        assert!(got[0].starts_with(words), "{words}: {got:?}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// #843d9 (the freeze plan's row 9): every `pub enum` is open or closed with
+// its reason.
+// ---------------------------------------------------------------------------
+
+/// A `pub enum` the scan found: `file:Name`, its line, whether it carries
+/// `#[non_exhaustive]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FoundEnum {
+    key: String,
+    line: usize,
+    attributed: bool,
+}
+
+/// One file's `pub enum`s, and its refusals (`path:line: reason`). An enum
+/// defined inside `non_exhaustive_enum!` is read as written there; a
+/// `macro_rules!` body's `$vis enum $name` is no declaration; a `pub enum`
+/// inside any other macro invocation is refused.
+fn scan_enums(path: &str, tokens: &[Token<'_>]) -> (Vec<FoundEnum>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut refused = Vec::new();
+    let mut macros: Vec<(usize, usize, &str)> = Vec::new();
+    for i in 0..tokens.len().saturating_sub(2) {
+        let t = tokens[i].text;
+        if t.starts_with(|c: char| c.is_alphabetic() || c == '_')
+            && !tokens[i].literal
+            && tokens[i + 1].text == "!"
+            && matches!(tokens[i + 2].text, "(" | "[" | "{")
+        {
+            macros.push((i + 2, after(tokens, i + 2), t));
+        }
+    }
+    for at in 1..tokens.len() {
+        if tokens[at].text != "enum" || tokens[at].literal || tokens[at - 1].text != "pub" {
+            continue;
+        }
+        let line = tokens[at].line;
+        let Some(name) = tokens
+            .get(at + 1)
+            .filter(|t| t.text.starts_with(|c: char| c.is_alphabetic() || c == '_'))
+        else {
+            continue;
+        };
+        // The innermost invocation holding the declaration.
+        let inside = macros
+            .iter()
+            .filter(|(s, e, _)| *s < at && at < *e)
+            .max_by_key(|(s, _, _)| *s)
+            .map(|(_, _, n)| *n);
+        match inside {
+            None | Some("non_exhaustive_enum") => {}
+            Some("macro_rules") => continue,
+            Some(other) => {
+                refused.push(format!(
+                    "{path}:{line}: `pub enum {}` inside `{other}!`, which this scan cannot read",
+                    name.text
+                ));
+                continue;
+            }
+        }
+        let attributed = attributes_before(tokens, at - 1)
+            .iter()
+            .any(|attribute| non_exhaustive(attribute));
+        found.push(FoundEnum {
+            key: format!("{path}:{}", name.text),
+            line,
+            attributed,
+        });
+    }
+    (found, refused)
+}
+
+/// The rows of [`CLOSED_ENUMS`] whose reason opens `closed: `: a row joins
+/// by a ruling alone.
+const CLOSED_LEN: usize = 15;
+/// The rows whose reason opens `held for row 4: `: only lowered, as row 4
+/// rules each.
+const HELD_LEN: usize = 5;
+
+/// `file:Name` and the reason: every `pub enum` under `src/` without
+/// `#[non_exhaustive]` (the captain's ruling of 2026-11-12 on three design
+/// reads). A closed enum costs a major version at its next variant, an open
+/// one a wildcard arm per outside match: one is closed only where its set is
+/// fixed by what the thing is, or where a caller's exhaustive match is the
+/// safety property. A reason opens `closed: ` or `held for row 4: `.
+const CLOSED_ENUMS: &[(&str, &str)] = &[
+    ("src/compat/bip39/mnemonic.rs:WordCount", "closed: BIP-39's five sizes"),
+    ("src/script/evaluation_error.rs:ExecutionContext", "closed: a spend runs two scripts"),
+    ("src/script/input_flags.rs:Word", "closed: the node's two flag words"),
+    ("src/script/template.rs:SignOutputs", "closed: the three base hash types"),
+    ("src/script/templates/pushdrop.rs:LockPosition", "closed: before or after"),
+    ("src/transaction/beef_stream.rs:Node", "closed: a BUMP leaf is a hash or a duplicate flag"),
+    ("src/transaction/beef_stream.rs:Element", "closed: every outside match is exhaustive at a BEEF door, where a wildcard arm could only skip an entry"),
+    ("src/transaction/beef_stream.rs:Step", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_stream.rs:Progress", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_stream.rs:Timed", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_tx.rs:TxDataFormat", "closed: the frame's format byte, `transaction/BeefConstants.ts:13-15` at `edf6e03`; a wildcard arm at a BEEF door could only skip an entry"),
+    ("src/transaction/broadcaster.rs:BroadcastStatus", "closed: success or error"),
+    ("src/wallet/types.rs:SecurityLevel", "closed: `SecurityLevel = 0 | 1 | 2`, `wallet/Wallet.interfaces.ts:225` at `edf6e03`; permission code matches it, and a wildcard arm would choose"),
+    ("src/wallet/types.rs:Counterparty", "closed: permission code matches it, and a wildcard arm would choose"),
+    ("src/wallet/types.rs:KeyringRevealer", "closed: the certifier or a key"),
+    ("src/compat/bip32.rs:Network", "held for row 4: the freeze plan's row 4 rules it; declared beside `wallet::Network` on purpose (#843): this one selects an extended key's version bytes under `compat`, which does not depend on `wallet`, and go-sdk keeps the two apart (`primitives/ec/privatekey.go:28`, `wallet/interfaces.go:641` at `2ca481c`)"),
+    ("src/wallet/types.rs:Network", "held for row 4: the freeze plan's row 4 rules it; declared beside `compat::bip32::Network` on purpose (#843): this one is the reference's `WalletNetwork`, a wallet's `getNetwork` answer, and `compat` does not depend on `wallet`"),
+    ("src/identity/types.rs:BroadcastResult", "held for row 4: the freeze plan's row 4 rules it"),
+    ("src/overlay/types.rs:Protocol", "held for row 4: the freeze plan's row 4 rules it; declared beside `wallet::Protocol` on purpose (#843): this one is the reference's `OverlayDiscoveryProtocol`, `'SHIP' | 'SLAP'`, that one its `WalletProtocol` pair, and go-sdk keeps the two apart by package (`overlay/overlay.go:15`, `wallet/wallet.go:26` at `2ca481c`)"),
+    ("src/wallet/types.rs:QueryMode", "held for row 4: the freeze plan's row 4 rules it"),
+];
+
+/// The rule's refusals: the scan's, an enum with neither the attribute nor
+/// a row, a row naming no enum or an attributed one, a row twice, a reason
+/// of neither opening.
+fn enum_errors(found: &[FoundEnum], refused: &[String], rows: &[(&str, &str)]) -> Vec<String> {
+    let mut errors: Vec<String> = refused.to_vec();
+    let keys: BTreeSet<&str> = rows.iter().map(|(key, _)| *key).collect();
+    if keys.len() != rows.len() {
+        errors.push("CLOSED_ENUMS names a row twice".into());
+    }
+    for item in found {
+        match (item.attributed, keys.contains(item.key.as_str())) {
+            (false, false) => errors.push(format!(
+                "{}: a `pub enum` (line {}) with neither `#[non_exhaustive]` nor a row of CLOSED_ENUMS: open it in `non_exhaustive_enum!`, or a ruling closes it",
+                item.key, item.line
+            )),
+            (true, true) => errors.push(format!(
+                "{}: attributed and still a row of CLOSED_ENUMS",
+                item.key
+            )),
+            _ => {}
+        }
+    }
+    for (key, reason) in rows {
+        if !found.iter().any(|item| item.key == *key) {
+            errors.push(format!(
+                "{key}: a row of CLOSED_ENUMS that names no `pub enum`"
+            ));
+        }
+        if !reason.starts_with("closed: ") && !reason.starts_with("held for row 4: ") {
+            errors.push(format!(
+                "{key}: a reason opens `closed: ` or `held for row 4: ` (found `{reason}`)"
+            ));
+        }
+    }
+    errors
+}
+
+/// Every `pub enum` under `src/`, test files aside, and the scan's refusals.
+fn crate_enums() -> (Vec<FoundEnum>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut refused = Vec::new();
+    for source in arch_support::sources() {
+        if is_test_file(&source.path) {
+            continue;
+        }
+        let tokens = source.tokens_with_attributes();
+        let (f, r) = scan_enums(&source.path, &tokens);
+        found.extend(f);
+        refused.extend(r);
+    }
+    (found, refused)
+}
+
+#[test]
+fn every_pub_enum_is_open_or_closed_with_its_reason_843d9() {
+    let (found, refused) = crate_enums();
+    let errors = enum_errors(&found, &refused, CLOSED_ENUMS);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let count = |opening: &str| {
+        CLOSED_ENUMS
+            .iter()
+            .filter(|(_, reason)| reason.starts_with(opening))
+            .count()
+    };
+    assert_eq!(
+        count("closed: "),
+        CLOSED_LEN,
+        "a closed row joins by a ruling alone; move CLOSED_LEN with it"
+    );
+    assert_eq!(
+        count("held for row 4: "),
+        HELD_LEN,
+        "the held rows take no new one; lower HELD_LEN as row 4 rules each"
+    );
+    let attributed = found.iter().filter(|item| item.attributed).count();
+    assert_eq!(found.len(), attributed + CLOSED_ENUMS.len());
+    println!(
+        "{} `pub enum`s: {attributed} attributed, {} closed, {} held for row 4",
+        found.len(),
+        count("closed: "),
+        count("held for row 4: ")
+    );
+}
+
+/// The enum scan and the rule on sample texts: each form and each refusal.
+#[test]
+fn the_enum_rule_refuses_each_case_on_a_probe_843d9() {
+    let tokens = arch_support::scan_tokens_with_attributes(
+        r#"
+        // pub enum InComment { A }
+        const S: &str = "pub enum InString { A }";
+        /// Doc.
+        #[derive(Clone)]
+        #[non_exhaustive]
+        pub enum Open { A }
+        crate::util::non_exhaustive::non_exhaustive_enum! {
+            path = bsv_rs::probe::Pinned;
+        /// Doc.
+        #[derive(Debug)]
+        #[non_exhaustive]
+        pub enum Pinned { A, B(u8) }
+        }
+        pub enum Closed { A }
+        pub enum Planted { A }
+        #[cfg_attr(feature = "x", non_exhaustive)]
+        pub enum Conditional { A }
+        pub(crate) enum Private { A }
+        enum Bare { A }
+        macro_rules! make { ($vis:vis enum $name:ident) => { $vis enum $name { A } }; }
+        other_macro! { pub enum Hidden { A } }
+        "#,
+    );
+    let (found, refused) = scan_enums("probe.rs", &tokens);
+    let read: Vec<(&str, bool)> = found
+        .iter()
+        .map(|item| (item.key.as_str(), item.attributed))
+        .collect();
+    assert_eq!(
+        read,
+        [
+            ("probe.rs:Open", true),
+            ("probe.rs:Pinned", true),
+            ("probe.rs:Closed", false),
+            ("probe.rs:Planted", false),
+            ("probe.rs:Conditional", false),
+        ]
+    );
+    assert_eq!(refused.len(), 1, "{refused:?}");
+    assert!(
+        refused[0]
+            .ends_with("`pub enum Hidden` inside `other_macro!`, which this scan cannot read"),
+        "{refused:?}"
+    );
+    let kept = [
+        ("probe.rs:Closed", "closed: a probe"),
+        ("probe.rs:Planted", "held for row 4: a probe"),
+        ("probe.rs:Conditional", "closed: a probe"),
+    ];
+    assert_eq!(enum_errors(&found, &[], &kept), Vec::<String>::new());
+    let cases: [(&[(&str, &str)], &str); 5] = [
+        (
+            &[kept[0], kept[2]],
+            "probe.rs:Planted: a `pub enum` (line 16) with neither `#[non_exhaustive]` nor a row",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                kept[2],
+                ("probe.rs:Open", "closed: a probe"),
+            ],
+            "probe.rs:Open: attributed and still a row of CLOSED_ENUMS",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                kept[2],
+                ("probe.rs:Gone", "closed: a probe"),
+            ],
+            "probe.rs:Gone: a row of CLOSED_ENUMS that names no `pub enum`",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                ("probe.rs:Conditional", "no pin yet: a probe"),
+            ],
+            "probe.rs:Conditional: a reason opens `closed: ` or `held for row 4: `",
+        ),
+        (
+            &[kept[0], kept[1], kept[2], kept[0]],
+            "CLOSED_ENUMS names a row twice",
+        ),
+    ];
+    for (rows, words) in cases {
+        let got = enum_errors(&found, &[], rows);
         assert_eq!(got.len(), 1, "{words}: {got:?}");
         assert!(got[0].starts_with(words), "{words}: {got:?}");
     }

@@ -101,14 +101,12 @@ fn a_second_outputs_overlong_custom_instructions_is_named_with_its_index() {
 
 #[test]
 fn a_create_action_outputs_custom_instructions_stay_unbounded() {
-    let output = CreateActionOutputRaw {
-        locking_script: "76a914".to_string() + &"00".repeat(20) + "88ac",
-        satoshis: 1,
-        output_description: "a fixture output".into(),
-        basket: None,
-        custom_instructions: Some("a".repeat(1001)),
-        tags: vec![],
-    };
+    let output = CreateActionOutputRaw::new(
+        "76a914".to_string() + &"00".repeat(20) + "88ac",
+        1,
+        "a fixture output",
+    )
+    .with_custom_instructions("a".repeat(1001));
     let valid = validate_create_action_output(&output).expect("no bound on createAction's copy");
     assert_eq!(valid.custom_instructions.map(|c| c.len()), Some(1001));
 }

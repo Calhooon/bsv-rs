@@ -63,7 +63,9 @@ const MAINNET_PUBLIC: [u8; 4] = [0x04, 0x88, 0xB2, 0x1E]; // xpub
 const TESTNET_PRIVATE: [u8; 4] = [0x04, 0x35, 0x83, 0x94]; // tprv
 const TESTNET_PUBLIC: [u8; 4] = [0x04, 0x35, 0x87, 0xCF]; // tpub
 
-/// Network type for extended key version bytes.
+/// Network type for extended key version bytes. Declared beside
+/// `wallet::Network` (a wallet's `getNetwork` answer) on purpose (#843):
+/// `compat` does not depend on `wallet`, and go-sdk keeps the two apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Network {
     /// Bitcoin mainnet (xprv/xpub)

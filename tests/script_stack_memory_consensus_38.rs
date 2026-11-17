@@ -90,12 +90,11 @@ fn consensus_100(s: &mut Spend) {
 }
 
 fn stack(limit: u64, attempted: u64) -> Outcome {
-    Declined(ScriptResourceLimit {
-        resource: ScriptResource::Stack,
+    Declined(ScriptResourceLimit::new(
+        ScriptResource::Stack,
         limit,
         attempted,
-        work_spent: None,
-    })
+    ))
 }
 
 /// Under the block word, a growth above the consensus figure is the node's

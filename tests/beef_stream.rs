@@ -2458,17 +2458,10 @@ impl bsv_rs::transaction::beef_stream::Headers for MiningHeaders {
         Some(self.tip)
     }
 }
-#[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
 fn mining_headers(roots: HashMap<u64, Hash32>, height: u32, mtp: u32) -> MiningHeaders {
     MiningHeaders {
         roots,
-        tip: bsv_rs::transaction::beef_stream::ChainTip {
-            height,
-            median_time_past: mtp,
-            genesis_height: 10_000,
-            csv_height: 0,
-            next_block_time: None,
-        },
+        tip: bsv_rs::transaction::beef_stream::ChainTip::new(height, mtp).with_csv_height(0),
     }
 }
 #[test]
@@ -2486,11 +2479,14 @@ fn mining_row3d_p2sh_before_genesis() {
         &[bump],
         &[Entry::Raw(parent, Some(0)), Entry::Raw(child, None)],
     );
-    let mut headers = mining_headers(roots, 9_998, 1_700_000_000);
+    // The default path judges by mainnet's Genesis height, 620,538 (the
+    // tip named the regtest's 10,000 until #843 removed its copy): a tip
+    // two blocks below it accepts the output, one block below refuses it.
+    let mut headers = mining_headers(roots, 620_536, 1_700_000_000);
     assert!(verify_stream(bytes.as_slice(), &headers, None)
         .unwrap()
         .is_valid());
-    headers.tip.height = 9_999;
+    headers.tip.height = 620_537;
     mining_spend(
         verify_stream(bytes.as_slice(), &headers, None).unwrap(),
         offsets[1] + 47,
@@ -2922,14 +2918,10 @@ fn a_spend_refusal_prints_the_interpreters_sentence_for_a_script() {
 
 #[test]
 fn a_spend_refusal_prints_the_interpreters_sentence_for_a_resource() {
-    let limit = |resource, work_spent| {
-        SpendRefusal::Resource(ScriptResourceLimit {
-            resource,
-            limit: 1_000,
-            attempted: 1_001,
-            work_spent,
-        })
-        .to_string()
+    let limit = |resource, work_spent: Option<u64>| {
+        let mut limit = ScriptResourceLimit::new(resource, 1_000, 1_001);
+        limit.work_spent = work_spent;
+        SpendRefusal::Resource(limit).to_string()
     };
     assert_eq!(
         limit(ScriptResource::Stack, None),

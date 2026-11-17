@@ -35,15 +35,8 @@ impl Headers for HeaderFacts {
     }
 }
 
-#[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
 fn tip(height: u32) -> ChainTip {
-    ChainTip {
-        height,
-        median_time_past: 0,
-        genesis_height: GENESIS,
-        csv_height: 419_328,
-        next_block_time: None,
-    }
+    ChainTip::new(height, 0)
 }
 
 fn key() -> PrivateKey {

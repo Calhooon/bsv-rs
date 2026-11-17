@@ -122,8 +122,11 @@ const MACRO_FILE: &str = "src/util/non_exhaustive.rs";
 /// (#819's fourth fold, as rule 14 pins `sealed`; the whole text, not its
 /// code tokens, since the macros' own doc tests are its comments). Whoever
 /// changes the file deliberately reads the change, then sets this to the
-/// digest the failure prints, in the same diff.
-const MACRO_FILE_DIGEST: u64 = 0x9dce_d5a1_36dd_693d;
+/// digest the failure prints, in the same diff. Moved by #843's structs
+/// lane: `assert_no_drop!` reads its name as a type (`$name:ty`, where an
+/// identifier and type arguments could name no lifetime), so
+/// `SigningContext<'static>` is pinned; one arm still.
+const MACRO_FILE_DIGEST: u64 = 0x018b_6d1b_bd53_69a6;
 
 use arch_support::fnv;
 
@@ -247,9 +250,16 @@ const PRELUDE_NAMES: &[&str] = &[
 /// `file:Type` with no pin yet, each with its reason. The list only shrinks:
 /// an entry that is pinned, or names no type, is refused, and its contents
 /// are [`LISTED_KEYS`], so an entry added fails naming itself.
+/// One entry was added since, by the captain's ruling on #843d9:
+/// `SubstrateType`, three of whose four variants stand under
+/// `cfg(feature = "http")`, in `Error`'s words.
 const LISTED: &[(&str, &str)] = &[
     (
         "src/error.rs:Error",
+        "no pin yet: variants under `cfg(feature)`, whose arms a doc test outside the crate cannot gate",
+    ),
+    (
+        "src/wallet/client.rs:SubstrateType",
         "no pin yet: variants under `cfg(feature)`, whose arms a doc test outside the crate cannot gate",
     ),
     (
@@ -276,8 +286,9 @@ const LISTED: &[(&str, &str)] = &[
 
 /// [`LISTED`]'s keys, exactly: the list only shrinks, so this pin moves with
 /// it by a removal alone.
-const LISTED_KEYS: [&str; 6] = [
+const LISTED_KEYS: [&str; 7] = [
     "src/error.rs:Error",
+    "src/wallet/client.rs:SubstrateType",
     "src/transaction/beef_stream.rs:Stop",
     "src/transaction/beef_stream.rs:Verdict",
     "src/transaction/beef_stream.rs:AsyncVerifyError",
@@ -744,15 +755,22 @@ fn macro_file_refusals(text: &str) -> Vec<String> {
 /// is the pins found under `src/` (the test below holds it so), and each
 /// entry must have exactly one `compile fail ... ok` line and at least one
 /// plain `... ok` line in the doc suite's log.
-const DOC_PINS: [&str; 25] = [
+const DOC_PINS: [&str; 77] = [
     "src/auth/certificates/certificate.rs - auth::certificates::certificate::Certificate",
     "src/auth/clients/auth_fetch.rs - auth::clients::auth_fetch::AuthFetchOptions",
+    "src/auth/clients/response.rs - auth::clients::response::Response",
     "src/auth/peer.rs - auth::peer::PeerOptions",
+    "src/auth/transports/socketio/app_event.rs - auth::transports::socketio::app_event::AppEvent",
+    "src/auth/transports/socketio/codec.rs - auth::transports::socketio::codec::CodecError",
+    "src/auth/transports/socketio/codec.rs - auth::transports::socketio::codec::EngineIoPacket",
+    "src/auth/transports/socketio/codec.rs - auth::transports::socketio::codec::SocketIoPacket",
     "src/auth/transports/websocket_transport.rs - auth::transports::websocket_transport::WebSocketTransportOptions",
+    "src/auth/types.rs - auth::types::MessageType",
     "src/block/activation.rs - block::activation::ActivationHeightsError",
     "src/block/difficulty.rs - block::difficulty::DifficultyError",
     "src/block/params.rs - block::params::ChainParams",
     "src/block/target.rs - block::target::PowError",
+    "src/compat/bip39/mnemonic.rs - compat::bip39::mnemonic::Language",
     "src/error.rs - error::TransportFault",
     "src/error/wallet_fault.rs - error::wallet_fault::AbortAcceptance",
     "src/error/wallet_fault.rs - error::wallet_fault::AbortKind",
@@ -760,16 +778,61 @@ const DOC_PINS: [&str; 25] = [
     "src/error/wallet_fault.rs - error::wallet_fault::WalletFaultFamily",
     "src/error/wallet_refusal.rs - error::wallet_refusal::WalletRefusalClass",
     "src/identity/types.rs - identity::types::Contact",
+    "src/identity/types.rs - identity::types::IdentityResolutionResult",
+    "src/identity/types.rs - identity::types::KnownCertificateType",
+    "src/kvstore/interpreter.rs - kvstore::interpreter::KVStoreContext",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupLimits",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupRequestOptions",
+    "src/overlay/rank_change_receiver.rs - overlay::rank_change_receiver::RankChangeEvent",
+    "src/overlay/topic_broadcaster.rs - overlay::topic_broadcaster::RequireAck",
+    "src/overlay/types.rs - overlay::types::HostResponse",
+    "src/overlay/types.rs - overlay::types::LookupAnswer",
+    "src/overlay/types.rs - overlay::types::LookupAnswerType",
+    "src/overlay/types.rs - overlay::types::NetworkPreset",
+    "src/overlay/types.rs - overlay::types::OutputListItem",
+    "src/registry/types.rs - registry::types::DefinitionData",
+    "src/registry/types.rs - registry::types::DefinitionType",
+    "src/script/evaluation_error.rs - script::evaluation_error::ScriptEvaluationError",
+    "src/script/evaluation_error.rs - script::evaluation_error::ScriptResource",
+    "src/script/evaluation_error.rs - script::evaluation_error::ScriptResourceLimit",
+    "src/script/flags.rs - script::flags::ProtocolEra",
+    "src/script/flags.rs - script::flags::ScriptFlagsError",
     "src/script/not_judged.rs - script::not_judged::NotJudgedCause",
+    "src/script/template.rs - script::template::SigningContext",
+    "src/script/templates/rpuzzle.rs - script::templates::rpuzzle::RPuzzleType",
+    "src/storage/types.rs - storage::types::UploadMetadata",
+    "src/totp/core.rs - totp::core::Algorithm",
+    "src/transaction/beef.rs - transaction::beef::BeefValidationResult",
+    "src/transaction/beef.rs - transaction::beef::SortResult",
     "src/transaction/beef/link.rs - transaction::beef::link::BeefLinkLimits",
+    "src/transaction/beef_stream.rs - transaction::beef_stream::MiningCheck",
+    "src/transaction/beef_stream.rs - transaction::beef_stream::Refusal",
+    "src/transaction/beef_stream.rs - transaction::beef_stream::SpendRefusal",
+    "src/transaction/beef_stream.rs - transaction::beef_stream::StreamError",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Kind",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Reason",
+    "src/transaction/beef_stream/tip.rs - transaction::beef_stream::tip::ChainTip",
+    "src/transaction/broadcasters/whatsonchain.rs - transaction::broadcasters::whatsonchain::WocBroadcastNetwork",
+    "src/transaction/chain_tracker.rs - transaction::chain_tracker::AlwaysValidChainTracker",
     "src/transaction/chain_tracker.rs - transaction::chain_tracker::ChainTrackerError",
+    "src/transaction/chain_trackers/whatsonchain.rs - transaction::chain_trackers::whatsonchain::WocNetwork",
+    "src/transaction/transaction.rs - transaction::transaction::ChangeDistribution",
     "src/transaction/work_budget.rs - transaction::work_budget::WorkBudget",
     "src/wallet/hmac_tag.rs - wallet::hmac_tag::HmacKeyEncoding",
     "src/wallet/hmac_tag.rs - wallet::hmac_tag::HmacVerifyPolicy",
+    "src/wallet/review_actions.rs - wallet::review_actions::ReviewActionsRefusal",
+    "src/wallet/types.rs - wallet::types::AcquisitionProtocol",
+    "src/wallet/types.rs - wallet::types::ActionStatus",
+    "src/wallet/types.rs - wallet::types::OutputInclude",
+    "src/wallet/types.rs - wallet::types::ReviewActionResultStatus",
+    "src/wallet/types.rs - wallet::types::SendWithResultStatus",
+    "src/wallet/types.rs - wallet::types::TrustSelf",
+    "src/wallet/validation/raw.rs - wallet::validation::raw::CreateActionArgsRaw",
+    "src/wallet/validation/raw.rs - wallet::validation::raw::CreateActionInputRaw",
+    "src/wallet/validation/raw.rs - wallet::validation::raw::CreateActionOptionsRaw",
+    "src/wallet/validation/raw.rs - wallet::validation::raw::CreateActionOutputRaw",
+    "src/wallet/validation/raw.rs - wallet::validation::raw::SignActionSpendRaw",
+    "src/wallet/wire/calls.rs - wallet::wire::calls::WalletCall",
 ];
 
 /// The macros' own doc tests (item 2): the name, its `compile fail ... ok`
@@ -783,7 +846,7 @@ const MACRO_DOC_TESTS: [(&str, usize, usize); 4] = [
     (
         "src/util/non_exhaustive.rs - util::non_exhaustive::non_exhaustive_enum",
         1,
-        1,
+        2,
     ),
     (
         "src/util/non_exhaustive.rs - util::non_exhaustive::non_exhaustive_fail_block",
@@ -1049,13 +1112,12 @@ fn a_pinned_structs_compile_fail_line_is_its_functional_updates_819() {
 fn the_macro_file_is_pinned_whole_and_each_macro_has_one_arm_819() {
     let text = arch_support::read(MACRO_FILE);
     assert_eq!(macro_file_pin_refusals(&text), Vec::<String>::new());
-    let general =
-        "macro_rules! assert_no_drop {\n    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {";
+    let general = "macro_rules! assert_no_drop {\n    ($name:ty, $path:path) => {";
     assert!(text.contains(general));
     // the third re-read's fault B: an arm for one type ahead of the general one
     let specialised = text.replacen(
         general,
-        "macro_rules! assert_no_drop {\n    (LookupRequestOptions, $path:path) => {};\n    ($name:ident $(< $($arg:ty),+ >)?, $path:path) => {",
+        "macro_rules! assert_no_drop {\n    (LookupRequestOptions, $path:path) => {};\n    ($name:ty, $path:path) => {",
         1,
     );
     // the second fold's two vacuous macros: the body emptied, a unit body

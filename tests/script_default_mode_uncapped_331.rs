@@ -111,12 +111,7 @@ fn a_default_mode_stack_past_32_000_000_bytes_is_judged_invalid_without_a_budget
 fn a_callers_32_000_000_bytes_decline_the_33rd_copy() {
     assert_eq!(
         declined(spend(&dup_lock(&[]), element_push(), 1, BUDGET_32_000_000)),
-        ScriptResourceLimit {
-            resource: ScriptResource::Stack,
-            limit: 32_000_000,
-            attempted: 33_000_000,
-            work_spent: None,
-        }
+        ScriptResourceLimit::new(ScriptResource::Stack, 32_000_000, 33_000_000)
     );
 }
 
@@ -135,12 +130,7 @@ fn a_40_000_000_byte_element_is_valid_without_a_budget_and_declined_under_one() 
             2,
             BUDGET_32_000_000
         )),
-        ScriptResourceLimit {
-            resource: ScriptResource::ElementSize,
-            limit: 32_000_000,
-            attempted: 40_000_000,
-            work_spent: None,
-        }
+        ScriptResourceLimit::new(ScriptResource::ElementSize, 32_000_000, 40_000_000)
     );
 }
 

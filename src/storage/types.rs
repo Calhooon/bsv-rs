@@ -101,7 +101,24 @@ pub struct FindFileData {
 }
 
 /// Metadata for an uploaded file in a list response.
+///
+/// A record this crate produces from a storage server's answer, so it is
+/// `#[non_exhaustive]` (#843): read the fields, end a pattern over it in
+/// `..`, and build one (a test double's) with [`UploadMetadata::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::storage::UploadMetadata) -> bsv_rs::storage::UploadMetadata {
+///     bsv_rs::storage::UploadMetadata { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::storage::UploadMetadata) -> bsv_rs::storage::UploadMetadata {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct UploadMetadata {
     /// UHRP URL of the file.
     #[serde(rename = "uhrpUrl")]
@@ -109,6 +126,19 @@ pub struct UploadMetadata {
     /// Expiration timestamp (Unix seconds).
     #[serde(rename = "expiryTime")]
     pub expiry_time: i64,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(UploadMetadata, bsv_rs::storage::UploadMetadata);
+
+impl UploadMetadata {
+    /// The file at `uhrp_url`, kept until `expiry_time` (Unix seconds).
+    #[must_use]
+    pub fn new(uhrp_url: impl Into<String>, expiry_time: i64) -> Self {
+        Self {
+            uhrp_url: uhrp_url.into(),
+            expiry_time,
+        }
+    }
 }
 
 /// Result of a file renewal operation.

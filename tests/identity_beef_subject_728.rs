@@ -182,12 +182,7 @@ impl OverlayLookupFacilitator for Answering {
 /// How many identities and certificates the two parsers return for `beef`
 /// served at `output_index`.
 async fn read(beef: Vec<u8>, output_index: u32, subject: &str) -> (usize, usize) {
-    let output = OutputListItem {
-        beef,
-        output_index,
-        context: None,
-        txid: None,
-    };
+    let output = OutputListItem::new(beef, output_index);
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Answering(output))),
         slap_trackers: Some(vec![]),

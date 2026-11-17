@@ -103,15 +103,7 @@ fn advertisement(domain: &str, seed: u32) -> (OutputListItem, Transaction) {
     beef.merge_raw_tx(tx.to_binary(), Some(index)).unwrap();
     let bytes = beef.to_binary().unwrap();
     let subject = Transaction::from_beef(&bytes, None).unwrap();
-    (
-        OutputListItem {
-            beef: bytes,
-            output_index: 0,
-            context: None,
-            txid: None,
-        },
-        subject,
-    )
+    (OutputListItem::new(bytes, 0), subject)
 }
 
 fn host(name: &str) -> String {

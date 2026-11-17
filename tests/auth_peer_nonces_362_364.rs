@@ -181,6 +181,7 @@ async fn message(p: &mut Pair, kind: MessageType) -> AuthMessage {
                 .await
                 .unwrap()
         }
+        other => panic!("unknown variant: {other:?}"),
     }
     p.b.sent.recv().await.unwrap()
 }

@@ -76,5 +76,6 @@ pub fn definition(case: &Value) -> DefinitionData {
             }
             data.into()
         }
+        other => panic!("unknown variant: {other:?}"),
     }
 }

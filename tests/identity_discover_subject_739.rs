@@ -139,12 +139,7 @@ impl OverlayLookupFacilitator for Answering {
 fn client(outputs: Vec<(Vec<u8>, u32)>) -> IdentityClient<ProtoWallet> {
     let outputs = outputs
         .into_iter()
-        .map(|(beef, output_index)| OutputListItem {
-            beef,
-            output_index,
-            context: None,
-            txid: None,
-        })
+        .map(|(beef, output_index)| OutputListItem::new(beef, output_index))
         .collect();
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Answering(outputs))),

@@ -39,11 +39,11 @@ fn token_outputs(tokens: &Value) -> Vec<OutputListItem> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|token| OutputListItem {
-            beef: from_hex(token["beef"].as_str().unwrap()).unwrap(),
-            output_index: token["output_index"].as_u64().unwrap() as u32,
-            context: None,
-            txid: None,
+        .map(|token| {
+            OutputListItem::new(
+                from_hex(token["beef"].as_str().unwrap()).unwrap(),
+                token["output_index"].as_u64().unwrap() as u32,
+            )
         })
         .collect()
 }
@@ -250,12 +250,7 @@ pub fn setup(name: &str) -> Harness {
                 case: case.clone(),
                 stage: stage.clone(),
                 queries: queries.clone(),
-                advertisement: OutputListItem {
-                    beef: advertisement.to_beef(true).unwrap(),
-                    output_index: 0,
-                    context: None,
-                    txid: None,
-                },
+                advertisement: OutputListItem::new(advertisement.to_beef(true).unwrap(), 0),
             })),
             ..Default::default()
         })

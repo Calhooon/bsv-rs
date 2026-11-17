@@ -81,12 +81,7 @@ fn fixture(answer: u8) -> Fixture {
 /// The interpreter's figures for the subject's input under `BUDGET`: the
 /// 600-byte push held, the duplicate asked for.
 fn expected_limit() -> ScriptResourceLimit {
-    ScriptResourceLimit {
-        resource: ScriptResource::Stack,
-        limit: BUDGET as u64,
-        attempted: 2 * PUSHED as u64,
-        work_spent: None,
-    }
+    ScriptResourceLimit::new(ScriptResource::Stack, BUDGET as u64, 2 * PUSHED as u64)
 }
 
 fn assert_declined(verdict: Verdict, subject: &Hash32) {

@@ -138,6 +138,7 @@ async fn resolved(
             .resolve_certificate(CertificateQuery::new())
             .await?
             .len(),
+        other => panic!("unknown variant: {other:?}"),
     })
 }
 

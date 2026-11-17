@@ -183,15 +183,8 @@ mod streaming {
         }
     }
 
-    #[allow(deprecated)] // The compatibility field is ignored under ChainParams (#451).
     fn tip(height: u32) -> ChainTip {
-        ChainTip {
-            height,
-            median_time_past: 0,
-            genesis_height: 1,
-            csv_height: 0,
-            next_block_time: None,
-        }
+        ChainTip::new(height, 0).with_csv_height(0)
     }
 
     fn parent(lock: LockingScript, proven: Option<u32>, genesis: u32) -> Transaction {

@@ -42,12 +42,7 @@ impl OverlayLookupFacilitator for TokenLookup {
     ) -> bsv_rs::Result<LookupAnswer> {
         assert_eq!(url, "https://kvstore-344.invalid");
         Ok(LookupAnswer::OutputList {
-            outputs: vec![OutputListItem {
-                beef: self.0.clone(),
-                output_index: 0,
-                context: None,
-                txid: None,
-            }],
+            outputs: vec![OutputListItem::new(self.0.clone(), 0)],
         })
     }
 }
@@ -90,7 +85,11 @@ fn an_untagged_reference_token_keeps_its_signature_out_of_tags() {
     ));
     assert!(KVStoreInterpreter::interpret_script(
         &script(&case),
-        Some(&KVStoreContext::new("alpha", "another namespace"))
+        Some(&KVStoreContext::new(
+            "alpha",
+            "another namespace",
+            fields.controller_hex()
+        ))
     )
     .is_none());
 }
@@ -189,12 +188,7 @@ async fn a_freeform_host_beside_a_list_answers_the_list_at_the_kvstore_door_815(
                     result: serde_json::json!({ "note": "no outputs here" }),
                 }),
                 "https://list.kvstore-815.invalid" => Ok(LookupAnswer::OutputList {
-                    outputs: vec![OutputListItem {
-                        beef: self.0.clone(),
-                        output_index: 0,
-                        context: None,
-                        txid: None,
-                    }],
+                    outputs: vec![OutputListItem::new(self.0.clone(), 0)],
                 }),
                 other => panic!("unscripted host {other}"),
             }

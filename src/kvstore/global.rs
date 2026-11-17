@@ -467,6 +467,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                                 .protocol_id
                                 .as_deref()
                                 .unwrap_or(&self.config.protocol_id),
+                            fields.controller_hex(),
                         )
                     });
 
@@ -489,7 +490,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
                         // Build history if requested
                         if options.history {
-                            let history = build_entry_history(&tx, &entry.key, &entry.protocol_id);
+                            let history = build_entry_history(&tx, &entry);
                             if !history.is_empty() {
                                 entry = entry.with_history(history);
                             }
@@ -558,23 +559,20 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 // History Building
 // =============================================================================
 
-/// Build the history of values for a key from transaction ancestry.
+/// Build the history of values for an entry from transaction ancestry.
 ///
 /// Uses `SyncHistorian` to traverse the transaction's input ancestry and extract
-/// all previous values for the same key/protocol combination.
-///
-/// # Arguments
-///
-/// * `tx` - The current transaction containing the entry
-/// * `key` - The key to track history for
-/// * `protocol_id` - The protocol ID to match
+/// all previous values for the entry's key, protocol and controller, the
+/// context the reference hands its historian (`GlobalKVStore.ts:648-656` at
+/// `ts-stack@edf6e03`: `{ key, protocolID, controller }` of the entry), whose
+/// interpreter matches all three (`kvStoreInterpreter.ts:39-46`).
 ///
 /// # Returns
 ///
 /// A vector of historical values in chronological order (oldest first).
-fn build_entry_history(tx: &Transaction, key: &str, protocol_id: &str) -> Vec<String> {
-    let ctx = KVStoreContext::new(key, protocol_id);
-    let protocol_id_owned = protocol_id.to_string();
+fn build_entry_history(tx: &Transaction, entry: &KVStoreEntry) -> Vec<String> {
+    let ctx = KVStoreContext::new(&entry.key, &entry.protocol_id, &entry.controller);
+    let protocol_id_owned = entry.protocol_id.clone();
 
     let historian = SyncHistorian::<String, KVStoreContext>::new(
         move |tx: &Transaction, output_idx: u32, ctx: Option<&KVStoreContext>| {
@@ -583,9 +581,12 @@ fn build_entry_history(tx: &Transaction, key: &str, protocol_id: &str) -> Vec<St
                 let fields = KVStoreInterpreter::extract_fields(&output.locking_script)?;
                 let field_protocol_id = fields.protocol_id_string()?;
 
-                // Match key and protocol_id
+                // Match key, protocol_id and controller
                 let field_key = fields.key_string()?;
-                if field_key != c.key || field_protocol_id != c.protocol_id {
+                if field_key != c.key
+                    || field_protocol_id != c.protocol_id
+                    || !fields.controller_hex().eq_ignore_ascii_case(&c.controller)
+                {
                     return None;
                 }
 
@@ -629,6 +630,40 @@ mod tests {
         assert_eq!(json["key"], "test_key");
         assert_eq!(json["controller"], "02abc...");
         assert_eq!(json["limit"], 10);
+    }
+
+    /// #843: the history walk keeps to the entry's controller, as the
+    /// reference hands its historian `{ key, protocolID, controller }`
+    /// (`GlobalKVStore.ts:648-656`) and its interpreter matches all three
+    /// (`kvStoreInterpreter.ts:39-46`): an ancestor's token of the same key
+    /// and protocol under another controller is no part of the history.
+    #[test]
+    fn the_history_walk_keeps_to_the_entrys_controller_843() {
+        use crate::kvstore::interpreter::tests::create_test_token;
+        use crate::primitives::PrivateKey;
+        use crate::transaction::{TransactionInput, TransactionOutput};
+        let key = |n: u8| PrivateKey::from_bytes(&[n; 32]).unwrap();
+        let (ours, theirs) = (key(7), key(8));
+        let holding = |source: Option<Transaction>, controller: &PrivateKey, value: &str| {
+            let mut tx = Transaction::new();
+            if let Some(source) = source {
+                tx.add_input(TransactionInput::with_source_transaction(source, 0))
+                    .unwrap();
+            }
+            let script = create_test_token("kvstore", "k1", value, controller, None);
+            tx.add_output(TransactionOutput::new(1, script)).unwrap();
+            tx
+        };
+        let oldest = holding(None, &theirs, "theirs");
+        let older = holding(Some(oldest), &ours, "old");
+        let tx = holding(Some(older), &ours, "new");
+        let entry = KVStoreInterpreter::interpret(&tx, 0, None).unwrap();
+        assert_eq!(entry.controller, ours.public_key().to_hex());
+        assert_eq!(build_entry_history(&tx, &entry), ["old", "new"]);
+        // Under the other controller's context the same chain reads its own.
+        let mut other = entry.clone();
+        other.controller = theirs.public_key().to_hex().to_uppercase();
+        assert_eq!(build_entry_history(&tx, &other), ["theirs"]);
     }
 
     #[test]

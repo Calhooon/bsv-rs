@@ -312,12 +312,7 @@ fn mock_resolver(
 
 fn output_list_of(beef: Vec<u8>) -> LookupAnswer {
     LookupAnswer::OutputList {
-        outputs: vec![OutputListItem {
-            beef,
-            output_index: 0,
-            context: None,
-            txid: None,
-        }],
+        outputs: vec![OutputListItem::new(beef, 0)],
     }
 }
 
