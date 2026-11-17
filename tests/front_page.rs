@@ -2009,6 +2009,32 @@ const SECURITY_PAGE_SAYS_849: &[(&str, &str)] = &[
         "### How to hear of an advisory",
         "the reader is told what to read in the tools' place",
     ),
+    // #1026, the reads of 2026-11-16: the page as nineteen advisories were published, one of
+    // them with no patched version.
+    (
+        "Read again on 2026-11-16, it listed none of the nineteen advisories this repository had published by then, thirteen of them published after 2026-11-13",
+        "the GitHub Advisory Database listed none of the nineteen advisories on 2026-11-16",
+    ),
+    (
+        "a Dependabot alert is not how to hear of an advisory of this crate",
+        "no Dependabot alert tells of an advisory",
+    ),
+    (
+        "An advisory may be published with no patched version: GHSA-82g9-h6jw-r99f named none on either line on 2026-11-16, and its text says what a caller does instead",
+        "an advisory may be published without a patch, and which one was",
+    ),
+    (
+        "(where the advisory names no patched version, as GHSA-82g9-h6jw-r99f, by the advisory alone, until a version is patched)",
+        "an unpatched defect is answered by its advisory alone",
+    ),
+    (
+        "`gh api --paginate 'repos/Calhooon/bsv-rs/security-advisories?per_page=100' --jq '.[] | select(.state == \"published\")",
+        "the listing command reads every page of the list",
+    ),
+    (
+        "a new release is then no sign that the version you run is patched, and the advisory says what a caller does instead",
+        "a release does not mean a patch where the advisory names none",
+    ),
 ];
 
 /// What the page said until #849 and may not say again: each a claim that an advisory of this
