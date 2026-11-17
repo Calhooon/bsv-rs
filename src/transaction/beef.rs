@@ -183,13 +183,32 @@ impl Beef {
     /// `ts-stack@edf6e03`); until #603 the inputs were left unlinked.
     pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction> {
         let mut tx = self.find_txid(txid)?.tx()?.clone();
-        // Through the linking door, which keeps the copy's caches where the
-        // input names its txid (#869's second fold).
+        // Each input that names a held parent is handed a FULL clone of that
+        // parent; a parent of many outputs spent by many inputs is cloned once
+        // per input, the #749 shared-parent re-materialization reached through
+        // this door too — a caller signing against an untrusted BEEF (bsv-rs
+        // #749 fold-c). Meter the wire and heap each clone holds under the
+        // default link bounds and yield `None` on a trip, exactly as
+        // `find_atomic_transaction` yields `None` when linking would overrun its
+        // default bound — so the signing door holds its memory inside the same
+        // isolate. A caller linking a large ancestry it trusts uses
+        // `find_atomic_transaction_limited`/`with_budget` with
+        // `BeefLinkLimits::unbounded`, which this convenience does not take.
+        let mut wire_used: u64 = 0;
+        let mut heap_used: u64 = 0;
         for i in 0..tx.inputs().len() {
             let input = &tx.inputs()[i];
             if input.source_transaction.is_none() {
                 let held = input.source_txid.as_deref().and_then(|t| self.find_txid(t));
                 if let Some(found) = held.and_then(BeefTx::tx) {
+                    let (wire, heap) = link::clone_weight(found);
+                    wire_used = wire_used.saturating_add(wire);
+                    heap_used = heap_used.saturating_add(heap);
+                    if wire_used > BeefLinkLimits::DEFAULT_MAX_LINK_BYTES
+                        || heap_used > BeefLinkLimits::DEFAULT_MAX_LINK_HEAP_BYTES
+                    {
+                        return None;
+                    }
                     tx.replace_source(i, Some(Box::new(found.clone())));
                 }
             }

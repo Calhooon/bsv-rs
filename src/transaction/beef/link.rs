@@ -66,11 +66,38 @@ use super::Beef;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BeefLinkLimits {
-    /// The maximum number of bytes linking may re-materialize for repeat inputs
-    /// that spend an already-linked shared parent, beyond the BEEF's own bytes,
-    /// before it is refused. `None` disables the bound (link whatever the bytes
-    /// hold — for a source the caller trusts).
+    /// The maximum number of WIRE bytes linking may re-materialize for repeat
+    /// inputs that spend an already-linked shared parent, beyond the BEEF's own
+    /// bytes, before it is refused — a stub's [`to_binary`](Transaction::to_binary)
+    /// length per repeat clone, exactly as 0.8.11 metered it. `None` disables the
+    /// bound (link whatever the bytes hold — for a source the caller trusts).
+    ///
+    /// This is the published number: a caller that set it to cap an honest
+    /// answer's reach by wire size keeps that exact meaning, and the per-output
+    /// onsets the 0.8.11 record states (702 / 251 / 127 plain / 256 B / 1 KiB
+    /// outputs at the default, 993 / 354 / 180 at 32 MiB) are unchanged. Memory
+    /// held is bounded separately by [`max_link_heap_bytes`](Self::max_link_heap_bytes),
+    /// so this number need not — and does not — change what it counts.
     pub max_link_bytes: Option<u64>,
+
+    /// The maximum number of HEAP bytes linking may hold in re-materialized
+    /// shared-parent stubs and proofs at once, before one link is refused
+    /// (bsv-rs #749 fold-c). A cloned stub holds far more heap than its wire
+    /// length — the `Vec` backings of its inputs and outputs, and a proof's leaf
+    /// structs — so a wide fan-in of one-byte-locked outputs, or many proven
+    /// parents sharing one wide proof, can hold hundreds of MB while
+    /// [`max_link_bytes`](Self::max_link_bytes) sees only a small wire count.
+    /// This bound weighs that heap and refuses BEFORE the clone that would
+    /// allocate past it, so the default link holds its memory inside a 128 MB
+    /// isolate. `None` disables it (for a source the caller trusts).
+    ///
+    /// It sits ABOVE every honest single-parent sweep the wire bound already
+    /// admits (those are bounded by `max_link_bytes` first, so this never lowers
+    /// an onset the published record states) and BELOW the memory-exhaustion
+    /// shapes the wire count alone did not catch. A caller that set a larger
+    /// explicit `max_link_bytes` and wants its full wire reach raises this in
+    /// step.
+    pub max_link_heap_bytes: Option<u64>,
 }
 
 crate::util::non_exhaustive::assert_no_drop!(BeefLinkLimits, bsv_rs::transaction::BeefLinkLimits);
@@ -79,39 +106,78 @@ impl Default for BeefLinkLimits {
     fn default() -> Self {
         Self {
             max_link_bytes: Some(Self::DEFAULT_MAX_LINK_BYTES),
+            max_link_heap_bytes: Some(Self::DEFAULT_MAX_LINK_HEAP_BYTES),
         }
     }
 }
 
 impl BeefLinkLimits {
-    /// The default per-link byte budget (bsv-rs #749 fold2, ruling 3): linking
-    /// may re-materialize up to this many bytes of repeated shared-parent stubs
-    /// beyond the BEEF's own bytes before one link is refused.
+    /// The default per-link WIRE budget (bsv-rs #749 fold2, ruling 3): linking
+    /// may re-materialize up to this many WIRE bytes of repeated shared-parent
+    /// stubs beyond the BEEF's own bytes before one link is refused.
     ///
-    /// 16 MiB — of the HEAP each repeat clone holds, not its wire bytes (bsv-rs
-    /// #749 fold-c). A transaction's `to_binary` is a flat byte count, but a
-    /// cloned stub holds far more: the struct `Vec` backings of its inputs and
-    /// outputs, its scripts' own containers, and the proof's leaf structs — a
-    /// one-byte-locked output is ~10 wire bytes yet ~150 heap bytes. Metering the
-    /// clone's heap keeps the budget a heap budget: a declined link peaks at
-    /// `≈ budget + the answer's own bytes`, ~18.6 MiB measured on the test
-    /// harness for the worst declined-late shape (a ~57 KB answer), so ~49 MiB on
-    /// a 128 MB Worker (~30 MiB baseline) — well within it, where the wire meter
-    /// this replaces held ~248 MB on that same answer, past the isolate. It sits
-    /// far below the #749 denial of service and far above every honest BEEF: the
-    /// largest shared-parent fan any real dependent's BEEF carries is 20, and the
-    /// default admits an honest single child sweeping many outputs of one parent
-    /// — up to 313 plain-payment (P2PKH) outputs, 203 data-carrying outputs of
-    /// 256 B, or 119 of 1 KiB, before one such sweep is refused (at 32 MiB: 443 /
-    /// 288 / 169). There is no single "general" figure: the onset falls as the
-    /// output grows, so the reach is stated per output size. The default refuses
-    /// no honest input any real dependent builds (their largest fan, 20, is far
-    /// under the smallest onset) while leaving generous single-link headroom; the
-    /// onsets fell from the wire meter's (P2PKH 701→313) when the fold-c began
-    /// charging the heap the clone holds, not its wire bytes. Raising it erases
-    /// that headroom; the headroom pin in `tests/beef_link_bound.rs`, which fixes
-    /// those per-output-size cells, turns red if this value moves.
+    /// 16 MiB — the stub's [`to_binary`](Transaction::to_binary) length per
+    /// repeat clone, exactly what 0.8.11 metered. A byte budget (not a count of
+    /// output slots) charges a parent of a few large outputs its true weight. The
+    /// full links (one per distinct parent) are the BEEF's own bytes and are not
+    /// counted; only the repeats are. It sits far below the #749 denial of
+    /// service and far above every honest BEEF: the largest shared-parent fan any
+    /// real dependent's BEEF carries is 20, and the default admits an honest
+    /// single child sweeping many outputs of one parent — up to 702
+    /// plain-payment (P2PKH) outputs, 251 data-carrying outputs of 256 B, or 127
+    /// of 1 KiB, before one such sweep is refused (at 32 MiB: 993 / 354 / 180;
+    /// measured by the crate's own writer). There is no single "general" figure:
+    /// the onset falls as the output grows, so the reach is stated per output
+    /// size. The memory a declined link holds is bounded separately by
+    /// [`DEFAULT_MAX_LINK_HEAP_BYTES`](Self::DEFAULT_MAX_LINK_HEAP_BYTES), so this
+    /// wire figure keeps the meaning the published record states and no honest
+    /// onset moves. The per-output-size headroom pin in `tests/beef_link_bound.rs`
+    /// turns red if this value moves.
     pub const DEFAULT_MAX_LINK_BYTES: u64 = 16 * 1024 * 1024;
+
+    /// The default per-link HEAP budget (bsv-rs #749 fold-c): linking may hold up
+    /// to this many HEAP bytes in re-materialized shared-parent stubs and proofs
+    /// at once before one link is refused.
+    ///
+    /// 56 MiB — of the HEAP each clone holds, not its wire bytes. A transaction's
+    /// `to_binary` is a flat byte count, but a cloned stub holds far more: the
+    /// `Vec` backings of its inputs and outputs (a one-byte-locked output is ~10
+    /// wire bytes yet ~150 heap bytes), and a proof's leaf structs (a BUMP leaf
+    /// is far larger in heap than the ~34 wire bytes it serializes to). Metering
+    /// that heap, under its own bound, catches the two shapes the wire count
+    /// alone did not: a wide fan-in of tiny-locked outputs (which held hundreds
+    /// of MB under a small wire count), and many proven parents sharing one wide
+    /// proof.
+    ///
+    /// For the lowest-heap-density output a single parent carries — a
+    /// plain-payment (P2PKH) output, the most of them that fit a given WIRE
+    /// budget — this HEAP bound is reached BEFORE the
+    /// [`max_link_bytes`](Self::max_link_bytes) wire bound, so it, not the wire
+    /// bound, sets the default onset of an honest single-parent P2PKH sweep:
+    /// **586** outputs, where the 16 MiB wire bound alone admitted **702** (the
+    /// figure the GHSA-gvmh-f5gf-5vjj / 0.8.11 record states for the default).
+    /// The data-carrying onsets stay wire-bound and unchanged (251 outputs of
+    /// 256 B, 127 of 1 KiB), because their heavier outputs hit the wire bound
+    /// first. This is the one default onset that moves (bsv-rs #749 fold-c): it
+    /// is stated, pinned by `the_default_headroom_is_stated_per_output_size`, and
+    /// the price of holding the memory a wide plain-payment sweep re-materializes
+    /// inside a 128 MB isolate.
+    ///
+    /// The peak LIVE heap a single link holds under this bound, measured with
+    /// `dhat::Alloc` on a native host: ~65 MiB accepting the 586-output P2PKH
+    /// sweep at the onset, ~58 MiB declining a 4,000-output one-byte fan-in spent
+    /// 420 ways (where the wire-only meter held ~248 MB), ~95 MiB declining a
+    /// 16,384-parent shared-BUMP answer (the worst shape, refused by this bound).
+    /// The `size_of` charge below is native-sized — an upper bound, since
+    /// wasm32's pointers and `usize` are half the width — so the real wasm32 peak
+    /// is lower, and with a ~30 MiB Worker baseline the default link stays inside
+    /// a 128 MB isolate. The largest shared-parent fan any real dependent's BEEF
+    /// carries is 20, far under any onset, so the default refuses no honest input
+    /// any dependent builds. A caller that set a larger explicit `max_link_bytes`
+    /// (e.g. 32 MiB, wire onset 993 P2PKH) and wants its full reach raises this
+    /// in step. The heap headroom pin in `tests/beef_link_heap_749c.rs` turns red
+    /// if this value moves.
+    pub const DEFAULT_MAX_LINK_HEAP_BYTES: u64 = 56 * 1024 * 1024;
 
     /// No bound: link whatever the bytes hold. Only for a BEEF whose source the
     /// caller trusts — an untrusted answer linked unbounded is the #749 denial
@@ -120,14 +186,25 @@ impl BeefLinkLimits {
     pub fn unbounded() -> Self {
         Self {
             max_link_bytes: None,
+            max_link_heap_bytes: None,
         }
     }
 
-    /// Sets [`max_link_bytes`](Self::max_link_bytes) (`None` disables the
-    /// bound).
+    /// Sets [`max_link_bytes`](Self::max_link_bytes) (`None` disables the wire
+    /// bound). The heap bound is unchanged.
     #[must_use]
     pub fn with_max_link_bytes(mut self, max_link_bytes: Option<u64>) -> Self {
         self.max_link_bytes = max_link_bytes;
+        self
+    }
+
+    /// Sets [`max_link_heap_bytes`](Self::max_link_heap_bytes) (`None` disables
+    /// the heap bound). The wire bound is unchanged. Raise this in step with a
+    /// larger explicit [`max_link_bytes`](Self::max_link_bytes) to keep the full
+    /// wire reach that figure admits (bsv-rs #749 fold-c).
+    #[must_use]
+    pub fn with_max_link_heap_bytes(mut self, max_link_heap_bytes: Option<u64>) -> Self {
+        self.max_link_heap_bytes = max_link_heap_bytes;
         self
     }
 }
@@ -261,8 +338,8 @@ impl SharedReservation {
         loop {
             let Some(remaining) = available.checked_sub(bytes) else {
                 return Err(crate::Error::BeefResourceLimit(format!(
-                    "linking would re-materialize more than the shared link budget's remaining \
-                     bytes ({available} of {capacity}) for a shared parent spent by many inputs \
+                    "linking would hold more than the shared link budget's remaining heap bytes \
+                     ({available} of {capacity}) in re-materialized shared-parent stubs and proofs \
                      (bsv-rs #749). Drop a linked transaction to return its share, raise the pool, \
                      or link the source you trust unbounded.",
                     capacity = self.capacity
@@ -298,89 +375,137 @@ impl Drop for SharedReservation {
 /// re-materialize: against a per-link budget, or against a shared pool (plus
 /// the per-link cap).
 enum LinkMeter<'r> {
-    /// A budget local to this one link; `None` is unbounded.
-    PerLink { budget: Option<u64>, used: u64 },
-    /// A shared pool, with a per-link cap on this one link besides.
+    /// A budget local to this one link; `None` on a dimension is unbounded.
+    /// `wire` is the published `max_link_bytes` (the stub wire bytes each repeat
+    /// re-materializes); `heap` is `max_link_heap_bytes` (the heap each clone
+    /// holds — the struct backings and proof leaves the wire count does not see).
+    PerLink {
+        wire_budget: Option<u64>,
+        heap_budget: Option<u64>,
+        wire_used: u64,
+        heap_used: u64,
+    },
+    /// A shared pool bounding the TOTAL heap of every concurrent link, with
+    /// per-link wire and heap caps on this one link besides.
     Shared {
-        per_link: Option<u64>,
-        used: u64,
+        per_link_wire: Option<u64>,
+        per_link_heap: Option<u64>,
+        wire_used: u64,
+        heap_used: u64,
         reservation: &'r mut SharedReservation,
     },
 }
 
 impl LinkMeter<'_> {
-    fn per_link(budget: Option<u64>) -> Self {
-        LinkMeter::PerLink { budget, used: 0 }
+    fn per_link(wire_budget: Option<u64>, heap_budget: Option<u64>) -> Self {
+        LinkMeter::PerLink {
+            wire_budget,
+            heap_budget,
+            wire_used: 0,
+            heap_used: 0,
+        }
     }
 
-    /// Charge `stub_bytes` to this meter, refusing BEFORE the clone that would
-    /// allocate past the budget (or overdraw the shared pool).
-    fn charge(&mut self, stub_bytes: u64) -> Result<()> {
+    /// Charge one clone's `wire` bytes (the stub's `to_binary` length) and `heap`
+    /// bytes (the heap the clone holds) to this meter, refusing BEFORE the clone
+    /// that would allocate past either bound (or overdraw the shared heap pool).
+    /// The two dimensions accumulate independently; a link is refused the moment
+    /// EITHER crosses its bound. The wire dimension keeps the published
+    /// `max_link_bytes` meaning (so no honest onset moves); the heap dimension
+    /// bounds the memory held, the shape the wire count alone did not catch
+    /// (bsv-rs #749 fold-c).
+    fn charge(&mut self, wire: u64, heap: u64) -> Result<()> {
         match self {
-            LinkMeter::PerLink { budget: None, .. } => Ok(()),
             LinkMeter::PerLink {
-                budget: Some(budget),
-                used,
+                wire_budget,
+                heap_budget,
+                wire_used,
+                heap_used,
             } => {
-                *used = used.saturating_add(stub_bytes);
-                if *used > *budget {
-                    return Err(per_link_limit_error(*budget));
+                *wire_used = wire_used.saturating_add(wire);
+                if let Some(b) = wire_budget {
+                    if *wire_used > *b {
+                        return Err(wire_limit_error(*b));
+                    }
+                }
+                *heap_used = heap_used.saturating_add(heap);
+                if let Some(b) = heap_budget {
+                    if *heap_used > *b {
+                        return Err(heap_limit_error(*b));
+                    }
                 }
                 Ok(())
             }
             LinkMeter::Shared {
-                per_link,
-                used,
+                per_link_wire,
+                per_link_heap,
+                wire_used,
+                heap_used,
                 reservation,
             } => {
-                *used = used.saturating_add(stub_bytes);
-                if let Some(cap) = per_link {
-                    if *used > *cap {
-                        return Err(per_link_limit_error(*cap));
+                *wire_used = wire_used.saturating_add(wire);
+                if let Some(cap) = per_link_wire {
+                    if *wire_used > *cap {
+                        return Err(wire_limit_error(*cap));
                     }
                 }
-                reservation.charge(stub_bytes)
+                *heap_used = heap_used.saturating_add(heap);
+                if let Some(cap) = per_link_heap {
+                    if *heap_used > *cap {
+                        return Err(heap_limit_error(*cap));
+                    }
+                }
+                // The pool bounds the TOTAL heap of every link sharing it, so a
+                // service linking many untrusted answers at once caps its peak
+                // heap against one handle, not each link alone.
+                reservation.charge(heap)
             }
         }
     }
 }
 
-fn per_link_limit_error(budget: u64) -> crate::Error {
+fn wire_limit_error(budget: u64) -> crate::Error {
     crate::Error::BeefResourceLimit(format!(
-        "linking would re-materialize more than {budget} bytes for a shared parent spent by many \
-         inputs (bsv-rs #749). Raise or disable the bound with \
-         Transaction::from_beef_with_limits / BeefLinkLimits::unbounded."
+        "linking would re-materialize more than {budget} wire bytes for a shared parent spent by \
+         many inputs (bsv-rs #749). Raise or disable the bound with \
+         Transaction::from_beef_with_limits / BeefLinkLimits::with_max_link_bytes / \
+         BeefLinkLimits::unbounded."
     ))
 }
 
-/// The wire-byte weight of a BUMP — the heap each clone of it re-materializes.
+fn heap_limit_error(budget: u64) -> crate::Error {
+    crate::Error::BeefResourceLimit(format!(
+        "linking would hold more than {budget} heap bytes of re-materialized shared-parent stubs \
+         and proofs at once (bsv-rs #749). Raise or disable the bound with \
+         Transaction::from_beef_with_limits / BeefLinkLimits::with_max_link_heap_bytes / \
+         BeefLinkLimits::unbounded."
+    ))
+}
+
+/// The HEAP a cloned `MerklePath` holds: the leaf structs its level `Vec`s carry
+/// plus the hash each leaf owns.
 ///
 /// Linking clones the proof (`MerklePath`) into every proven transaction it
 /// links and into every stub a repeat input spends, but [`Transaction`]'s
 /// `to_binary` serializes only its four fields, never the attached path, so the
 /// stub byte-meter did not weigh the BUMP: a BEEF of K parents sharing one
 /// K-leaf BUMP holds ~2K copies of that O(K) path, uncounted, the DoS sibling
-/// of the shared-parent output amplification (bsv-rs #749 fold). Charging this
-/// weight at each BUMP clone brings the proof under the same [`BeefLinkLimits`]
-/// bound. A path a parsed BEEF carries always serializes; the impossible case
-/// of one that cannot (caught at `to_binary` wherever it is written) weighs 0
-/// here rather than turn a link into a serialization error.
-fn bump_bytes(mp: &MerklePath) -> u64 {
-    mp.to_binary().map_or(0, |bytes| bytes.len() as u64)
-}
-
-/// The HEAP a cloned `MerklePath` holds: its serialized bytes (the leaf hashes a
-/// clone re-materializes) plus the leaf structs its level `Vec`s carry. A
-/// `MerklePathLeaf` is far larger in heap than the ~34 wire bytes it serializes
-/// to, so weighing the clone by [`bump_bytes`] (wire) alone under-charged the
-/// proof the shared-BUMP fold still let a repeat hold; charging the leaf structs
-/// too brings the proof's clone within a small factor of the heap it costs
-/// (bsv-rs #749 fold-c).
+/// of the shared-parent output amplification (bsv-rs #749 fold). A
+/// `MerklePathLeaf` holds far more heap than the ~34 wire bytes it serializes to
+/// — its struct, and a hash kept as a 64-character hex `String` whose buffer
+/// `size_of` does not see — so the charge is the struct size plus that buffer
+/// per leaf, an upper bound (a duplicate leaf owns no hash) that brings the
+/// proof's clone within the budget the heap it costs on native and wasm32 alike
+/// (bsv-rs #749 fold-c). Charging this at each BUMP clone brings the proof under
+/// the [`max_link_heap_bytes`](BeefLinkLimits::max_link_heap_bytes) bound.
 fn bump_heap(mp: &MerklePath) -> u64 {
+    // The hex hash a hash-bearing leaf owns on the heap, beyond its struct: 32
+    // bytes rendered as 64 hex characters.
+    const LEAF_HASH_HEAP: u64 = 64;
+    let per_leaf = core::mem::size_of::<crate::transaction::merkle_path::MerklePathLeaf>() as u64
+        + LEAF_HASH_HEAP;
     let leaves: u64 = mp.path.iter().map(|level| level.len() as u64).sum();
-    bump_bytes(mp).saturating_add(leaves.saturating_mul(core::mem::size_of::<
-        crate::transaction::merkle_path::MerklePathLeaf,
-    >() as u64))
+    leaves.saturating_mul(per_leaf)
 }
 
 /// The HEAP a cloned stub re-materializes beyond its wire bytes: the `Vec`
@@ -405,6 +530,23 @@ fn stub_struct_heap(tx: &Transaction) -> u64 {
             (tx.outputs().len() as u64)
                 .saturating_mul(size_of::<crate::transaction::TransactionOutput>() as u64),
         )
+}
+
+/// The (wire, heap) weight one full clone of `tx` re-materializes: its
+/// `to_binary` length (the published wire meter's basis), and the heap it holds
+/// — that wire, the proof it carries, and the struct backings of its inputs and
+/// outputs. For a door that clones a held source directly, without the stub
+/// walk of [`add_input_proof`](Beef::add_input_proof) — the signing door
+/// (`find_transaction_for_signing`), which hands each input a full clone of the
+/// parent it names and was unmetered before (bsv-rs #749 fold-c, the signing
+/// sibling: a caller signing against an untrusted BEEF).
+pub(super) fn clone_weight(tx: &Transaction) -> (u64, u64) {
+    let wire = tx.to_binary().len() as u64;
+    let proof = tx.merkle_path.as_ref().map(bump_heap).unwrap_or(0);
+    let heap = wire
+        .saturating_add(proof)
+        .saturating_add(stub_struct_heap(tx));
+    (wire, heap)
 }
 
 // The struct backings a clone re-materializes are target-sized: wasm32's
@@ -506,7 +648,7 @@ impl Beef {
         let Some(mut tx) = beef_tx.tx().cloned() else {
             return Ok(None);
         };
-        let mut meter = LinkMeter::per_link(limits.max_link_bytes);
+        let mut meter = LinkMeter::per_link(limits.max_link_bytes, limits.max_link_heap_bytes);
         self.add_input_proof(&mut tx, &mut meter)?;
         Ok(Some(tx))
     }
@@ -537,7 +679,11 @@ impl Beef {
         };
         match &budget.0 {
             BudgetRepr::PerLink(max) => {
-                let mut meter = LinkMeter::per_link(*max);
+                // A per-link budget caps the wire dimension at the caller's
+                // number (`None` unbounded); the heap dimension takes the default
+                // heap bound when the budget is bounded, and is lifted with it.
+                let heap = max.map(|_| BeefLinkLimits::DEFAULT_MAX_LINK_HEAP_BYTES);
+                let mut meter = LinkMeter::per_link(*max, heap);
                 self.add_input_proof(&mut tx, &mut meter)?;
                 Ok(Some(LinkedTransaction {
                     tx,
@@ -552,11 +698,13 @@ impl Beef {
                 };
                 // Meter in a block so the `&mut reservation` borrow ends before
                 // the reservation moves into the result. On the `?` error path
-                // the reservation drops here, returning the bytes it had taken.
+                // the reservation drops here, returning the heap it had taken.
                 {
                     let mut meter = LinkMeter::Shared {
-                        per_link: Some(BeefLinkLimits::DEFAULT_MAX_LINK_BYTES),
-                        used: 0,
+                        per_link_wire: Some(BeefLinkLimits::DEFAULT_MAX_LINK_BYTES),
+                        per_link_heap: Some(BeefLinkLimits::DEFAULT_MAX_LINK_HEAP_BYTES),
+                        wire_used: 0,
+                        heap_used: 0,
                         reservation: &mut reservation,
                     };
                     self.add_input_proof(&mut tx, &mut meter)?;
@@ -654,10 +802,13 @@ impl Beef {
             let next_input = match find_bump(&tx.id()) {
                 Some(mp) => {
                     // The BUMP is cloned into this proven transaction, one deep
-                    // copy per distinct proven txid; its bytes are
-                    // re-materialized heap the #749 bound must see, which the
-                    // stub byte-meter did not weigh (bsv-rs #749 fold).
-                    meter.charge(bump_heap(mp))?;
+                    // copy per distinct proven txid. One copy is in the BEEF's
+                    // own bytes, so it does not count toward the wire bound (the
+                    // first full link is free); but a BEEF of K parents sharing
+                    // one K-leaf BUMP holds K heap copies of that O(K) path, the
+                    // shared-proof amplification, which the heap bound must see
+                    // (bsv-rs #749 fold / fold-c).
+                    meter.charge(0, bump_heap(mp))?;
                     tx.merkle_path = Some(mp.clone());
                     tx.inputs().len()
                 }
@@ -666,10 +817,12 @@ impl Beef {
             Ok(Frame { tx, next_input })
         };
 
-        // Keyed by txid, the value being the stub handed to later inputs and
-        // its wire-byte weight (computed once, the cost each repeat clone adds).
-        // Presence also means "this txid has been linked in full once".
-        let mut stubs: HashMap<String, (Transaction, u64)> = HashMap::new();
+        // Keyed by txid, the value being the stub handed to later inputs and its
+        // (wire, heap) weight (computed once, the cost each repeat clone adds):
+        // the wire bytes the published `max_link_bytes` meters, and the heap the
+        // clone holds that `max_link_heap_bytes` meters. Presence also means
+        // "this txid has been linked in full once".
+        let mut stubs: HashMap<String, (Transaction, u64, u64)> = HashMap::new();
         let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx), meter)?];
 
         while let Some(top) = stack.last_mut() {
@@ -702,13 +855,14 @@ impl Beef {
                 (None, Some(text)) => text.clone(),
                 (None, None) => continue, // links and names nothing: left as it is
             };
-            if let Some((stub, stub_bytes)) = stubs.get(&src_txid) {
+            if let Some((stub, stub_wire, stub_heap)) = stubs.get(&src_txid) {
                 // Already linked in full once: this input gets the stub, which
                 // carries the output being spent (and the proof when there is
                 // one) without repeating the ancestry underneath it. Meter the
-                // stub's byte weight and refuse BEFORE the clone that would
-                // allocate past the budget (per link, or across a shared pool).
-                meter.charge(*stub_bytes)?;
+                // stub's wire weight (the published bound) and the heap it holds,
+                // and refuse BEFORE the clone that would allocate past either
+                // bound (per link, or across a shared heap pool).
+                meter.charge(*stub_wire, *stub_heap)?;
                 top.tx.replace_source(i, Some(Box::new(stub.clone())));
                 continue;
             }
@@ -738,21 +892,28 @@ impl Beef {
             // #749 bound must see. Charge it once for the map-held copy (refuse
             // BEFORE the clone) and fold its bytes into `stub_bytes`, so each
             // later repeat is charged the proof too (bsv-rs #749 fold).
+            // The proof this stub carries is one deep copy into the map-held
+            // stub here; `to_binary` leaves it out, and the first copy is the
+            // BEEF's own bytes, so it is heap-only (wire 0), as the per-parent
+            // BUMP in `enter` is.
             let path_weight = bump
                 .map(bump_heap)
                 .or_else(|| src.merkle_path.as_ref().map(bump_heap))
                 .unwrap_or(0);
-            meter.charge(path_weight)?;
+            meter.charge(0, path_weight)?;
             let stub = Self::bare_stub(&src, bump);
-            // Each repeat input re-materializes this stub in full: its wire bytes
-            // (scripts, txids), the proof it carries, and the struct backings of
-            // its inputs and outputs the wire count does not see (bsv-rs #749
-            // fold-c). Weigh all three, so the budget bounds the heap, not the
-            // wire bytes, each repeat clone holds.
-            let stub_bytes = (stub.to_binary().len() as u64)
+            // Each repeat input re-materializes this stub in full. Its WIRE weight
+            // (the published `max_link_bytes`) is its `to_binary` length, exactly
+            // as 0.8.11 metered — so no honest onset moves. Its HEAP weight (the
+            // new `max_link_heap_bytes`) is that wire plus the proof it carries
+            // plus the struct backings of its inputs and outputs the wire count
+            // does not see — a one-byte-locked output is ~10 wire bytes but holds
+            // ~150 heap bytes (bsv-rs #749 fold-c).
+            let stub_wire = stub.to_binary().len() as u64;
+            let stub_heap = stub_wire
                 .saturating_add(path_weight)
                 .saturating_add(stub_struct_heap(&stub));
-            stubs.insert(src_txid, (stub, stub_bytes));
+            stubs.insert(src_txid, (stub, stub_wire, stub_heap));
             stack.push(enter(src, meter)?);
         }
         Ok(())
