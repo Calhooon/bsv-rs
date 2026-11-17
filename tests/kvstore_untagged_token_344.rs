@@ -32,7 +32,7 @@ fn script(case: &Value) -> LockingScript {
 
 struct TokenLookup(Vec<u8>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for TokenLookup {
     async fn lookup(
         &self,
@@ -176,7 +176,7 @@ async fn malformed_reference_tags_are_refused_by_both_reader_paths() {
 async fn a_freeform_host_beside_a_list_answers_the_list_at_the_kvstore_door_815() {
     struct ByHost(Vec<u8>);
 
-    #[async_trait::async_trait(?Send)]
+    #[async_trait::async_trait]
     impl OverlayLookupFacilitator for ByHost {
         async fn lookup(
             &self,

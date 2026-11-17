@@ -48,7 +48,7 @@ static NEXT_LOOKUP: AtomicUsize = AtomicUsize::new(0);
 /// an empty list before.
 struct TokenLookup(Arc<Mutex<Option<Vec<u8>>>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for TokenLookup {
     async fn lookup(
         &self,

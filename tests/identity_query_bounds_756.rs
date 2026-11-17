@@ -35,7 +35,7 @@ use std::sync::{Arc, Mutex};
 /// A facilitator recording each question's query.
 struct Recording(Arc<Mutex<Vec<Value>>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Recording {
     async fn lookup(
         &self,

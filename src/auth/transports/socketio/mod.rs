@@ -287,10 +287,11 @@ impl<S: SocketIoSink + Clone + 'static> Transport for SocketIoTransport<S> {
 ///   manager stays consistent.
 /// - Exits the loop on `recv_engineio` error (WS closed).
 ///
-/// Drives one BRC-103 channel; spawn one of these per WebSocket. On
-/// native this future is `Send` when the `frames`/`sink`/callback `Arc`
-/// are `Send`, so it can run under `tokio::spawn`; on `wasm32` spawn it
-/// with `wasm_bindgen_futures::spawn_local`.
+/// Drives one BRC-103 channel; spawn one of these per WebSocket. This
+/// future is `Send` on every target (the frames, the sink and the callback
+/// are, by their traits' bounds; #843), so it runs under `tokio::spawn`, or
+/// under `wasm_bindgen_futures::spawn_local` on `wasm32`, where a source over
+/// a JS socket holds it through its platform's `Send` wrapper.
 pub async fn run_dispatch<F, S>(
     mut frames: F,
     sink: S,

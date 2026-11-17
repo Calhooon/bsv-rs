@@ -209,7 +209,7 @@ impl WhatsOnChainBroadcaster {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for WhatsOnChainBroadcaster {
     #[cfg(feature = "http")]
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {

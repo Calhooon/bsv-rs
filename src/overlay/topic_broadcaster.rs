@@ -403,7 +403,7 @@ impl TopicBroadcaster {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for TopicBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
         self.broadcast_tx(tx).await

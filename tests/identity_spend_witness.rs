@@ -427,7 +427,7 @@ struct TokenLookup {
     beef: Vec<u8>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for TokenLookup {
     async fn lookup(
         &self,

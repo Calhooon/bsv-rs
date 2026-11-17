@@ -224,7 +224,7 @@ async fn serve(case: &Value, body: Vec<u8>) -> (String, Server) {
 /// A lookup facilitator answering every question with its one answer.
 struct Scripted(LookupAnswer);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Scripted {
     async fn lookup(
         &self,
@@ -243,7 +243,7 @@ struct Rerouted {
     to: String,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Rerouted {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         self.door.send(&self.to, tagged).await

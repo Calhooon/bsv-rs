@@ -197,7 +197,7 @@ fn a_door_asked_under_a_protocol_refuses_a_token_naming_another() {
 /// A lookup host answering one output.
 struct TokenLookup(Vec<u8>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for TokenLookup {
     async fn lookup(
         &self,

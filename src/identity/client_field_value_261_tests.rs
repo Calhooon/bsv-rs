@@ -154,7 +154,7 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_to_a_verifyi
 /// A lookup host that answers every question with the outputs it holds.
 struct Outputs(Vec<OutputListItem>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl crate::overlay::OverlayLookupFacilitator for Outputs {
     async fn lookup(
         &self,

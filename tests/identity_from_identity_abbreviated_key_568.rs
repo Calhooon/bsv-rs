@@ -58,7 +58,7 @@ fn cases() -> Vec<Value> {
 /// A facilitator refusing every question: the contacts answer first.
 struct Refusing;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Refusing {
     async fn lookup(
         &self,

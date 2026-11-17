@@ -97,6 +97,11 @@ pub mod kvstore;
 #[cfg(feature = "identity")]
 pub mod identity;
 
+// The `Send` rule's compile-time witnesses (#843): private, never called,
+// built on every target the library is built for.
+#[cfg(feature = "transaction")]
+mod send_rule;
+
 // Convenience re-exports from primitives (most common items)
 #[cfg(feature = "primitives")]
 pub use primitives::{

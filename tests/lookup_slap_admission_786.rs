@@ -42,7 +42,7 @@ const SERVICE: &str = "ls_slap_admission";
 /// A facilitator answering each tracker by URL from its script.
 struct Scripted(HashMap<String, Vec<OutputListItem>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Scripted {
     async fn lookup(
         &self,

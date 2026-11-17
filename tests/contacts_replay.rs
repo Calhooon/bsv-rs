@@ -1002,7 +1002,7 @@ async fn a_cold_update_the_validator_refuses_asks_the_wallet_nothing_959() {
 /// an empty list: no network.
 struct Counted(std::sync::Arc<std::sync::atomic::AtomicUsize>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl bsv_rs::overlay::OverlayLookupFacilitator for Counted {
     async fn lookup(
         &self,

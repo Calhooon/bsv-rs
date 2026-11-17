@@ -34,7 +34,7 @@ struct Answering {
     asked: Arc<Mutex<Vec<(String, serde_json::Value)>>>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Answering {
     async fn lookup(
         &self,

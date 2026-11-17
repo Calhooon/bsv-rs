@@ -258,7 +258,7 @@ impl MockLookupFacilitator {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl OverlayLookupFacilitator for MockLookupFacilitator {
     async fn lookup(
         &self,

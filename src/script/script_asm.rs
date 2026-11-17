@@ -121,9 +121,7 @@ impl Script {
     /// writes the data's hex alone (`Script.ts:668-677`), which reads back as
     /// a push, and an empty rest as nothing (#634).
     pub fn to_asm(&self) -> String {
-        self.ensure_parsed();
-        let chunks = self.chunks.borrow();
-        let parts: Vec<String> = chunks.iter().map(Self::chunk_asm).collect();
+        let parts: Vec<String> = self.chunks().iter().map(Self::chunk_asm).collect();
         parts.join(" ")
     }
 

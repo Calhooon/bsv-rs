@@ -120,7 +120,7 @@ fn built(name: &str, size: Option<usize>) -> Vec<u8> {
 /// A facilitator answering every question with its outputs.
 struct Answering(Vec<OutputListItem>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Answering {
     async fn lookup(
         &self,

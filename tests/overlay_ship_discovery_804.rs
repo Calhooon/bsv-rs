@@ -58,7 +58,7 @@ const MIB: usize = 1024 * 1024;
 /// A lookup facilitator answering every question with its one answer.
 struct Scripted(LookupAnswer);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Scripted {
     async fn lookup(
         &self,
@@ -73,7 +73,7 @@ impl OverlayLookupFacilitator for Scripted {
 /// A broadcast facilitator acknowledging every topic it is sent.
 struct Acknowledging;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayBroadcastFacilitator for Acknowledging {
     async fn send(&self, _url: &str, tagged: &TaggedBEEF) -> bsv_rs::Result<Steak> {
         Ok(tagged
@@ -336,7 +336,7 @@ async fn a_freeform_ls_ship_host_admits_no_host_and_refuses_nothing_815() {
 /// A lookup facilitator answering each `ls_ship` host with its own answer.
 struct ByHost(HashMap<String, LookupAnswer>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for ByHost {
     async fn lookup(
         &self,

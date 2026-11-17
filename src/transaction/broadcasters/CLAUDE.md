@@ -82,7 +82,7 @@ impl ArcBroadcaster {
     pub fn api_key(&self) -> Option<&str>
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for ArcBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
     // broadcast_many() inherited from Broadcaster default (sequential)
@@ -120,7 +120,7 @@ impl TeranodeBroadcaster {
     // Note: no Default impl — URL is required
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for TeranodeBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
     // broadcast_many() inherited from Broadcaster default (sequential)
@@ -179,7 +179,7 @@ impl WhatsOnChainBroadcaster {
     pub fn api_key(&self) -> Option<&str>
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl Broadcaster for WhatsOnChainBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
     // broadcast_many() inherited from Broadcaster default (sequential)
@@ -391,7 +391,7 @@ for (i, result) in results.iter().enumerate() {
 
 ## Implementation Notes
 
-- **Async Trait**: Uses `#[async_trait(?Send)]` because `Transaction` contains `RefCell` which is not `Send`
+- **Async Trait**: plain `#[async_trait]` since #843 (the captain's ruling 1 of 2026-11-17): the future of `broadcast` and `broadcast_many` is `Send` on every target, as every public async trait's is, so each of the three broadcasters is spawned on a multi-threaded runtime (`src/send_rule/transaction.rs`, `tests/arch_send_rule_843.rs`). Until then the trait and the three implementations carried `#[async_trait(?Send)]`, written when `Transaction` held `RefCell`s (in `Script`) and was not `Sync` (#843d1 mended that). The three hold `reqwest`'s client and futures, which are `Send` on native, the only target `http` builds for (`build.rs`, #152)
 - **Sequential Batching**: `broadcast_many()` is a default trait method that broadcasts sequentially; none of the three implementations override it
 - **Timeout Handling**: Default 30-second timeout on all broadcasters; increase for slow networks or large transactions
 - **TXID Computation**: All broadcasters compute the TXID locally via `tx.id()` before sending

@@ -39,7 +39,7 @@ impl Scripted {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Scripted {
     async fn lookup(
         &self,

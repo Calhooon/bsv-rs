@@ -389,25 +389,16 @@ fn reindex_rekeys_an_entry_edited_through_the_deprecated_tx_mut_817() {
     assert_eq!(ids(&beef), vec![v.id()]);
 }
 
-/// `Beef` and `BeefTx` are `Send` and not `Sync`, exactly as on beta
-/// `cfbe3c98`: `Transaction`'s serialization caches are `RefCell`s; this
-/// change adds no interior mutability (the index's count is a plain
-/// `usize`). Compile-time: the second impl makes the path ambiguous when
-/// the type is `Sync`.
+/// `Beef` and `BeefTx` are `Send` and `Sync`: this change added no interior
+/// mutability (the index's count is a plain `usize`), and since #843d1 the
+/// `Script` every `Transaction` holds keeps its caches in `OnceLock`s, so the
+/// last `RefCell` under them is gone (until #843d1 this test pinned them as
+/// `Send` and not `Sync`, as on beta `cfbe3c98`).
 #[test]
-fn beef_and_beef_tx_are_send_and_not_sync_as_on_beta_817() {
-    fn send<T: Send>() {}
-    send::<Beef>();
-    send::<BeefTx>();
-    trait AmbiguousIfSync<A> {
-        fn some_item() {}
-    }
-    impl<T: ?Sized> AmbiguousIfSync<()> for T {}
-    #[allow(dead_code)]
-    struct IsSync;
-    impl<T: ?Sized + Sync> AmbiguousIfSync<IsSync> for T {}
-    let _ = <Beef as AmbiguousIfSync<_>>::some_item;
-    let _ = <BeefTx as AmbiguousIfSync<_>>::some_item;
+fn beef_and_beef_tx_are_send_and_sync_with_no_interior_mutability_of_their_own_817() {
+    fn shareable<T: Send + Sync>() {}
+    shareable::<Beef>();
+    shareable::<BeefTx>();
 }
 
 /// The cold read's case (#817's fold of the rebuild): a hand push, a `&mut`

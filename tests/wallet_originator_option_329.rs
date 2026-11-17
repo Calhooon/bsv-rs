@@ -331,7 +331,7 @@ mod kvstore {
     /// never reaches the network (tests are hermetic).
     struct Failing;
 
-    #[async_trait::async_trait(?Send)]
+    #[async_trait::async_trait]
     impl OverlayLookupFacilitator for Failing {
         async fn lookup(
             &self,

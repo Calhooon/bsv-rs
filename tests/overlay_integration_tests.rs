@@ -1138,7 +1138,7 @@ struct ScriptedTracker {
     asked: Mutex<Vec<(String, String, serde_json::Value)>>,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl bsv_rs::overlay::OverlayLookupFacilitator for ScriptedTracker {
     async fn lookup(
         &self,

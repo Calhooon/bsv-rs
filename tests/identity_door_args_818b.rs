@@ -65,7 +65,7 @@ fn cases(prefix: &str) -> Vec<Value> {
 /// A facilitator recording each question's query and answering `outputs`.
 struct Recording(Arc<Mutex<Vec<Value>>>, Vec<OutputListItem>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for Recording {
     async fn lookup(
         &self,

@@ -188,7 +188,7 @@ fn item(entry: &Value) -> OutputListItem {
 /// A facilitator answering each host with its scripted outputs.
 struct ByHost(HashMap<String, Vec<OutputListItem>>);
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for ByHost {
     async fn lookup(
         &self,

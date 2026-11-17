@@ -33,7 +33,7 @@ static NEXT: AtomicUsize = AtomicUsize::new(0);
 /// A lookup host that answers every question with no output.
 struct NoOutputs;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl OverlayLookupFacilitator for NoOutputs {
     async fn lookup(
         &self,

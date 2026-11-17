@@ -298,7 +298,7 @@ struct Delayed {
     delay_ms: u64,
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl bsv_rs::overlay::OverlayLookupFacilitator for Delayed {
     async fn lookup(
         &self,

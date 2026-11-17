@@ -238,7 +238,7 @@ mod transaction_tests {
         should_succeed: bool,
     }
 
-    #[async_trait(?Send)]
+    #[async_trait]
     impl Broadcaster for TestBroadcaster {
         async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
             if self.should_succeed {

@@ -19,12 +19,19 @@ use std::pin::Pin;
 /// value of type T. Returning `None` means the output does not contribute to
 /// history.
 ///
+/// The future it returns is `Send` (#843: until then the alias named no
+/// bound, and [`Historian::build_history`] returned a future no multi-threaded
+/// runtime could spawn): `Box::pin(async move { .. })` over `Send` captures is
+/// written as before.
+///
 /// # Type Parameters
 ///
 /// * `T` - The decoded/typed value produced for a matching output
 /// * `C` - The per-call context passed through Historian to the interpreter
 pub type InterpreterFn<T, C> = Box<
-    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>>>> + Send + Sync,
+    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>> + Send>>
+        + Send
+        + Sync,
 >;
 
 /// Configuration for the Historian.
