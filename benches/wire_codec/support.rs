@@ -575,6 +575,7 @@ fn request_args(call: WalletCall) -> Vec<Layout> {
         | C::GetHeight
         | C::GetNetwork
         | C::GetVersion => Vec::new(),
+        other => panic!("unknown variant: {other:?}"),
     }
 }
 
@@ -641,5 +642,6 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
         | C::VerifyHmac
         | C::VerifySignature
         | C::WaitForAuthentication => Vec::new(),
+        other => panic!("unknown variant: {other:?}"),
     }
 }

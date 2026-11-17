@@ -6,7 +6,7 @@
 # Every entry is checked against the mutant list in CI's `checks` job and the nightly's pin job
 # (`.github/scripts/mutants_entries.py`, #663); `mutants_entries.py --fix` re-points a stale one.
 exclude_re = [
-  # src/script/templates/rpuzzle.rs:350:34, `<` to `<=` (#603, PR #615). The comparison bounds a
+  # src/script/templates/rpuzzle.rs:354:34, `<` to `<=` (#603, PR #615). The comparison bounds a
   # direct push against OP_PUSHDATA1 (76 bytes): at the one length where the two branches differ,
   # 76, both write the opcode byte 0x4c (bitcoin-sv v1.2.3 script.h:106-113 and
   # interpreter.cpp:344-351; bsv-script-lean lean/BsvScript/Sighash.lean:277-281 and
@@ -14,7 +14,7 @@ exclude_re = [
   # tests/vectors/rpuzzle_lock_and_spend_603.json). Three reads: the cold read (0.86), the
   # adversarial read with every length 0 to 80 and the PUSHDATA edges probed (0.98), the rule
   # read (0.97).
-  '^src/script/templates/rpuzzle\.rs:350:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
+  '^src/script/templates/rpuzzle\.rs:354:34: replace < with <= in <impl ScriptTemplate for RPuzzle>::lock$',
   # src/script/template.rs:210:36, `|` to `^` in compute_sighash_scope (#603, PR #624). The
   # operands' bits are disjoint under the sighash rule (a base type 1 to 3 against FORKID 0x40), so
   # `^` and `|` give the same word for every SignOutputs (bitcoin-sv v1.2.3 sighashtype.h:16-21,43,
@@ -76,7 +76,7 @@ exclude_re = [
   '^src/transaction/beef_stream\.rs:502:28: replace match guard \*p == parent with true in bump_root$',
   '^src/transaction/beef_stream\.rs:507:42: replace \+ with - in bump_root$',
   '^src/transaction/beef_stream\.rs:507:42: replace \+ with \* in bump_root$',
-  # src/transaction/beef_stream.rs:2348:66, `<` to `<=` in atomic_unreached (#603, shard S4, PR
+  # src/transaction/beef_stream.rs:2360:66, `<` to `<=` in atomic_unreached (#603, shard S4, PR
   # #645). Every table the comparison walks holds one entry per txid, and the trie order's key
   # (each byte's bits reversed) is one-to-one, so the two keys compared are never equal and `<`
   # and `<=` pick the same entry (the stream's `HashMap`, beef_stream.rs:1746, a repeat through
@@ -89,7 +89,7 @@ exclude_re = [
   # every feed split of a streamed BEEF probed (EQUIVALENT, 0.98), the rule read (EQUIVALENT,
   # 0.98). At :2348:55 since the seed fold (#645): the comparison walks the unreached txids in a
   # `BTreeSet`, still one per map key, so the reason stands.
-  '^src/transaction/beef_stream\.rs:2348:55: replace < with <= in atomic_unreached$',
+  '^src/transaction/beef_stream\.rs:2360:55: replace < with <= in atomic_unreached$',
   # src/script/script.rs:186:30, 209:31, 209:43, 209:56, `|` to `^` in Script::parse_chunks (#603,
   # shard B). The size of OP_PUSHDATA2 and OP_PUSHDATA4 is the little-endian sum of its size
   # bytes, `a + 256 * b` and `a + 256 * (b + 256 * (c + 256 * d))` (bsv-script-lean@5dc337e1

@@ -67,6 +67,7 @@ async fn read(kind: DefinitionType, script: LockingScript) -> (usize, usize) {
             .await
             .unwrap()
             .len(),
+        other => panic!("unknown variant: {other:?}"),
     };
     let listed = client.list_own_registry_entries(kind).await.unwrap().len();
     (resolved, listed)

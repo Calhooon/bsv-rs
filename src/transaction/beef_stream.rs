@@ -1342,13 +1342,17 @@ impl BeefDecoder {
 // The stream over a reader
 // ---------------------------------------------------------------------------
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::beef_stream::StreamError;
 /// What stops a [`BeefStream`]: the source failed, or the bytes are invalid.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum StreamError {
     /// The source returned an error. Nothing is said about the bytes.
     Io(std::io::Error),
     /// The bytes are invalid.
     Refused(Refusal),
+}
 }
 
 impl fmt::Display for StreamError {
@@ -1574,9 +1578,12 @@ fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
         .map_or(0, |o| o.iter().filter(|slot| slot.is_some()).count())
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::beef_stream::SpendRefusal;
 /// Why a spend was refused: a transaction judgment or a verifier decline,
 /// never a rule about the BEEF's bytes or one of the twenty-six [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
     ParentIsTxidOnly,
@@ -1616,6 +1623,7 @@ pub enum SpendRefusal {
         /// The typed scope, configuration or resource refusal.
         cause: crate::script::NotJudgedCause,
     },
+}
 }
 
 /// The refusal as one sentence (#213): the interpreter's words for a script,
@@ -1662,13 +1670,17 @@ impl fmt::Display for SpendRefusal {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::beef_stream::MiningCheck;
 /// A mining check that cannot be judged without header context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum MiningCheck {
     /// Next-block transaction finality.
     Finality,
     /// Coinbase maturity at the next block's height.
     CoinbaseMaturity,
+}
 }
 
 /// What [`BeefIndex::fold_one`] came to.

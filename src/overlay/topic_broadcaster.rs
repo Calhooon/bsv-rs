@@ -23,8 +23,11 @@ mod discovery; // the discovery's admission and the endpoint's origin (#804)
 mod requirements; // the acknowledgment requirements as the reference has them
 mod steak; // a host's STEAK judged as the reference's `validateSTEAK` (#815)
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::overlay::RequireAck;
 /// Acknowledgment requirement for broadcast success.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub enum RequireAck {
     /// No acknowledgment required.
     #[default]
@@ -35,6 +38,7 @@ pub enum RequireAck {
     Some(Vec<String>),
     /// Acknowledgment from all hosts.
     All,
+}
 }
 
 /// Configuration for the topic broadcaster.

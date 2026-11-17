@@ -24,6 +24,8 @@ impl fmt::Display for ExecutionContext {
     }
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::script::ScriptResource;
 /// A rich error type for script evaluation failures.
 ///
 /// Contains the full execution state at the time of failure, enabling
@@ -34,6 +36,7 @@ impl fmt::Display for ExecutionContext {
 /// EVALUATOR's budget, never about the script's validity on the network, and
 /// a caller (an overlay door, a wallet) must be able to tell the two apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ScriptResource {
     /// The main stack's memory budget (`memory_limit`); under a flag word the
     /// one budget of both stacks on the node's count (`Spend::memory_limit`),
@@ -47,6 +50,7 @@ pub enum ScriptResource {
     ElementSize,
     /// A LOCAL bound on opcode steps and bytes hashed, never a script verdict.
     Work,
+}
 }
 
 impl fmt::Display for ScriptResource {

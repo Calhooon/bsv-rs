@@ -12,7 +12,7 @@ This module provides Time-based One-Time Password (TOTP) functionality following
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | ~42 | Module root with documentation and re-exports |
-| `core.rs` | ~934 | Core TOTP implementation with extensive tests |
+| `core.rs` | 298 | Core TOTP implementation; its unit tests in `core_tests.rs` since #843d9 |
 
 ## Key Exports
 
@@ -241,3 +241,7 @@ The module includes private helper functions used internally:
 - [Primitives Module](../primitives/CLAUDE.md) - HMAC functions used by TOTP (`sha1_hmac`, `sha256_hmac`, `sha512_hmac`)
 - [RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238) - TOTP specification
 - [RFC 4226](https://datatracker.ietf.org/doc/html/rfc4226) - HOTP specification
+
+## Open enums (#843d9)
+
+`Algorithm`: `#[non_exhaustive]` since #843d9 (the freeze plan's row 9), each defined inside `crate::util::non_exhaustive::non_exhaustive_enum!` under its public path, which writes into its doc the every-variant `compile_fail` match and its wildcard twin from the definition (`tests/arch_non_exhaustive_pins_819.rs` holds the pin, `tests/arch_non_exhaustive_843d.rs` that every `pub enum` is open or a row of `CLOSED_ENUMS`). A later variant is additive: a `match` outside the crate ends in a wildcard arm, and at a door that arm refuses, it never skips. Inside the crate the attribute binds nothing: every match under `src/` stays exhaustive, and no wildcard arm is added for it. Building a variant and serde are unchanged. `core.rs`'s unit tests live in `core_tests.rs` since #843d9 (the module is still `tests`), the room under the file's ratchet line.

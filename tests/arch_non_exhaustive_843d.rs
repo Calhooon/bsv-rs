@@ -28,6 +28,13 @@
 //! struct a macro builds without the `struct` keyword in the source, a setter
 //! defined by a macro or a trait, a `new` in another impl of a same-named
 //! type in another module (setters are matched by the type's name alone).
+//!
+//! Since #843d9 (the freeze plan's row 9) the same holds of enums: every
+//! `pub enum` under `src/` carries `#[non_exhaustive]` or is a row of
+//! [`CLOSED_ENUMS`], `file:Name` with a reason opening `closed: ` (its set is
+//! fixed by what the thing is, or a caller's exhaustive match is the safety
+//! property) or `held for row 4: `; a row naming no enum, or an attributed
+//! one, fails. An attributed enum's pin is `arch_non_exhaustive_pins_819.rs`'s.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 mod arch_support;
@@ -1074,6 +1081,296 @@ fn the_rule_refuses_each_case_on_a_probe_843d8a() {
     ];
     for (rows, assigned, words) in cases {
         let got = errors(&found, &refused, &impls, rows, assigned);
+        assert_eq!(got.len(), 1, "{words}: {got:?}");
+        assert!(got[0].starts_with(words), "{words}: {got:?}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// #843d9 (the freeze plan's row 9): every `pub enum` is open or closed with
+// its reason.
+// ---------------------------------------------------------------------------
+
+/// A `pub enum` the scan found: `file:Name`, its line, whether it carries
+/// `#[non_exhaustive]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FoundEnum {
+    key: String,
+    line: usize,
+    attributed: bool,
+}
+
+/// One file's `pub enum`s, and its refusals (`path:line: reason`). An enum
+/// defined inside `non_exhaustive_enum!` is read as written there; a
+/// `macro_rules!` body's `$vis enum $name` is no declaration; a `pub enum`
+/// inside any other macro invocation is refused.
+fn scan_enums(path: &str, tokens: &[Token<'_>]) -> (Vec<FoundEnum>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut refused = Vec::new();
+    let mut macros: Vec<(usize, usize, &str)> = Vec::new();
+    for i in 0..tokens.len().saturating_sub(2) {
+        let t = tokens[i].text;
+        if t.starts_with(|c: char| c.is_alphabetic() || c == '_')
+            && !tokens[i].literal
+            && tokens[i + 1].text == "!"
+            && matches!(tokens[i + 2].text, "(" | "[" | "{")
+        {
+            macros.push((i + 2, after(tokens, i + 2), t));
+        }
+    }
+    for at in 1..tokens.len() {
+        if tokens[at].text != "enum" || tokens[at].literal || tokens[at - 1].text != "pub" {
+            continue;
+        }
+        let line = tokens[at].line;
+        let Some(name) = tokens
+            .get(at + 1)
+            .filter(|t| t.text.starts_with(|c: char| c.is_alphabetic() || c == '_'))
+        else {
+            continue;
+        };
+        // The innermost invocation holding the declaration.
+        let inside = macros
+            .iter()
+            .filter(|(s, e, _)| *s < at && at < *e)
+            .max_by_key(|(s, _, _)| *s)
+            .map(|(_, _, n)| *n);
+        match inside {
+            None | Some("non_exhaustive_enum") => {}
+            Some("macro_rules") => continue,
+            Some(other) => {
+                refused.push(format!(
+                    "{path}:{line}: `pub enum {}` inside `{other}!`, which this scan cannot read",
+                    name.text
+                ));
+                continue;
+            }
+        }
+        let attributed = attributes_before(tokens, at - 1)
+            .iter()
+            .any(|attribute| non_exhaustive(attribute));
+        found.push(FoundEnum {
+            key: format!("{path}:{}", name.text),
+            line,
+            attributed,
+        });
+    }
+    (found, refused)
+}
+
+/// The rows of [`CLOSED_ENUMS`] whose reason opens `closed: `: a row joins
+/// by a ruling alone.
+const CLOSED_LEN: usize = 15;
+/// The rows whose reason opens `held for row 4: `: only lowered, as row 4
+/// rules each.
+const HELD_LEN: usize = 5;
+
+/// `file:Name` and the reason: every `pub enum` under `src/` without
+/// `#[non_exhaustive]` (the captain's ruling of 2026-11-12 on three design
+/// reads). A closed enum costs a major version at its next variant, an open
+/// one a wildcard arm per outside match: one is closed only where its set is
+/// fixed by what the thing is, or where a caller's exhaustive match is the
+/// safety property. A reason opens `closed: ` or `held for row 4: `.
+const CLOSED_ENUMS: &[(&str, &str)] = &[
+    ("src/compat/bip39/mnemonic.rs:WordCount", "closed: BIP-39's five sizes"),
+    ("src/script/evaluation_error.rs:ExecutionContext", "closed: a spend runs two scripts"),
+    ("src/script/input_flags.rs:Word", "closed: the node's two flag words"),
+    ("src/script/template.rs:SignOutputs", "closed: the three base hash types"),
+    ("src/script/templates/pushdrop.rs:LockPosition", "closed: before or after"),
+    ("src/transaction/beef_stream.rs:Node", "closed: a BUMP leaf is a hash or a duplicate flag"),
+    ("src/transaction/beef_stream.rs:Element", "closed: every outside match is exhaustive at a BEEF door, where a wildcard arm could only skip an entry"),
+    ("src/transaction/beef_stream.rs:Step", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_stream.rs:Progress", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_stream.rs:Timed", "closed: what one decoder call came to, handled by a driver loop"),
+    ("src/transaction/beef_tx.rs:TxDataFormat", "closed: the frame's format byte, `transaction/BeefConstants.ts:13-15` at `edf6e03`; a wildcard arm at a BEEF door could only skip an entry"),
+    ("src/transaction/broadcaster.rs:BroadcastStatus", "closed: success or error"),
+    ("src/wallet/types.rs:SecurityLevel", "closed: `SecurityLevel = 0 | 1 | 2`, `wallet/Wallet.interfaces.ts:225` at `edf6e03`; permission code matches it, and a wildcard arm would choose"),
+    ("src/wallet/types.rs:Counterparty", "closed: permission code matches it, and a wildcard arm would choose"),
+    ("src/wallet/types.rs:KeyringRevealer", "closed: the certifier or a key"),
+    ("src/compat/bip32.rs:Network", "held for row 4: the freeze plan's row 4 rules it"),
+    ("src/wallet/types.rs:Network", "held for row 4: the freeze plan's row 4 rules it"),
+    ("src/identity/types.rs:BroadcastResult", "held for row 4: the freeze plan's row 4 rules it"),
+    ("src/overlay/types.rs:Protocol", "held for row 4: the freeze plan's row 4 rules it"),
+    ("src/wallet/types.rs:QueryMode", "held for row 4: the freeze plan's row 4 rules it"),
+];
+
+/// The rule's refusals: the scan's, an enum with neither the attribute nor
+/// a row, a row naming no enum or an attributed one, a row twice, a reason
+/// of neither opening.
+fn enum_errors(found: &[FoundEnum], refused: &[String], rows: &[(&str, &str)]) -> Vec<String> {
+    let mut errors: Vec<String> = refused.to_vec();
+    let keys: BTreeSet<&str> = rows.iter().map(|(key, _)| *key).collect();
+    if keys.len() != rows.len() {
+        errors.push("CLOSED_ENUMS names a row twice".into());
+    }
+    for item in found {
+        match (item.attributed, keys.contains(item.key.as_str())) {
+            (false, false) => errors.push(format!(
+                "{}: a `pub enum` (line {}) with neither `#[non_exhaustive]` nor a row of CLOSED_ENUMS: open it in `non_exhaustive_enum!`, or a ruling closes it",
+                item.key, item.line
+            )),
+            (true, true) => errors.push(format!(
+                "{}: attributed and still a row of CLOSED_ENUMS",
+                item.key
+            )),
+            _ => {}
+        }
+    }
+    for (key, reason) in rows {
+        if !found.iter().any(|item| item.key == *key) {
+            errors.push(format!(
+                "{key}: a row of CLOSED_ENUMS that names no `pub enum`"
+            ));
+        }
+        if !reason.starts_with("closed: ") && !reason.starts_with("held for row 4: ") {
+            errors.push(format!(
+                "{key}: a reason opens `closed: ` or `held for row 4: ` (found `{reason}`)"
+            ));
+        }
+    }
+    errors
+}
+
+/// Every `pub enum` under `src/`, test files aside, and the scan's refusals.
+fn crate_enums() -> (Vec<FoundEnum>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut refused = Vec::new();
+    for source in arch_support::sources() {
+        if is_test_file(&source.path) {
+            continue;
+        }
+        let tokens = source.tokens_with_attributes();
+        let (f, r) = scan_enums(&source.path, &tokens);
+        found.extend(f);
+        refused.extend(r);
+    }
+    (found, refused)
+}
+
+#[test]
+fn every_pub_enum_is_open_or_closed_with_its_reason_843d9() {
+    let (found, refused) = crate_enums();
+    let errors = enum_errors(&found, &refused, CLOSED_ENUMS);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+    let count = |opening: &str| {
+        CLOSED_ENUMS
+            .iter()
+            .filter(|(_, reason)| reason.starts_with(opening))
+            .count()
+    };
+    assert_eq!(
+        count("closed: "),
+        CLOSED_LEN,
+        "a closed row joins by a ruling alone; move CLOSED_LEN with it"
+    );
+    assert_eq!(
+        count("held for row 4: "),
+        HELD_LEN,
+        "the held rows take no new one; lower HELD_LEN as row 4 rules each"
+    );
+    let attributed = found.iter().filter(|item| item.attributed).count();
+    assert_eq!(found.len(), attributed + CLOSED_ENUMS.len());
+    println!(
+        "{} `pub enum`s: {attributed} attributed, {} closed, {} held for row 4",
+        found.len(),
+        count("closed: "),
+        count("held for row 4: ")
+    );
+}
+
+/// The enum scan and the rule on sample texts: each form and each refusal.
+#[test]
+fn the_enum_rule_refuses_each_case_on_a_probe_843d9() {
+    let tokens = arch_support::scan_tokens_with_attributes(
+        r#"
+        // pub enum InComment { A }
+        const S: &str = "pub enum InString { A }";
+        /// Doc.
+        #[derive(Clone)]
+        #[non_exhaustive]
+        pub enum Open { A }
+        crate::util::non_exhaustive::non_exhaustive_enum! {
+            path = bsv_rs::probe::Pinned;
+        /// Doc.
+        #[derive(Debug)]
+        #[non_exhaustive]
+        pub enum Pinned { A, B(u8) }
+        }
+        pub enum Closed { A }
+        pub enum Planted { A }
+        #[cfg_attr(feature = "x", non_exhaustive)]
+        pub enum Conditional { A }
+        pub(crate) enum Private { A }
+        enum Bare { A }
+        macro_rules! make { ($vis:vis enum $name:ident) => { $vis enum $name { A } }; }
+        other_macro! { pub enum Hidden { A } }
+        "#,
+    );
+    let (found, refused) = scan_enums("probe.rs", &tokens);
+    let read: Vec<(&str, bool)> = found
+        .iter()
+        .map(|item| (item.key.as_str(), item.attributed))
+        .collect();
+    assert_eq!(
+        read,
+        [
+            ("probe.rs:Open", true),
+            ("probe.rs:Pinned", true),
+            ("probe.rs:Closed", false),
+            ("probe.rs:Planted", false),
+            ("probe.rs:Conditional", false),
+        ]
+    );
+    assert_eq!(refused.len(), 1, "{refused:?}");
+    assert!(
+        refused[0]
+            .ends_with("`pub enum Hidden` inside `other_macro!`, which this scan cannot read"),
+        "{refused:?}"
+    );
+    let kept = [
+        ("probe.rs:Closed", "closed: a probe"),
+        ("probe.rs:Planted", "held for row 4: a probe"),
+        ("probe.rs:Conditional", "closed: a probe"),
+    ];
+    assert_eq!(enum_errors(&found, &[], &kept), Vec::<String>::new());
+    let cases: [(&[(&str, &str)], &str); 5] = [
+        (
+            &[kept[0], kept[2]],
+            "probe.rs:Planted: a `pub enum` (line 16) with neither `#[non_exhaustive]` nor a row",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                kept[2],
+                ("probe.rs:Open", "closed: a probe"),
+            ],
+            "probe.rs:Open: attributed and still a row of CLOSED_ENUMS",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                kept[2],
+                ("probe.rs:Gone", "closed: a probe"),
+            ],
+            "probe.rs:Gone: a row of CLOSED_ENUMS that names no `pub enum`",
+        ),
+        (
+            &[
+                kept[0],
+                kept[1],
+                ("probe.rs:Conditional", "no pin yet: a probe"),
+            ],
+            "probe.rs:Conditional: a reason opens `closed: ` or `held for row 4: `",
+        ),
+        (
+            &[kept[0], kept[1], kept[2], kept[0]],
+            "CLOSED_ENUMS names a row twice",
+        ),
+    ];
+    for (rows, words) in cases {
+        let got = enum_errors(&found, &[], rows);
         assert_eq!(got.len(), 1, "{words}: {got:?}");
         assert!(got[0].starts_with(words), "{words}: {got:?}");
     }

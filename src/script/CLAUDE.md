@@ -615,3 +615,7 @@ const REQUIRE_CLEAN_STACK: bool = true;          // the default mode, version <=
 - `../primitives/CLAUDE.md` - Primitives module (encoding, hashing)
 - `../primitives/bsv/CLAUDE.md` - BSV primitives (sighash, transaction signatures)
 - `templates/CLAUDE.md` - Templates module documentation
+
+## Open enums (#843d9)
+
+`ScriptResource`, `ProtocolEra`, `ScriptFlagsError`, `RPuzzleType`: `#[non_exhaustive]` since #843d9 (the freeze plan's row 9), each defined inside `crate::util::non_exhaustive::non_exhaustive_enum!` under its public path, which writes into its doc the every-variant `compile_fail` match and its wildcard twin from the definition (`tests/arch_non_exhaustive_pins_819.rs` holds the pin, `tests/arch_non_exhaustive_843d.rs` that every `pub enum` is open or a row of `CLOSED_ENUMS`). A later variant is additive: a `match` outside the crate ends in a wildcard arm, and at a door that arm refuses, it never skips. Inside the crate the attribute binds nothing: every match under `src/` stays exhaustive, and no wildcard arm is added for it. Building a variant and serde are unchanged. Closed, each by what it is: `ExecutionContext` (a spend runs two scripts), `Word` (the node's two flag words), `SignOutputs` (the three base hash types), `LockPosition` (before or after). `flags.rs`'s unit tests live in `flags_tests.rs` since #843d9 (the module is still `tests`), the room under the file's ratchet line.

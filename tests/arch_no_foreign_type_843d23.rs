@@ -24,6 +24,9 @@
 //! `IndexMap`, reaches `RequestedCertificateSet.types`). Only a bare `pub` is
 //! public here: `pub(crate)`, `pub(super)` and `pub(in ..)` are not read.
 //!
+//! An enum defined inside `non_exhaustive_enum!` is read as written there
+//! (#843d9).
+//!
 //! What it cannot see: a glob import (`use serde_json::*`), a signature a
 //! macro builds (a `thiserror` `#[from]` impl among them), a trait method's
 //! copy in an impl (its declaration is read), an associated type or
@@ -945,6 +948,18 @@ impl Scan<'_> {
                 i = self.public_item(tokens, i + 1, end, owner);
                 continue;
             }
+            // An enum defined inside `non_exhaustive_enum!` is read as
+            // written there (#843d9: the invocation's braces hid its
+            // variants' fields).
+            if text == "non_exhaustive_enum"
+                && tokens.get(i + 1).is_some_and(|t| t.text == "!")
+                && tokens.get(i + 2).is_some_and(|t| t.text == "{")
+            {
+                let body_end = group_end(tokens, i + 2);
+                self.walk(tokens, i + 3, body_end - 1, owner);
+                i = body_end;
+                continue;
+            }
             if text == "{" {
                 i = group_end(tokens, i);
                 continue;
@@ -1301,6 +1316,27 @@ fn the_scan_refuses_a_planted_field_843d23() {
             ("Shape::A".to_string(), "p256"),
             ("Shape::B".to_string(), "num_bigint"),
             ("type Alias".to_string(), "futures"),
+        ]
+    );
+}
+
+/// An enum defined inside `non_exhaustive_enum!` is read as one outside it
+/// (#843d9: until then the invocation's braces hid `SocketIoPacket`'s and
+/// `LookupAnswer`'s variants, and their listed rows matched no site).
+#[test]
+fn the_scan_reads_an_enum_inside_non_exhaustive_enum_843d9() {
+    assert_eq!(
+        planted(
+            "use serde_json::Value;\n\
+             crate::util::non_exhaustive::non_exhaustive_enum! {\n\
+                 path = bsv_rs::sample::Shape;\n\
+             #[derive(Debug)]\n#[non_exhaustive]\n\
+             pub enum Shape { A(p256::PublicKey), B { x: Value }, C = 3 }\n}\n\
+             other_macro! { pub enum Hidden { A(reqwest::Client) } }"
+        ),
+        vec![
+            ("Shape::A".to_string(), "p256"),
+            ("Shape::B".to_string(), "serde_json"),
         ]
     );
 }

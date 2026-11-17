@@ -106,6 +106,7 @@ fn type_code(packet: &SocketIoPacket) -> u8 {
         SocketIoPacket::Event { .. } => 2,
         SocketIoPacket::Ack { .. } => 3,
         SocketIoPacket::ConnectError { .. } => 4,
+        other => panic!("unknown variant: {other:?}"),
     }
 }
 
@@ -118,6 +119,7 @@ fn data(packet: &SocketIoPacket) -> Option<Value> {
             Some(Value::Array(data.clone()))
         }
         SocketIoPacket::Disconnect { .. } => None,
+        other => panic!("unknown variant: {other:?}"),
     }
 }
 
@@ -150,6 +152,7 @@ fn every_frame_the_reference_refuses_is_refused_in_its_words() {
                 assert!(words.starts_with("unknown packet type"), "{}", case.name)
             }
             CodecError::EmptyPacket => panic!("{}: refused as empty", case.name),
+            other => panic!("unknown variant: {other:?}"),
         }
     }
 }

@@ -104,13 +104,17 @@ pub struct Transaction {
     pub merkle_path: Option<MerklePath>,
 }
 
+crate::util::non_exhaustive::non_exhaustive_enum! {
+    path = bsv_rs::transaction::ChangeDistribution;
 /// Specifies how change should be distributed among change outputs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ChangeDistribution {
     /// Distribute change equally among all change outputs.
     Equal,
     /// Distribute change randomly using Benford's law distribution.
     Random,
+}
 }
 
 /// Script offsets for efficient script retrieval from binary transaction data.

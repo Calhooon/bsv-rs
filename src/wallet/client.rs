@@ -32,6 +32,7 @@ use crate::Error;
 
 /// Substrate types for WalletClient.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SubstrateType {
     /// Auto-detect available substrate.
     ///
