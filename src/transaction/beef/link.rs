@@ -88,25 +88,29 @@ impl BeefLinkLimits {
     /// may re-materialize up to this many bytes of repeated shared-parent stubs
     /// beyond the BEEF's own bytes before one link is refused.
     ///
-    /// 16 MiB. The heap a declined link peaks at follows `≈ 2 × budget +
-    /// baseline` (the re-materialized bytes plus one in-flight stub clone, over
-    /// the host's resident baseline): ~37 MiB measured on the test harness,
-    /// ~62 MiB on a 128 MB Worker (~30 MiB baseline) — well within the Worker
-    /// with room to spare. It sits far below the #749 denial of service (a
-    /// 128 KiB answer re-materializing ~1.69 GB) and far above every honest
-    /// BEEF: the largest shared-parent fan any real dependent's BEEF carries is
-    /// 20, and the default admits an honest single child sweeping many outputs
-    /// of one parent — up to 701 plain-payment (P2PKH) outputs, 250
-    /// data-carrying outputs of 256 B, or 127 of 1 KiB, before one such sweep is
-    /// refused (at 32 MiB: 992 / 354 / 180). There is no single "general"
-    /// figure: the onset falls as the output grows, so the reach is stated per
-    /// output size. The default refuses no honest input while leaving generous
-    /// single-link headroom above anything a wallet or the overlay engine
-    /// builds (the figures fell by one output — 702→701, 251→250, 993→992 — when
-    /// the #749 fold began charging the proof a stub carries too). Raising it
-    /// erases that headroom; the headroom pin in
-    /// `tests/beef_link_bound.rs`, which fixes those per-output-size cells, turns
-    /// red if this value moves.
+    /// 16 MiB — of the HEAP each repeat clone holds, not its wire bytes (bsv-rs
+    /// #749 fold-c). A transaction's `to_binary` is a flat byte count, but a
+    /// cloned stub holds far more: the struct `Vec` backings of its inputs and
+    /// outputs, its scripts' own containers, and the proof's leaf structs — a
+    /// one-byte-locked output is ~10 wire bytes yet ~150 heap bytes. Metering the
+    /// clone's heap keeps the budget a heap budget: a declined link peaks at
+    /// `≈ budget + the answer's own bytes`, ~18.6 MiB measured on the test
+    /// harness for the worst declined-late shape (a ~57 KB answer), so ~49 MiB on
+    /// a 128 MB Worker (~30 MiB baseline) — well within it, where the wire meter
+    /// this replaces held ~248 MB on that same answer, past the isolate. It sits
+    /// far below the #749 denial of service and far above every honest BEEF: the
+    /// largest shared-parent fan any real dependent's BEEF carries is 20, and the
+    /// default admits an honest single child sweeping many outputs of one parent
+    /// — up to 313 plain-payment (P2PKH) outputs, 203 data-carrying outputs of
+    /// 256 B, or 119 of 1 KiB, before one such sweep is refused (at 32 MiB: 443 /
+    /// 288 / 169). There is no single "general" figure: the onset falls as the
+    /// output grows, so the reach is stated per output size. The default refuses
+    /// no honest input any real dependent builds (their largest fan, 20, is far
+    /// under the smallest onset) while leaving generous single-link headroom; the
+    /// onsets fell from the wire meter's (P2PKH 701→313) when the fold-c began
+    /// charging the heap the clone holds, not its wire bytes. Raising it erases
+    /// that headroom; the headroom pin in `tests/beef_link_bound.rs`, which fixes
+    /// those per-output-size cells, turns red if this value moves.
     pub const DEFAULT_MAX_LINK_BYTES: u64 = 16 * 1024 * 1024;
 
     /// No bound: link whatever the bytes hold. Only for a BEEF whose source the
@@ -365,6 +369,58 @@ fn bump_bytes(mp: &MerklePath) -> u64 {
     mp.to_binary().map_or(0, |bytes| bytes.len() as u64)
 }
 
+/// The HEAP a cloned `MerklePath` holds: its serialized bytes (the leaf hashes a
+/// clone re-materializes) plus the leaf structs its level `Vec`s carry. A
+/// `MerklePathLeaf` is far larger in heap than the ~34 wire bytes it serializes
+/// to, so weighing the clone by [`bump_bytes`] (wire) alone under-charged the
+/// proof the shared-BUMP fold still let a repeat hold; charging the leaf structs
+/// too brings the proof's clone within a small factor of the heap it costs
+/// (bsv-rs #749 fold-c).
+fn bump_heap(mp: &MerklePath) -> u64 {
+    let leaves: u64 = mp.path.iter().map(|level| level.len() as u64).sum();
+    bump_bytes(mp).saturating_add(leaves.saturating_mul(core::mem::size_of::<
+        crate::transaction::merkle_path::MerklePathLeaf,
+    >() as u64))
+}
+
+/// The HEAP a cloned stub re-materializes beyond its wire bytes: the `Vec`
+/// backings of its inputs and outputs, and the box each repeat input holds it
+/// in. A transaction's `to_binary` is a flat byte count — a one-byte-locked
+/// output is ~10 wire bytes but holds ~150 heap bytes once cloned (its struct in
+/// the output `Vec`, its script's own container) — so the stub byte-meter
+/// under-weighed each repeat clone, letting a 16 MiB budget admit hundreds of MB
+/// of heap, past the 128 MB Worker isolate. Adding the struct backings brings
+/// the charge within a small factor of the heap the clone holds, so the budget
+/// bounds the heap the default link re-materializes, on native and on wasm32
+/// alike (bsv-rs #749 fold-c — the declined-late / accepted sibling of the
+/// shared-proof fold).
+fn stub_struct_heap(tx: &Transaction) -> u64 {
+    use core::mem::size_of;
+    (size_of::<Transaction>() as u64)
+        .saturating_add(
+            (tx.inputs().len() as u64)
+                .saturating_mul(size_of::<crate::transaction::TransactionInput>() as u64),
+        )
+        .saturating_add(
+            (tx.outputs().len() as u64)
+                .saturating_mul(size_of::<crate::transaction::TransactionOutput>() as u64),
+        )
+}
+
+// The struct backings a clone re-materializes are target-sized: wasm32's
+// pointers and `usize` are 4 bytes where native's are 8, so every `size_of`
+// above only SHRINKS on wasm32 — the native-sized charge over-weighs the wasm32
+// clone, and the same budget bounds the (smaller) wasm32 heap too. These
+// assertions are recompiled on every target the crate builds (the CI wasm32
+// slice among them), so a struct that grew past these native-side bounds —
+// which would make the heap accounting above stale — fails the build rather than
+// silently loosening the bound.
+const _: () = assert!(core::mem::size_of::<Transaction>() <= 1024);
+const _: () = assert!(core::mem::size_of::<crate::transaction::TransactionInput>() <= 512);
+const _: () = assert!(core::mem::size_of::<crate::transaction::TransactionOutput>() <= 512);
+const _: () =
+    assert!(core::mem::size_of::<crate::transaction::merkle_path::MerklePathLeaf>() <= 256);
+
 /// A transaction linked under a [`BeefLinkBudget`], holding its claim on the
 /// budget's shared pool (when it has one) until it is dropped.
 ///
@@ -601,7 +657,7 @@ impl Beef {
                     // copy per distinct proven txid; its bytes are
                     // re-materialized heap the #749 bound must see, which the
                     // stub byte-meter did not weigh (bsv-rs #749 fold).
-                    meter.charge(bump_bytes(mp))?;
+                    meter.charge(bump_heap(mp))?;
                     tx.merkle_path = Some(mp.clone());
                     tx.inputs().len()
                 }
@@ -683,12 +739,19 @@ impl Beef {
             // BEFORE the clone) and fold its bytes into `stub_bytes`, so each
             // later repeat is charged the proof too (bsv-rs #749 fold).
             let path_weight = bump
-                .map(bump_bytes)
-                .or_else(|| src.merkle_path.as_ref().map(bump_bytes))
+                .map(bump_heap)
+                .or_else(|| src.merkle_path.as_ref().map(bump_heap))
                 .unwrap_or(0);
             meter.charge(path_weight)?;
             let stub = Self::bare_stub(&src, bump);
-            let stub_bytes = stub.to_binary().len() as u64 + path_weight;
+            // Each repeat input re-materializes this stub in full: its wire bytes
+            // (scripts, txids), the proof it carries, and the struct backings of
+            // its inputs and outputs the wire count does not see (bsv-rs #749
+            // fold-c). Weigh all three, so the budget bounds the heap, not the
+            // wire bytes, each repeat clone holds.
+            let stub_bytes = (stub.to_binary().len() as u64)
+                .saturating_add(path_weight)
+                .saturating_add(stub_struct_heap(&stub));
             stubs.insert(src_txid, (stub, stub_bytes));
             stack.push(enter(src, meter)?);
         }

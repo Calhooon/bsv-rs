@@ -245,14 +245,17 @@ fn the_default_per_link_budget_is_16_mib_with_headroom_above_any_honest_input() 
     );
     // The headroom it leaves: the largest shared-parent fan any real dependent
     // BEEF carries is 20, and the default admits a same-parent sweep far above
-    // that. A 500-output OP_TRUE consolidation (25× the largest real fan) links
+    // that. A 300-output OP_TRUE consolidation (15× the largest real fan) links
     // by default; a default low enough to refuse it would turn this red, so the
-    // single-link headroom cannot be quietly erased.
-    let (bytes, child) = shared_parent_beef(500, 500, &op_true());
+    // single-link headroom cannot be quietly erased. (The onset fell from 500+
+    // when the #749 fold-c began charging the HEAP a repeat clone holds, not its
+    // wire bytes — see `the_default_headroom_is_stated_per_output_size` — but it
+    // stays well above any honest input.)
+    let (bytes, child) = shared_parent_beef(300, 300, &op_true());
     let tx = Transaction::from_beef(&bytes, None)
-        .expect("the default leaves headroom for a 500-output honest sweep");
+        .expect("the default leaves headroom for a 300-output honest sweep");
     assert_eq!(tx.id(), child);
-    assert_eq!(linked_inputs(&tx), 500);
+    assert_eq!(linked_inputs(&tx), 300);
 }
 
 #[test]
@@ -269,12 +272,18 @@ fn the_default_headroom_is_stated_per_output_size() {
     // (output-script bytes, 16 MiB default onset, 32 MiB onset). 25 B is a
     // plain-payment (P2PKH) locking script's exact size; 256 B and 1 KiB are
     // data-carrying outputs.
-    // Since the #749 fold also charges the proof (`MerklePath`) a stub carries —
-    // ~40 B for the single-leaf BUMP these one-parent sweeps use — three cells
-    // fell by one output from their pre-fold values (702→701, 993→992, 251→250):
-    // the honest sweeps now refused that 0.8.11 admitted. The others are
-    // unchanged (the extra proof bytes did not cross their integer boundary).
-    let cells: &[(usize, usize, usize)] = &[(25, 701, 992), (256, 250, 354), (1024, 127, 180)];
+    // The #749 fold-c meters the HEAP a repeat clone holds — the output and input
+    // struct `Vec` backings, and the proof's leaf structs — not its wire bytes
+    // alone, so the budget now bounds the heap the link re-materializes (it held
+    // ~248 MB on a ~57 KB answer before, past the 128 MB Worker isolate; ~18 MB
+    // now). A one-byte-locked output is ~10 wire bytes but ~150 heap bytes, so
+    // the onsets fell well below their wire-meter values (P2PKH 701→313, 992→443)
+    // — the honest reach is still ≥15× the largest shared-parent fan (20) any
+    // real dependent BEEF carries, but the heap a hostile answer can hold is now
+    // a small multiple of the budget, not hundreds of MB. These cells are
+    // measured by this crate's own writer and pinned EXACTLY; the link.rs doc,
+    // the CHANGELOG and the advisory state the same numbers.
+    let cells: &[(usize, usize, usize)] = &[(25, 313, 443), (256, 203, 288), (1024, 119, 169)];
     for &(script_bytes, onset16, onset32) in cells {
         let script = filler_script(script_bytes);
         // The shipped default (16 MiB) admits exactly `onset16` and refuses one
