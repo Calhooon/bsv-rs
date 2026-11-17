@@ -157,7 +157,7 @@ fn redeem_step(lock: &[u8], unlock: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
         return None;
     }
     let script = bsv_rs::script::Script::from_binary(unlock).unwrap();
-    let mut chunks = script.chunks();
+    let mut chunks = script.chunks().to_vec();
     let pushes = script.is_push_only() && script.truncated_push().is_none();
     let Some(last) = chunks.pop().filter(|c| pushes && c.op != 0x50) else {
         return Some((unlock.to_vec(), lock.to_vec()));

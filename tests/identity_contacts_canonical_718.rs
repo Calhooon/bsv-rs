@@ -50,7 +50,7 @@ fn token(v: &Value, case: &Value) -> LockingScript {
         .iter()
         .map(|length| vec![byte; length.as_u64().unwrap() as usize])
         .collect();
-    let mut chunks = PushDrop::new(key, fields).lock().chunks();
+    let mut chunks = PushDrop::new(key, fields).lock().chunks().to_vec();
     match case["second_op"].as_u64() {
         Some(op) => chunks[1] = ScriptChunk::new_opcode(op as u8),
         None => {

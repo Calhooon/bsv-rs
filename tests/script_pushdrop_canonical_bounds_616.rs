@@ -57,7 +57,7 @@ fn token(case: &Value) -> LockingScript {
     if let Some(last) = case["last_field_byte"].as_u64() {
         *fields.last_mut().unwrap() = vec![last as u8];
     }
-    let mut chunks = PushDrop::new(key, fields).lock().chunks();
+    let mut chunks = PushDrop::new(key, fields).lock().chunks().to_vec();
     chunks[1] = ScriptChunk::new_opcode(case["second_op"].as_u64().unwrap() as u8);
     let script = LockingScript::from_chunks(chunks);
     let bytes = script.to_binary();

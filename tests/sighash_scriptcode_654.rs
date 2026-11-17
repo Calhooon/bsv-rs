@@ -421,10 +421,13 @@ fn a_non_forkid_signature_is_refused_by_the_words_before_its_script_code_654() {
 fn the_chunk_serializer_keeps_the_references_stop_and_a_read_script_its_bytes_654() {
     let unlock = case("U2 0x41 node-signed", 2).unlock;
     let read = Script::from_binary(&unlock).unwrap();
-    let rebuilt = Script::from_chunks(read.chunks());
+    let rebuilt = Script::from_chunks(read.chunks().to_vec());
     assert_eq!(rebuilt.to_binary(), unlock);
-    let mut chunks = Script::from_binary(&[0x6a, 0x01, 0x00]).unwrap().chunks();
-    chunks.extend(Script::from_binary(&LOCK).unwrap().chunks());
+    let mut chunks = Script::from_binary(&[0x6a, 0x01, 0x00])
+        .unwrap()
+        .chunks()
+        .to_vec();
+    chunks.extend_from_slice(Script::from_binary(&LOCK).unwrap().chunks());
     assert_eq!(Script::from_chunks(chunks).to_binary(), [0x6a, 0x01, 0x00]);
 }
 
