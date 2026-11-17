@@ -204,15 +204,17 @@ fn resolver_of(shape: &Value, test: &str) -> (Vec<(String, String)>, LookupResol
             (role, url)
         })
         .collect();
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(ByHost(answers)) as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            SERVICE.to_string(),
-            hosts.iter().map(|(_, url)| url.clone()).collect(),
-        )])),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(
+                Arc::new(ByHost(answers)) as Arc<dyn OverlayLookupFacilitator>
+            ))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                SERVICE.to_string(),
+                hosts.iter().map(|(_, url)| url.clone()).collect(),
+            )]))),
+    );
     (hosts, resolver)
 }
 

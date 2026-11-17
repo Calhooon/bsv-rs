@@ -2,6 +2,7 @@
 //!
 //! Implements RFC 6238 for generating time-based OTPs commonly used in 2FA.
 
+use super::options::{TotpOptions, TotpValidateOptions};
 use crate::primitives::hash::{sha1_hmac, sha256_hmac, sha512_hmac};
 use subtle::ConstantTimeEq;
 
@@ -19,75 +20,6 @@ pub enum Algorithm {
     Sha256,
     /// HMAC-SHA512 (64-byte output)
     Sha512,
-}
-
-/// Options for TOTP generation.
-///
-/// All fields have sensible defaults following RFC 6238 recommendations.
-#[derive(Debug, Clone)]
-pub struct TotpOptions {
-    /// Number of digits in the generated code (default: 6).
-    ///
-    /// Common values are 6 or 8. The value should be between 1 and 10
-    /// for practical use.
-    pub digits: u32,
-
-    /// HMAC algorithm to use (default: SHA-1).
-    ///
-    /// SHA-1 is the most widely supported by authenticator apps.
-    /// SHA-256 and SHA-512 provide stronger security.
-    pub algorithm: Algorithm,
-
-    /// Time period in seconds (default: 30).
-    ///
-    /// The counter increments every `period` seconds. 30 seconds is
-    /// the standard value used by most services.
-    pub period: u64,
-
-    /// Override timestamp in seconds since Unix epoch.
-    ///
-    /// If `None`, uses the current system time. Set this for testing
-    /// or when generating codes for a specific time.
-    pub timestamp: Option<u64>,
-}
-
-impl Default for TotpOptions {
-    fn default() -> Self {
-        Self {
-            digits: 6,
-            algorithm: Algorithm::Sha1,
-            period: 30,
-            timestamp: None,
-        }
-    }
-}
-
-/// Options for TOTP validation.
-///
-/// Extends `TotpOptions` with a skew parameter to handle clock drift.
-#[derive(Debug, Clone)]
-pub struct TotpValidateOptions {
-    /// Base TOTP options (digits, algorithm, period, timestamp).
-    pub options: TotpOptions,
-
-    /// Number of time periods to check before and after the current period.
-    ///
-    /// Default is 1, which means codes from the previous period, current
-    /// period, and next period are all accepted. This accommodates up to
-    /// 30 seconds of clock drift in either direction (with default 30-second
-    /// periods).
-    ///
-    /// Higher values increase tolerance for clock drift but reduce security.
-    pub skew: u32,
-}
-
-impl Default for TotpValidateOptions {
-    fn default() -> Self {
-        Self {
-            options: TotpOptions::default(),
-            skew: 1,
-        }
-    }
 }
 
 /// TOTP (Time-based One-Time Password) implementation.
@@ -141,12 +73,10 @@ impl Totp {
     /// assert_eq!(code.len(), 6);
     ///
     /// // Generate with custom options
-    /// let options = TotpOptions {
-    ///     digits: 8,
-    ///     algorithm: Algorithm::Sha256,
-    ///     timestamp: Some(59), // Fixed time for testing
-    ///     ..Default::default()
-    /// };
+    /// let options = TotpOptions::default()
+    ///     .with_digits(8)
+    ///     .with_algorithm(Algorithm::Sha256)
+    ///     .with_timestamp(Some(59)); // Fixed time for testing
     /// let code = Totp::generate(secret, Some(options));
     /// assert_eq!(code.len(), 8);
     /// ```
@@ -189,10 +119,9 @@ impl Totp {
     /// assert!(Totp::validate(secret, &code, None));
     ///
     /// // Validate with custom options
-    /// let validate_options = TotpValidateOptions {
-    ///     options: TotpOptions::default(),
-    ///     skew: 2, // Accept codes from 2 periods before/after
-    /// };
+    /// let validate_options = TotpValidateOptions::default()
+    ///     .with_options(TotpOptions::default())
+    ///     .with_skew(2); // Accept codes from 2 periods before/after
     /// assert!(Totp::validate(secret, &code, Some(validate_options)));
     ///
     /// // Invalid codes are rejected

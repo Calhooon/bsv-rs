@@ -50,15 +50,15 @@ impl OverlayLookupFacilitator for Recording {
 
 fn client() -> (IdentityClient<ProtoWallet>, Arc<Mutex<Vec<Value>>>) {
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Recording(asked.clone()))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec!["https://ls_identity.invalid".to_string()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Recording(asked.clone()))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec!["https://ls_identity.invalid".to_string()],
+            )]))),
+    ));
     (
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver),
         asked,

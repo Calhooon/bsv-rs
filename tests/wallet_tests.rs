@@ -333,7 +333,7 @@ mod cached_key_deriver_tests {
     #[test]
     fn test_lru_eviction() {
         // Create a very small cache
-        let config = CacheConfig { max_size: 3 };
+        let config = CacheConfig::default().with_max_size(3);
         let cached = CachedKeyDeriver::new(Some(PrivateKey::random()), Some(config));
         let protocol = Protocol::new(SecurityLevel::App, "eviction test");
 
@@ -362,7 +362,7 @@ mod cached_key_deriver_tests {
 
     #[test]
     fn test_lru_access_updates_recentness() {
-        let config = CacheConfig { max_size: 3 };
+        let config = CacheConfig::default().with_max_size(3);
         let cached = CachedKeyDeriver::new(Some(PrivateKey::random()), Some(config));
         let protocol = Protocol::new(SecurityLevel::App, "lru access test");
 

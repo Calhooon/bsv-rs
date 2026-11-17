@@ -61,14 +61,14 @@ impl OverlayLookupFacilitator for Scripted {
 
 /// The hosts one tracker's answer admits, sorted.
 async fn admitted(tracker: &str, outputs: Vec<OutputListItem>) -> Vec<String> {
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        slap_trackers: Some(vec![tracker.to_string()]),
-        facilitator: Some(Arc::new(Scripted(HashMap::from([(
-            tracker.to_string(),
-            outputs,
-        )])))),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_slap_trackers(Some(vec![tracker.to_string()]))
+            .with_facilitator(Some(Arc::new(Scripted(HashMap::from([(
+                tracker.to_string(),
+                outputs,
+            )]))))),
+    );
     let mut hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     hosts.sort();
     hosts

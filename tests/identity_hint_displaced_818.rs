@@ -135,12 +135,12 @@ async fn through(door: Door, hosts: &[(&str, Option<String>)]) -> (Vec<String>, 
         );
         urls.push(url);
     }
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(ByHost(answers, asked.clone()))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([("ls_identity".to_string(), urls)])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(ByHost(answers, asked.clone()))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([("ls_identity".to_string(), urls)]))),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver.clone());
     let key = subject_key();

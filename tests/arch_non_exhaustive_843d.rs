@@ -11,8 +11,9 @@
 //! `Pending` and `Unruled` classes take no new row (their lengths are pinned
 //! and only lowered). Each `pub` field of an attributed struct has a
 //! `with_<field>` method in an inherent `impl` of its name, or is a
-//! parameter of its `new`, else the struct is a row of [`ASSIGNED`] with its
-//! reason.
+//! parameter of its `new`, or a setter [`NAMED_SETTERS`] names for it (the
+//! four that existed under another name before #843d8c), else the struct is a
+//! row of [`ASSIGNED`] with its reason.
 //!
 //! The scan is lexical (`arch_support`): comments and string literals supply
 //! nothing, `#[cfg(test)]` items and files named `tests.rs` or `*_tests.rs`
@@ -400,7 +401,8 @@ enum Class {
     /// Deprecated, or a deprecated door's alone.
     Deprecated,
     /// The freeze plan's row 8b or 8c: opened by a later part. Takes no new
-    /// row; [`PENDING_LEN`] only lowers.
+    /// row; [`PENDING_LEN`] only lowers. Empty since #843d8c.
+    #[allow(dead_code)]
     Pending,
     /// No class holds it and no ruling names it. Takes no new row;
     /// [`UNRULED_LEN`] only lowers.
@@ -408,7 +410,7 @@ enum Class {
 }
 
 /// The rows of `Pending`: only lowered, as each struct is opened.
-const PENDING_LEN: usize = 20;
+const PENDING_LEN: usize = 0;
 /// The rows of `Unruled`: only lowered, as each struct takes a class or the
 /// attribute.
 const UNRULED_LEN: usize = 57;
@@ -546,26 +548,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/script/spend/mod.rs:TxSpendParams", Class::ParameterBlock, "every field a caller's choice of the input judged and its budgets"),
     ("src/transaction/beef.rs:BeefLimits", Class::Deprecated, "the hints of the deprecated `Beef::from_binary_with_limits` door alone (0.4.0)"),
     ("src/transaction/broadcasters/arc.rs:ArcConfig", Class::Deprecated, "deprecated since 0.9.0 with ARC (#350, the owner's word of 2026-10-27): ARCade is the standard"),
-    ("src/identity/types.rs:IdentityClientConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/identity/types.rs:ContactsManagerConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreGetOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreSetOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreRemoveOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/historian.rs:HistorianConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/host_reputation_tracker.rs:ReputationConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/lookup_resolver.rs:LookupResolverConfig", Class::Pending, "the freeze plan's row 8b"),
-    ("src/overlay/topic_broadcaster.rs:TopicBroadcasterConfig", Class::Pending, "the freeze plan's row 8b"),
-    ("src/registry/client.rs:RegistryClientConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/storage/downloader.rs:StorageDownloaderConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/storage/uploader.rs:StorageUploaderConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/totp/core.rs:TotpOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/totp/core.rs:TotpValidateOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/broadcasters/teranode.rs:TeranodeConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/broadcasters/whatsonchain.rs:WocBroadcastConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/chain_trackers/block_headers_service.rs:BlockHeadersServiceConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/fee_models/live_policy.rs:LivePolicyConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/wallet/cached_key_deriver.rs:CacheConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/auth/clients/response.rs:Response", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/auth/transports/http.rs:HttpRequest", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/auth/transports/http.rs:HttpResponse", Class::Unruled, "no class holds it and no ruling names it"),
@@ -701,6 +683,40 @@ const ASSIGNED: &[(&str, &str)] = &[
     ),
 ];
 
+/// `file:Name`, the field, the setter: a field of an attributed struct whose
+/// setter was named otherwise before the rule (#843d8c). A row whose setter is
+/// gone, or whose field has a `with_<field>` too, fails.
+const NAMED_SETTERS: &[(&str, &str, &str)] = &[
+    (
+        "src/identity/types.rs:IdentityClientConfig",
+        "network_preset",
+        "with_network",
+    ),
+    (
+        "src/registry/client.rs:RegistryClientConfig",
+        "network_preset",
+        "with_network",
+    ),
+    (
+        "src/registry/client.rs:RegistryClientConfig",
+        "accept_delayed_broadcast",
+        "with_delayed_broadcast",
+    ),
+    (
+        "src/storage/uploader.rs:StorageUploaderConfig",
+        "default_retention_minutes",
+        "with_retention_minutes",
+    ),
+];
+
+/// The setter [`NAMED_SETTERS`] names for a field, when it names one.
+fn named_setter(row: &str, field: &str) -> Option<&'static str> {
+    NAMED_SETTERS
+        .iter()
+        .find(|(r, f, _)| *r == row && *f == field)
+        .map(|(_, _, setter)| *setter)
+}
+
 /// The structs the scan reads by name: the generic ones, the tuple one and
 /// the ones a `key_args!` invocation declares.
 const GENERIC: &[&str] = &[
@@ -735,7 +751,9 @@ fn unset_fields(
         .map(|(name, _)| name.clone())
         .filter(|name| {
             impls.get(&found.name).is_none_or(|(fns, params)| {
-                !fns.contains(&format!("with_{name}")) && !params.contains(name)
+                !fns.contains(&format!("with_{name}"))
+                    && !params.contains(name)
+                    && !named_setter(&found.row(), name).is_some_and(|s| fns.contains(s))
             })
         })
         .collect()
@@ -900,10 +918,39 @@ fn the_scan_reads_every_form_by_name_843d8a() {
     assert_eq!(public.len(), 220, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
-        13,
+        33,
         "attributed"
     );
-    assert_eq!(ROWS.len() + 13, public.len(), "every other one a row");
+    assert_eq!(ROWS.len() + 33, public.len(), "every other one a row");
+}
+
+/// Each row of [`NAMED_SETTERS`] names an attributed struct, a `pub` field of
+/// it with no `with_<field>`, and a method its inherent impl has (#843d8c).
+#[test]
+fn every_named_setter_names_a_field_and_its_method_843d8c() {
+    let (found, _, impls) = crate_scan();
+    for (row, field, setter) in NAMED_SETTERS {
+        let f = found
+            .iter()
+            .find(|f| f.row() == *row && f.attributed)
+            .unwrap_or_else(|| panic!("{row}: no attributed struct"));
+        assert!(
+            f.fields.iter().any(|(name, _)| name == field),
+            "{row}: no field `{field}`"
+        );
+        let (fns, _) = impls
+            .get(&f.name)
+            .unwrap_or_else(|| panic!("{row}: no impl"));
+        assert!(fns.contains(*setter), "{row}: no method `{setter}`");
+        assert!(
+            !fns.contains(&format!("with_{field}")),
+            "{row}: `with_{field}` exists, so its NAMED_SETTERS row goes"
+        );
+    }
+    let probe: Vec<&str> = NAMED_SETTERS.iter().map(|(r, _, _)| *r).collect();
+    assert!(named_setter(probe[0], "network_preset").is_some());
+    assert!(named_setter(probe[0], "key_id").is_none());
+    assert!(named_setter("probe.rs:Half", "network_preset").is_none());
 }
 
 fn probe(text: &str) -> (Vec<Found>, Vec<String>) {

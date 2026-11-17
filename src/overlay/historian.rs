@@ -28,8 +28,23 @@ pub type InterpreterFn<T, C> = Box<
 >;
 
 /// Configuration for the Historian.
-#[derive(Default)]
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::HistorianConfig<u8, u8>) -> bsv_rs::overlay::HistorianConfig<u8, u8> {
+///     bsv_rs::overlay::HistorianConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::HistorianConfig<u8, u8>) -> bsv_rs::overlay::HistorianConfig<u8, u8> {
+///     value
+/// }
+/// ```
 #[allow(clippy::type_complexity)]
+#[non_exhaustive]
 pub struct HistorianConfig<T, C> {
     /// Enable debug logging.
     pub debug: bool,
@@ -39,6 +54,58 @@ pub struct HistorianConfig<T, C> {
     pub interpreter_version: Option<String>,
     /// Function to generate cache key from context.
     pub ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String + Send + Sync>>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(
+    HistorianConfig<u8, u8>,
+    bsv_rs::overlay::HistorianConfig<u8, u8>
+);
+
+// Written out so that neither `T` nor `C` needs `Default` (#843d8c); the values
+// are the derive's.
+impl<T, C> Default for HistorianConfig<T, C> {
+    fn default() -> Self {
+        Self {
+            debug: false,
+            history_cache: None,
+            interpreter_version: None,
+            ctx_key_fn: None,
+        }
+    }
+}
+
+impl<T, C> HistorianConfig<T, C> {
+    /// Sets `debug`.
+    #[must_use]
+    pub fn with_debug(mut self, debug: bool) -> Self {
+        self.debug = debug;
+        self
+    }
+
+    /// Sets `history_cache`.
+    #[must_use]
+    pub fn with_history_cache(mut self, history_cache: Option<HashMap<String, Vec<T>>>) -> Self {
+        self.history_cache = history_cache;
+        self
+    }
+
+    /// Sets `interpreter_version`.
+    #[must_use]
+    pub fn with_interpreter_version(mut self, interpreter_version: Option<String>) -> Self {
+        self.interpreter_version = interpreter_version;
+        self
+    }
+
+    /// Sets `ctx_key_fn`.
+    #[must_use]
+    #[allow(clippy::type_complexity)]
+    pub fn with_ctx_key_fn(
+        mut self,
+        ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String + Send + Sync>>,
+    ) -> Self {
+        self.ctx_key_fn = ctx_key_fn;
+        self
+    }
 }
 
 /// Traverses transaction ancestry to build history.

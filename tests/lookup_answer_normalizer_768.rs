@@ -50,15 +50,15 @@ async fn host_answering(body: serde_json::Value) -> MockServer {
 }
 
 fn http_resolver(host: &str) -> LookupResolver {
-    LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            SERVICE.to_string(),
-            vec![host.to_string()],
-        )])),
-        ..Default::default()
-    })
+    LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                SERVICE.to_string(),
+                vec![host.to_string()],
+            )]))),
+    )
 }
 
 fn question() -> LookupQuestion {

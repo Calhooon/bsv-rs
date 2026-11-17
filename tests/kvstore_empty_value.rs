@@ -51,13 +51,13 @@ fn store(wallet: &Counting) -> GlobalKVStore<Counting> {
         "https://kvstore-empty-value-{}.invalid",
         NEXT.fetch_add(1, Ordering::Relaxed)
     );
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some([(config.service_name.clone(), vec![host])].into()),
-        slap_trackers: Some(vec![]),
-        facilitator: Some(Arc::new(NoOutputs)),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some([(config.service_name.clone(), vec![host])].into()))
+            .with_slap_trackers(Some(vec![]))
+            .with_facilitator(Some(Arc::new(NoOutputs))),
+    );
     GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver)
 }
 
@@ -81,10 +81,7 @@ async fn written(value: &str) -> LockingScript {
 async fn an_empty_value_is_refused_before_the_wallet_is_asked() {
     for options in [
         None,
-        Some(KVStoreSetOptions {
-            tags: Some(vec!["a".into()]),
-            ..Default::default()
-        }),
+        Some(KVStoreSetOptions::new().with_tags(vec!["a".into()])),
     ] {
         let wallet = Counting::of_scalar(9);
         let result = store(&wallet).set("alpha", "", options).await;

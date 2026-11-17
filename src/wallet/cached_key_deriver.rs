@@ -27,7 +27,7 @@
 //! let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), None);
 //!
 //! // Or with custom cache size
-//! let config = CacheConfig { max_size: 500 };
+//! let config = CacheConfig::default().with_max_size(500);
 //! let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), Some(config));
 //!
 //! // Use like KeyDeriver - results are cached automatically
@@ -47,15 +47,42 @@ use super::key_deriver::{KeyDeriver, KeyDeriverApi};
 use super::types::{Counterparty, Protocol};
 
 /// Configuration for the cached key deriver.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::wallet::CacheConfig) -> bsv_rs::wallet::CacheConfig {
+///     bsv_rs::wallet::CacheConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::wallet::CacheConfig) -> bsv_rs::wallet::CacheConfig {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct CacheConfig {
     /// Maximum number of entries in each cache.
     pub max_size: usize,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(CacheConfig, bsv_rs::wallet::CacheConfig);
+
 impl Default for CacheConfig {
     fn default() -> Self {
         Self { max_size: 1000 }
+    }
+}
+
+impl CacheConfig {
+    /// Sets `max_size`.
+    #[must_use]
+    pub fn with_max_size(mut self, max_size: usize) -> Self {
+        self.max_size = max_size;
+        self
     }
 }
 
@@ -164,7 +191,7 @@ impl CachedKeyDeriver {
     /// let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), None);
     ///
     /// // Custom cache size
-    /// let config = CacheConfig { max_size: 2000 };
+    /// let config = CacheConfig::default().with_max_size(2000);
     /// let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), Some(config));
     /// ```
     pub fn new(root_key: Option<PrivateKey>, config: Option<CacheConfig>) -> Self {

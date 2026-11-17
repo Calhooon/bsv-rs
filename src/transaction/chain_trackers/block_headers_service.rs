@@ -39,7 +39,24 @@ use crate::transaction::{ChainTracker, ChainTrackerError};
 pub const DEFAULT_HEADERS_URL: &str = "https://headers.spv.money";
 
 /// Block Headers Service chain tracker configuration.
-#[derive(Clone)] // Debug redacts the token (credential_debug.rs)
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::BlockHeadersServiceConfig) -> bsv_rs::transaction::BlockHeadersServiceConfig {
+///     bsv_rs::transaction::BlockHeadersServiceConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::BlockHeadersServiceConfig) -> bsv_rs::transaction::BlockHeadersServiceConfig {
+///     value
+/// }
+/// ```
+// Debug redacts the token (credential_debug.rs)
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct BlockHeadersServiceConfig {
     /// Base URL for the headers service
     pub base_url: String,
@@ -49,6 +66,11 @@ pub struct BlockHeadersServiceConfig {
     pub timeout_ms: u64,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    BlockHeadersServiceConfig,
+    bsv_rs::transaction::BlockHeadersServiceConfig
+);
+
 impl Default for BlockHeadersServiceConfig {
     fn default() -> Self {
         Self {
@@ -56,6 +78,29 @@ impl Default for BlockHeadersServiceConfig {
             auth_token: None,
             timeout_ms: 30_000,
         }
+    }
+}
+
+impl BlockHeadersServiceConfig {
+    /// Sets `base_url`.
+    #[must_use]
+    pub fn with_base_url(mut self, base_url: String) -> Self {
+        self.base_url = base_url;
+        self
+    }
+
+    /// Sets `auth_token`.
+    #[must_use]
+    pub fn with_auth_token(mut self, auth_token: Option<String>) -> Self {
+        self.auth_token = auth_token;
+        self
+    }
+
+    /// Sets `timeout_ms`.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
     }
 }
 

@@ -70,14 +70,16 @@ fn client(
     definition_type: DefinitionType,
     scripts: &[LockingScript],
 ) -> RegistryClient<ProtoWallet> {
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Answering(scripts.iter().map(item).collect()))),
-        host_overrides: Some(HashMap::from([(
-            definition_type.lookup_service().to_string(),
-            vec!["https://h.invalid".to_string()],
-        )])),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Answering(
+                scripts.iter().map(item).collect(),
+            ))))
+            .with_host_overrides(Some(HashMap::from([(
+                definition_type.lookup_service().to_string(),
+                vec!["https://h.invalid".to_string()],
+            )]))),
+    );
     RegistryClient::new(
         ProtoWallet::new(Some(PrivateKey::from_hex(&"77".repeat(32)).unwrap())),
         RegistryClientConfig::new().with_resolver(Arc::new(resolver)),

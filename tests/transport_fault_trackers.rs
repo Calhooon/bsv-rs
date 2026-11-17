@@ -32,11 +32,10 @@ fn trackers(url: &str, timeout_ms: u64) -> Vec<(&'static str, Box<dyn ChainTrack
         (
             "BlockHeadersService",
             Box::new(BlockHeadersServiceTracker::with_config(
-                BlockHeadersServiceConfig {
-                    base_url: url.to_string(),
-                    auth_token: None,
-                    timeout_ms,
-                },
+                BlockHeadersServiceConfig::default()
+                    .with_base_url(url.to_string())
+                    .with_auth_token(None)
+                    .with_timeout_ms(timeout_ms),
             )),
         ),
     ]
@@ -130,11 +129,12 @@ async fn a_timeout_is_a_transport_fault_that_may_have_been_received() {
     .await;
     // Both trackers now bound every request; the WhatsOnChain door's own bound
     // is pinned by `the_whatsonchain_door_bounds_a_stalled_response_98` below.
-    let tracker = BlockHeadersServiceTracker::with_config(BlockHeadersServiceConfig {
-        base_url: server.uri(),
-        auth_token: None,
-        timeout_ms: 300,
-    });
+    let tracker = BlockHeadersServiceTracker::with_config(
+        BlockHeadersServiceConfig::default()
+            .with_base_url(server.uri())
+            .with_auth_token(None)
+            .with_timeout_ms(300),
+    );
     for err in [
         tracker
             .is_valid_root_for_height(ROOT, 700_000)
@@ -369,11 +369,12 @@ async fn a_500_stays_the_providers_answer() {
 async fn a_body_that_never_ends_is_bounded_by_the_timeout_and_may_have_been_received_98() {
     let stub = body_stub::BodyStub::stalled().await;
     let tracker = || {
-        BlockHeadersServiceTracker::with_config(BlockHeadersServiceConfig {
-            base_url: stub.url.clone(),
-            auth_token: None,
-            timeout_ms: body_stub::DOOR_TIMEOUT.as_millis() as u64,
-        })
+        BlockHeadersServiceTracker::with_config(
+            BlockHeadersServiceConfig::default()
+                .with_base_url(stub.url.clone())
+                .with_auth_token(None)
+                .with_timeout_ms(body_stub::DOOR_TIMEOUT.as_millis() as u64),
+        )
     };
     let root = stub
         .stalled_once("root", || async {

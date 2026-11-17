@@ -32,10 +32,10 @@ async fn a_host_is_named_only_for_an_authenticated_advertisement_of_the_file_544
     assert_eq!(cases.len(), 8);
     for case in cases {
         let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
-        let downloader = StorageDownloader::new(StorageDownloaderConfig {
-            resolver: Some(lock_position::answering("ls_uhrp", script)),
-            ..Default::default()
-        });
+        let downloader = StorageDownloader::new(
+            StorageDownloaderConfig::default()
+                .with_resolver(Some(lock_position::answering("ls_uhrp", script))),
+        );
         let hosts = downloader.resolve(url).await.unwrap();
         let expected: Vec<String> = serde_json::from_value(case["hosts"].clone()).unwrap();
         assert_eq!(hosts, expected, "{}: {}", case["name"], case["words"]);
@@ -56,11 +56,9 @@ async fn a_freeform_host_beside_a_list_names_the_host_at_the_storage_door_815() 
     let expected: Vec<String> = serde_json::from_value(case["hosts"].clone()).unwrap();
     assert_eq!(expected.len(), 1, "the control names one host");
     let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
-    let downloader = StorageDownloader::new(StorageDownloaderConfig {
-        resolver: Some(lock_position::answering_beside_freeform(
-            "ls_uhrp", script, "storage",
-        )),
-        ..Default::default()
-    });
+    let downloader =
+        StorageDownloader::new(StorageDownloaderConfig::default().with_resolver(Some(
+            lock_position::answering_beside_freeform("ls_uhrp", script, "storage"),
+        )));
     assert_eq!(downloader.resolve(url).await.unwrap(), expected);
 }

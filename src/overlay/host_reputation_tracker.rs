@@ -23,6 +23,7 @@
 //! let tracker = HostReputationTracker::with_storage(storage);
 //! ```
 
+pub use super::reputation_config::ReputationConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 // a lock poisoned by a panic elsewhere still holds whole entries (#134): read on, never panic again
@@ -114,39 +115,6 @@ pub struct RankedHost {
     pub entry: HostReputationEntry,
     /// Lower score = better host.
     pub score: f64,
-}
-
-/// Configuration for reputation tracking.
-#[derive(Debug, Clone)]
-pub struct ReputationConfig {
-    /// Smoothing factor for latency EMA (0.0-1.0).
-    pub latency_smoothing: f64,
-    /// Number of failures before backoff starts.
-    pub grace_failures: u32,
-    /// Base backoff time (ms).
-    pub backoff_base_ms: u64,
-    /// Maximum backoff time (ms).
-    pub backoff_max_ms: u64,
-    /// Default latency for new hosts (ms).
-    pub default_latency_ms: f64,
-    /// Penalty per consecutive failure (ms).
-    pub failure_penalty_ms: f64,
-    /// Bonus per success (ms), capped at half of latency.
-    pub success_bonus_ms: f64,
-}
-
-impl Default for ReputationConfig {
-    fn default() -> Self {
-        Self {
-            latency_smoothing: 0.25,
-            grace_failures: 2,
-            backoff_base_ms: 1000,
-            backoff_max_ms: 60_000,
-            default_latency_ms: 1500.0,
-            failure_penalty_ms: 400.0,
-            success_bonus_ms: 30.0,
-        }
-    }
 }
 
 /// Tracks reputation of overlay hosts.
