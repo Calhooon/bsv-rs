@@ -44,7 +44,9 @@ use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
 
 mod link;
-pub use link::{BeefLinkBudget, BeefLinkLimits, LinkedTransaction};
+mod link_limits;
+pub use link::{BeefLinkBudget, LinkedTransaction};
+pub use link_limits::BeefLinkLimits;
 
 /// Result of sorting transactions in a BEEF.
 #[derive(Debug, Clone, Default)]
