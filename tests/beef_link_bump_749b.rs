@@ -104,12 +104,16 @@ fn shared_bump_beef(parents: usize) -> (Vec<u8>, String) {
 
 #[test]
 fn a_shared_bump_cloned_per_proven_parent_is_refused_by_the_byte_bound_749b() {
-    // 64 proven parents sharing one 64-leaf BUMP (~2.3 KiB). The fix charges
-    // the BUMP at each of the ~2*64 clones (~290 KiB), far past this explicit
-    // 128 KiB budget. BEFORE the fix the stub meter weighs only the four
-    // transaction fields — never the attached path — and these inputs never
-    // repeat a parent, so NOTHING is charged and the BEEF links with `Ok`.
-    let budget = BeefLinkLimits::default().with_max_link_bytes(Some(128 * 1024));
+    // 64 proven parents sharing one 64-leaf BUMP. The fix charges the BUMP's
+    // HEAP at each clone (the leaf structs and their hashes, ~64*64 leaf-heaps
+    // far past this explicit 128 KiB HEAP budget). The shared proof is a HEAP
+    // amplification (one copy in the wire, K copies in memory), so the #749
+    // fold-c charges it to `max_link_heap_bytes`, not the wire `max_link_bytes`;
+    // the wire bound stays at its default here. BEFORE the fix the stub meter
+    // weighs only the four transaction fields — never the attached path — and
+    // these inputs never repeat a parent, so NOTHING is charged and the BEEF
+    // links with `Ok`.
+    let budget = BeefLinkLimits::default().with_max_link_heap_bytes(Some(128 * 1024));
     let (bytes, subject) = shared_bump_beef(64);
 
     let err = Transaction::from_beef_with_limits(&bytes, Some(&subject), &budget)
