@@ -1,4 +1,6 @@
-//! WalletInterface forwarding and unsupported operations for ProtoWallet.
+//! WalletInterface forwarding and unsupported operations for ProtoWallet: the
+//! fourteen calls it does not serve answer `Error::WalletRefusal` of class
+//! `WalletRefusalClass::NotImplemented` (#843).
 
 use super::*;
 
@@ -24,7 +26,22 @@ use super::super::{
     RelinquishCertificateArgs, RelinquishCertificateResult, RelinquishOutputArgs,
     RelinquishOutputResult, SignActionArgs, SignActionResult, WalletCertificate,
 };
+use crate::error::WalletRefusalClass;
 use async_trait::async_trait;
+
+/// The answer to a call a `ProtoWallet` does not serve (#843): the typed
+/// refusal of the reference's class for it, `WERR_NOT_IMPLEMENTED`
+/// (`packages/wallet/wallet-toolbox/src/sdk/WERR_errors.ts:8` at
+/// `ts-stack@11faa7d1`, raised by a provider for a call it does not serve,
+/// `storage/StorageProvider.ts:445-534`), in the words each stub always
+/// answered. The class has no SDK code, so the wire processor frames it as
+/// it framed the `WalletError` these were: code 1, `Wallet operation failed`.
+fn not_implemented<T>(words: &str) -> Result<T> {
+    Err(Error::WalletRefusal {
+        class: WalletRefusalClass::NotImplemented,
+        message: words.to_string(),
+    })
+}
 
 #[async_trait]
 impl WalletInterface for ProtoWallet {
@@ -151,9 +168,7 @@ impl WalletInterface for ProtoWallet {
         _args: CreateActionArgs,
         _: Option<&str>,
     ) -> Result<CreateActionResult> {
-        Err(Error::WalletError(
-            "createAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
+        not_implemented("createAction requires a full wallet implementation with UTXO management")
     }
 
     async fn sign_action(
@@ -161,9 +176,7 @@ impl WalletInterface for ProtoWallet {
         _args: SignActionArgs,
         _: Option<&str>,
     ) -> Result<SignActionResult> {
-        Err(Error::WalletError(
-            "signAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
+        not_implemented("signAction requires a full wallet implementation with UTXO management")
     }
 
     async fn abort_action(
@@ -171,9 +184,7 @@ impl WalletInterface for ProtoWallet {
         _args: AbortActionArgs,
         _: Option<&str>,
     ) -> Result<AbortActionResult> {
-        Err(Error::WalletError(
-            "abortAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
+        not_implemented("abortAction requires a full wallet implementation with UTXO management")
     }
 
     async fn list_actions(
@@ -181,10 +192,9 @@ impl WalletInterface for ProtoWallet {
         _args: ListActionsArgs,
         _: Option<&str>,
     ) -> Result<ListActionsResult> {
-        Err(Error::WalletError(
-            "listActions requires a full wallet implementation with transaction history"
-                .to_string(),
-        ))
+        not_implemented(
+            "listActions requires a full wallet implementation with transaction history",
+        )
     }
 
     async fn internalize_action(
@@ -193,9 +203,9 @@ impl WalletInterface for ProtoWallet {
         _: Option<&str>,
     ) -> Result<InternalizeActionResult> {
         crate::wallet::validation::validate_internalize_action_args(&args)?;
-        Err(Error::WalletError(
-            "internalizeAction requires a full wallet implementation with UTXO management".into(),
-        ))
+        not_implemented(
+            "internalizeAction requires a full wallet implementation with UTXO management",
+        )
     }
 
     // =========================================================================
@@ -207,9 +217,7 @@ impl WalletInterface for ProtoWallet {
         _args: ListOutputsArgs,
         _: Option<&str>,
     ) -> Result<ListOutputsResult> {
-        Err(Error::WalletError(
-            "listOutputs requires a full wallet implementation with UTXO management".to_string(),
-        ))
+        not_implemented("listOutputs requires a full wallet implementation with UTXO management")
     }
 
     async fn relinquish_output(
@@ -217,10 +225,9 @@ impl WalletInterface for ProtoWallet {
         _args: RelinquishOutputArgs,
         _: Option<&str>,
     ) -> Result<RelinquishOutputResult> {
-        Err(Error::WalletError(
-            "relinquishOutput requires a full wallet implementation with UTXO management"
-                .to_string(),
-        ))
+        not_implemented(
+            "relinquishOutput requires a full wallet implementation with UTXO management",
+        )
     }
 
     // =========================================================================
@@ -232,10 +239,9 @@ impl WalletInterface for ProtoWallet {
         _args: AcquireCertificateArgs,
         _: Option<&str>,
     ) -> Result<WalletCertificate> {
-        Err(Error::WalletError(
-            "acquireCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
+        not_implemented(
+            "acquireCertificate requires a full wallet implementation with certificate storage",
+        )
     }
 
     async fn list_certificates(
@@ -243,10 +249,9 @@ impl WalletInterface for ProtoWallet {
         _args: ListCertificatesArgs,
         _: Option<&str>,
     ) -> Result<ListCertificatesResult> {
-        Err(Error::WalletError(
-            "listCertificates requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
+        not_implemented(
+            "listCertificates requires a full wallet implementation with certificate storage",
+        )
     }
 
     async fn prove_certificate(
@@ -254,10 +259,9 @@ impl WalletInterface for ProtoWallet {
         _args: ProveCertificateArgs,
         _: Option<&str>,
     ) -> Result<ProveCertificateResult> {
-        Err(Error::WalletError(
-            "proveCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
+        not_implemented(
+            "proveCertificate requires a full wallet implementation with certificate storage",
+        )
     }
 
     async fn relinquish_certificate(
@@ -265,10 +269,9 @@ impl WalletInterface for ProtoWallet {
         _args: RelinquishCertificateArgs,
         _: Option<&str>,
     ) -> Result<RelinquishCertificateResult> {
-        Err(Error::WalletError(
-            "relinquishCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
+        not_implemented(
+            "relinquishCertificate requires a full wallet implementation with certificate storage",
+        )
     }
 
     // =========================================================================
@@ -280,10 +283,9 @@ impl WalletInterface for ProtoWallet {
         _args: DiscoverByIdentityKeyArgs,
         _: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
-        Err(Error::WalletError(
-            "discoverByIdentityKey requires a full wallet implementation with certificate discovery"
-                .to_string(),
-        ))
+        not_implemented(
+            "discoverByIdentityKey requires a full wallet implementation with certificate discovery",
+        )
     }
 
     async fn discover_by_attributes(
@@ -291,10 +293,9 @@ impl WalletInterface for ProtoWallet {
         _args: DiscoverByAttributesArgs,
         _: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
-        Err(Error::WalletError(
-            "discoverByAttributes requires a full wallet implementation with certificate discovery"
-                .to_string(),
-        ))
+        not_implemented(
+            "discoverByAttributes requires a full wallet implementation with certificate discovery",
+        )
     }
 
     // =========================================================================
@@ -326,10 +327,9 @@ impl WalletInterface for ProtoWallet {
         _args: GetHeaderArgs,
         _: Option<&str>,
     ) -> Result<GetHeaderResult> {
-        Err(Error::WalletError(
-            "getHeaderForHeight requires a full wallet implementation with block header storage"
-                .to_string(),
-        ))
+        not_implemented(
+            "getHeaderForHeight requires a full wallet implementation with block header storage",
+        )
     }
 
     async fn get_network(&self, _: Option<&str>) -> Result<GetNetworkResult> {
