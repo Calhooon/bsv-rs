@@ -77,17 +77,17 @@ fn client(
     outputs: Option<Vec<LockingScript>>,
 ) -> (RegistryClient<ProtoWallet>, Asked) {
     let asked = Asked::default();
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Answering {
-            outputs: outputs.map(|scripts| scripts.iter().map(item).collect()),
-            asked: asked.clone(),
-        })),
-        host_overrides: Some(HashMap::from([(
-            definition_type.lookup_service().to_string(),
-            vec![format!("https://{host}-{definition_type:?}.invalid")],
-        )])),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Answering {
+                outputs: outputs.map(|scripts| scripts.iter().map(item).collect()),
+                asked: asked.clone(),
+            })))
+            .with_host_overrides(Some(HashMap::from([(
+                definition_type.lookup_service().to_string(),
+                vec![format!("https://{host}-{definition_type:?}.invalid")],
+            )]))),
+    );
     let client = RegistryClient::new(
         ProtoWallet::new(Some(PrivateKey::from_hex(&"77".repeat(32)).unwrap())),
         RegistryClientConfig::new().with_resolver(Arc::new(resolver)),

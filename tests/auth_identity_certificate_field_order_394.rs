@@ -437,12 +437,12 @@ async fn a_published_token_keeps_its_fields_and_keyring_in_the_order_of_its_text
         "ls_identity".to_string(),
         vec!["https://identity-lookup.invalid".to_string()],
     );
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Outputs(vec![published(&json)]))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Outputs(vec![published(&json)]))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
 

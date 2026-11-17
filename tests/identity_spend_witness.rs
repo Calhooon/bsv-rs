@@ -561,15 +561,15 @@ async fn an_identity_revocation_signature_verifies_under_the_node_word() {
         "ls_identity".to_string(),
         vec!["http://token-lookup.invalid".to_string()],
     );
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(TokenLookup {
-            beef: source.to_beef(true).unwrap(),
-        }) as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(Arc::new(TokenLookup {
+                beef: source.to_beef(true).unwrap(),
+            }) as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    ));
     let client = IdentityClient::with_resolver(wallet.clone(), config, resolver);
 
     // the mock's signAction returns no transaction, so the call stops there,

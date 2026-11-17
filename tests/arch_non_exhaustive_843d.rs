@@ -408,7 +408,7 @@ enum Class {
 }
 
 /// The rows of `Pending`: only lowered, as each struct is opened.
-const PENDING_LEN: usize = 20;
+const PENDING_LEN: usize = 18;
 /// The rows of `Unruled`: only lowered, as each struct takes a class or the
 /// attribute.
 const UNRULED_LEN: usize = 57;
@@ -554,8 +554,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/kvstore/types.rs:KVStoreRemoveOptions", Class::Pending, "the freeze plan's row 8c"),
     ("src/overlay/historian.rs:HistorianConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/overlay/host_reputation_tracker.rs:ReputationConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/lookup_resolver.rs:LookupResolverConfig", Class::Pending, "the freeze plan's row 8b"),
-    ("src/overlay/topic_broadcaster.rs:TopicBroadcasterConfig", Class::Pending, "the freeze plan's row 8b"),
     ("src/registry/client.rs:RegistryClientConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/storage/downloader.rs:StorageDownloaderConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/storage/uploader.rs:StorageUploaderConfig", Class::Pending, "the freeze plan's row 8c"),
@@ -900,10 +898,10 @@ fn the_scan_reads_every_form_by_name_843d8a() {
     assert_eq!(public.len(), 220, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
-        13,
+        15,
         "attributed"
     );
-    assert_eq!(ROWS.len() + 13, public.len(), "every other one a row");
+    assert_eq!(ROWS.len() + 15, public.len(), "every other one a row");
 }
 
 fn probe(text: &str) -> (Vec<Found>, Vec<String>) {

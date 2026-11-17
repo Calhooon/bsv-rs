@@ -417,14 +417,12 @@ fn test_lookup_resolver_default_config() {
 
 #[test]
 fn test_lookup_resolver_config_custom_values() {
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Testnet,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 64,
-        tx_memo_ttl_ms: 120_000,
-        tx_memo_max_entries: 2048,
-        ..Default::default()
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Testnet)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(64)
+        .with_tx_memo_ttl_ms(120_000)
+        .with_tx_memo_max_entries(2048);
 
     assert_eq!(config.network_preset, NetworkPreset::Testnet);
     assert_eq!(config.hosts_cache_ttl_ms, 60_000);
@@ -441,10 +439,7 @@ fn test_lookup_resolver_config_with_host_overrides() {
         vec!["https://custom.host.com".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        host_overrides: Some(overrides.clone()),
-        ..Default::default()
-    };
+    let config = LookupResolverConfig::default().with_host_overrides(Some(overrides.clone()));
 
     let host_overrides = config.host_overrides.unwrap();
     assert!(host_overrides.contains_key("ls_myservice"));
@@ -458,10 +453,7 @@ fn test_lookup_resolver_config_with_additional_hosts() {
         vec!["https://extra.host.com".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        additional_hosts: Some(additional.clone()),
-        ..Default::default()
-    };
+    let config = LookupResolverConfig::default().with_additional_hosts(Some(additional.clone()));
 
     assert!(config.additional_hosts.is_some());
 }
@@ -1184,11 +1176,11 @@ async fn test_find_competent_hosts_public_api() {
         )]),
         asked: Mutex::new(vec![]),
     });
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator.clone()),
-        slap_trackers: Some(vec![TRACKER.to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(facilitator.clone()))
+            .with_slap_trackers(Some(vec![TRACKER.to_string()])),
+    );
     let hosts: Vec<String> = resolver
         .find_competent_hosts("ls_test_service")
         .await
@@ -1207,11 +1199,11 @@ async fn test_find_competent_hosts_public_api() {
 #[tokio::test]
 async fn test_find_competent_hosts_with_custom_config() {
     // Verify find_competent_hosts works with custom LookupResolverConfig
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Testnet,
-        slap_trackers: Some(vec!["https://nonexistent-tracker.invalid".to_string()]),
-        ..Default::default()
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Testnet)
+        .with_slap_trackers(Some(
+            vec!["https://nonexistent-tracker.invalid".to_string()],
+        ));
     let resolver = LookupResolver::new(config);
     let result = resolver.find_competent_hosts("ls_custom_service").await;
 

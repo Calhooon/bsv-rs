@@ -352,13 +352,13 @@ mod kvstore {
             "ls_kvstore".to_string(),
             vec!["https://overlay.invalid".to_string()],
         );
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            facilitator: Some(Arc::new(Failing)),
-            slap_trackers: Some(Vec::new()),
-            host_overrides: Some(host_overrides),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_facilitator(Some(Arc::new(Failing)))
+                .with_slap_trackers(Some(Vec::new()))
+                .with_host_overrides(Some(host_overrides)),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
         let _ = store.set("key", "value", None).await;

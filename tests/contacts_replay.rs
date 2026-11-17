@@ -1032,15 +1032,15 @@ async fn the_by_key_door_answers_a_failed_cold_listing_with_the_wallets_error_95
     use std::sync::Arc;
     let (wallet, keys) = (Basket::new(), keys());
     let asked = Arc::new(AtomicUsize::new(0));
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Counted(asked.clone()))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(std::collections::HashMap::from([(
-            "ls_identity".to_string(),
-            vec!["https://ls-identity-959-fold.invalid".to_string()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Counted(asked.clone()))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(std::collections::HashMap::from([(
+                "ls_identity".to_string(),
+                vec!["https://ls-identity-959-fold.invalid".to_string()],
+            )]))),
+    ));
     let client = IdentityClient::with_resolver(wallet.clone(), Default::default(), resolver);
     let (forced, _) = calls_of!(wallet, fault("throw"), client.get_contacts(true).await);
     let expected = forced.unwrap_err();

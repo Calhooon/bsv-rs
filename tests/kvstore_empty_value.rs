@@ -51,13 +51,13 @@ fn store(wallet: &Counting) -> GlobalKVStore<Counting> {
         "https://kvstore-empty-value-{}.invalid",
         NEXT.fetch_add(1, Ordering::Relaxed)
     );
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some([(config.service_name.clone(), vec![host])].into()),
-        slap_trackers: Some(vec![]),
-        facilitator: Some(Arc::new(NoOutputs)),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some([(config.service_name.clone(), vec![host])].into()))
+            .with_slap_trackers(Some(vec![]))
+            .with_facilitator(Some(Arc::new(NoOutputs))),
+    );
     GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver)
 }
 

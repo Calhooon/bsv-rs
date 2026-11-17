@@ -63,14 +63,12 @@ fn advertising(service: &str, hosts: &[&str]) -> bsv_rs::Result<LookupAnswer> {
 }
 
 fn overriding(service: &str, hosts: &[&str]) -> LookupResolverConfig {
-    LookupResolverConfig {
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
+    LookupResolverConfig::default()
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(HashMap::from([(
             service.to_string(),
             hosts.iter().map(|host| host.to_string()).collect(),
-        )])),
-        ..Default::default()
-    }
+        )])))
 }
 
 /// The host's reputation entry: failures, successes and the last error.
@@ -101,10 +99,8 @@ async fn a_scripted_answer_of_4097_outputs_is_malformed_and_its_hosts_failure_77
         (OVER, Ok(output_list(4097, 1))),
         (AT, Ok(output_list(4096, 1))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[OVER, AT])
-    });
+    let resolver =
+        LookupResolver::new(overriding(SERVICE, &[OVER, AT]).with_facilitator(Some(facilitator)));
 
     let answer = resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
@@ -147,11 +143,11 @@ async fn a_tracker_answer_of_4097_outputs_is_malformed_and_names_no_host_775() {
         (OVER, Ok(LookupAnswer::OutputList { outputs: flood })),
         (NAMING, advertising(SERVICE, &[HOST])),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        slap_trackers: Some(vec![OVER.to_string(), NAMING.to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(facilitator))
+            .with_slap_trackers(Some(vec![OVER.to_string(), NAMING.to_string()])),
+    );
 
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(hosts, [HOST], "the flooding tracker names no host");
@@ -180,11 +176,11 @@ async fn the_discovered_hosts_keep_the_trackers_answer_order_785() {
         (A, advertising(SERVICE, &[H2, H1])),
         (B, advertising(SERVICE, &[H1, H3])),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        slap_trackers: Some(vec![A.to_string(), B.to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(facilitator))
+            .with_slap_trackers(Some(vec![A.to_string(), B.to_string()])),
+    );
 
     // A fresh hasher per call on the base: ten discoveries, one order.
     for _ in 0..10 {
@@ -208,11 +204,11 @@ async fn a_longer_answer_keeps_its_own_order_and_its_earliest_occurrences_785() 
         (A, advertising(SERVICE, &borrowed(&leading))),
         (B, advertising(SERVICE, &borrowed(&trailing))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        slap_trackers: Some(vec![A.to_string(), B.to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(facilitator))
+            .with_slap_trackers(Some(vec![A.to_string(), B.to_string()])),
+    );
 
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(hosts, [9, 3, 7, 1, 8, 6, 2, 4].map(name));
@@ -226,7 +222,7 @@ mod http {
     use super::overriding;
     use bsv_rs::overlay::{
         HttpsOverlayLookupFacilitator, LookupAnswer, LookupQuestion, LookupResolver,
-        LookupResolverConfig, OverlayLookupFacilitator,
+        OverlayLookupFacilitator,
     };
     use serde_json::json;
     use std::sync::Arc;
@@ -239,10 +235,10 @@ mod http {
     }
 
     fn http_resolver(host: &str) -> LookupResolver {
-        LookupResolver::new(LookupResolverConfig {
-            facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-            ..overriding(SERVICE, &[host])
-        })
+        LookupResolver::new(
+            overriding(SERVICE, &[host])
+                .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true)))),
+        )
     }
 
     /// The facilitator refuses the host's answer as the limit named, in the

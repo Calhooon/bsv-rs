@@ -301,13 +301,13 @@ fn mock_resolver(
         service.to_string(),
         vec!["http://mock-749-host:8080".to_string()],
     );
-    LookupResolver::new(LookupResolverConfig {
-        network_preset: preset,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    })
+    LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(preset)
+            .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    )
 }
 
 fn output_list_of(beef: Vec<u8>) -> LookupAnswer {
@@ -337,12 +337,12 @@ async fn the_resolver_slap_door_links_nothing_behaviourally() {
     let mock = Arc::new(MockLookupFacilitator::new());
     mock.add_response("http://slap-749-tracker:8080", output_list_of(beef))
         .await;
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Mainnet,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec!["http://slap-749-tracker:8080".to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Mainnet)
+            .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec!["http://slap-749-tracker:8080".to_string()])),
+    );
 
     let hosts = resolver.find_competent_hosts(service).await.unwrap();
     assert!(
@@ -366,14 +366,13 @@ async fn the_topic_discovery_door_links_nothing_behaviourally() {
     let resolver = Arc::new(mock_resolver(NetworkPreset::Mainnet, "ls_ship", mock));
     let broadcaster = TopicBroadcaster::new(
         vec![topic.to_string()],
-        TopicBroadcasterConfig {
-            network_preset: NetworkPreset::Mainnet,
-            facilitator: None,
-            resolver: Some(resolver),
-            require_ack_from_all_hosts: RequireAck::None,
-            require_ack_from_any_host: RequireAck::None,
-            require_ack_from_specific_hosts: HashMap::new(),
-        },
+        TopicBroadcasterConfig::default()
+            .with_network_preset(NetworkPreset::Mainnet)
+            .with_facilitator(None)
+            .with_resolver(Some(resolver))
+            .with_require_ack_from_all_hosts(RequireAck::None)
+            .with_require_ack_from_any_host(RequireAck::None)
+            .with_require_ack_from_specific_hosts(HashMap::new()),
     )
     .unwrap();
 

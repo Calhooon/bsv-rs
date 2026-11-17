@@ -112,28 +112,26 @@ async fn broadcast(steak: Steak) -> (Option<String>, Vec<Vec<String>>) {
     static N: AtomicUsize = AtomicUsize::new(0);
     let n = N.fetch_add(1, Ordering::Relaxed);
     let (output, subject) = advertisement();
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Scripted(LookupAnswer::OutputList {
-            outputs: vec![output],
-        }))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_ship".to_string(),
-            vec![format!("https://ls-ship-{n}.ship-steak-815-rs.invalid")],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Scripted(LookupAnswer::OutputList {
+                outputs: vec![output],
+            }))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_ship".to_string(),
+                vec![format!("https://ls-ship-{n}.ship-steak-815-rs.invalid")],
+            )]))),
+    ));
     let facilitator = Arc::new(Answering {
         steak,
         sent: Mutex::new(vec![]),
     });
     let b = TopicBroadcaster::new(
         vec![TOPIC.to_string()],
-        TopicBroadcasterConfig {
-            resolver: Some(resolver),
-            facilitator: Some(facilitator.clone()),
-            ..Default::default()
-        },
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver))
+            .with_facilitator(Some(facilitator.clone())),
     )
     .unwrap();
     let code = b.broadcast_tx(&subject).await.err().map(|f| f.code);

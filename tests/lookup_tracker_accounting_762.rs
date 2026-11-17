@@ -59,14 +59,14 @@ fn tracker_resolver(
     script: Vec<bsv_rs::Result<LookupAnswer>>,
 ) -> (LookupResolver, Arc<Mutex<Vec<String>>>) {
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Recording {
-            asked: asked.clone(),
-            script: Mutex::new(script.into()),
-        })),
-        slap_trackers: Some(vec![tracker.to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Recording {
+                asked: asked.clone(),
+                script: Mutex::new(script.into()),
+            })))
+            .with_slap_trackers(Some(vec![tracker.to_string()])),
+    );
     (resolver, asked)
 }
 
@@ -146,15 +146,15 @@ mod http_answers {
     }
 
     fn http_resolver(host: &str) -> LookupResolver {
-        LookupResolver::new(LookupResolverConfig {
-            facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-            slap_trackers: Some(vec![]),
-            host_overrides: Some(HashMap::from([(
-                SERVICE.to_string(),
-                vec![host.to_string()],
-            )])),
-            ..Default::default()
-        })
+        LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+                .with_slap_trackers(Some(vec![]))
+                .with_host_overrides(Some(HashMap::from([(
+                    SERVICE.to_string(),
+                    vec![host.to_string()],
+                )]))),
+        )
     }
 
     fn question() -> LookupQuestion {

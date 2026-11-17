@@ -508,20 +508,20 @@ async fn the_revocation_retries_a_double_spend_answered_over_the_json_substrate(
         "ls_identity".to_string(),
         vec!["http://identity-lookup.invalid".to_string()],
     );
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(Lookup(LookupAnswer::OutputList {
-            outputs: vec![OutputListItem {
-                beef: lookup,
-                output_index: 0,
-                context: None,
-                txid: None,
-            }],
-        })) as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(Arc::new(Lookup(LookupAnswer::OutputList {
+                outputs: vec![OutputListItem {
+                    beef: lookup,
+                    output_index: 0,
+                    context: None,
+                    txid: None,
+                }],
+            })) as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    ));
     let ship = Ship::default();
     let config = IdentityClientConfig::default().with_network(NetworkPreset::Local);
     let client = IdentityClient::with_resolver(wallet.clone(), config, resolver)

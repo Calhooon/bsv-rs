@@ -744,7 +744,7 @@ fn macro_file_refusals(text: &str) -> Vec<String> {
 /// is the pins found under `src/` (the test below holds it so), and each
 /// entry must have exactly one `compile fail ... ok` line and at least one
 /// plain `... ok` line in the doc suite's log.
-const DOC_PINS: [&str; 25] = [
+const DOC_PINS: [&str; 27] = [
     "src/auth/certificates/certificate.rs - auth::certificates::certificate::Certificate",
     "src/auth/clients/auth_fetch.rs - auth::clients::auth_fetch::AuthFetchOptions",
     "src/auth/peer.rs - auth::peer::PeerOptions",
@@ -762,6 +762,8 @@ const DOC_PINS: [&str; 25] = [
     "src/identity/types.rs - identity::types::Contact",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupLimits",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupRequestOptions",
+    "src/overlay/lookup_resolver.rs - overlay::lookup_resolver::LookupResolverConfig",
+    "src/overlay/topic_broadcaster.rs - overlay::topic_broadcaster::TopicBroadcasterConfig",
     "src/script/not_judged.rs - script::not_judged::NotJudgedCause",
     "src/transaction/beef/link.rs - transaction::beef::link::BeefLinkLimits",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Kind",

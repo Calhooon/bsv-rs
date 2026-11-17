@@ -129,23 +129,21 @@ fn broadcaster(
         answers,
         calls: AtomicUsize::new(0),
     });
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(lookup.clone()),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_ship".to_string(),
-            vec![format!("https://ls-ship-{n}.ship-cache-815-rs.invalid")],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(lookup.clone()))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_ship".to_string(),
+                vec![format!("https://ls-ship-{n}.ship-cache-815-rs.invalid")],
+            )]))),
+    ));
     let sender = Arc::new(Acknowledging(Mutex::new(0)));
     let b = TopicBroadcaster::new(
         vec![TOPIC.to_string()],
-        TopicBroadcasterConfig {
-            resolver: Some(resolver),
-            facilitator: Some(sender.clone()),
-            ..Default::default()
-        },
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver))
+            .with_facilitator(Some(sender.clone())),
     )
     .unwrap();
     (b, lookup, sender)

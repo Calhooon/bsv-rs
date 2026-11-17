@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: LookupResolverConfig and TopicBroadcasterConfig are #[non_exhaustive], built from default() and setters (#843d8b)
+
+**What changed (breaking).** `overlay::LookupResolverConfig` and `overlay::TopicBroadcasterConfig` carry `#[non_exhaustive]` (#843's freeze plan, row 8, part b; the captain's ruling of 2026-11-12: class D, `Default` kept and a setter per field). Each keeps its `Default`, value for value, and gains one `#[must_use]` setter per field, named `with_<field>` and taking the field's own type: ten on `LookupResolverConfig` (`with_network_preset`, `with_facilitator`, `with_slap_trackers`, `with_host_overrides`, `with_additional_hosts`, `with_hosts_cache_ttl_ms`, `with_hosts_cache_max_entries`, `with_tx_memo_ttl_ms`, `with_tx_memo_max_entries`, `with_limits`) and six on `TopicBroadcasterConfig` (`with_network_preset`, `with_facilitator`, `with_resolver`, `with_require_ack_from_all_hosts`, `with_require_ack_from_any_host`, `with_require_ack_from_specific_hosts`). The fields stay `pub` and keep their names and types; a struct expression or a functional update outside the crate no longer compiles (E0639), and a pattern over one ends in `..`. No default, wire byte, verdict or error text moves; nothing else under `src/` changes (the crate's own 22 struct expressions stand), and `HistorianConfig` is untouched (part c's).
+
+**Why a literal was wrong.** Both are records that grow. The reference's are interfaces of optional members handed to a constructor that takes `config = {}`, so a caller there names only what it sets (`ts-stack@edf6e03` `packages/sdk/src/overlay-tools/LookupResolver.ts:658-690`, `:1264`; `SHIPBroadcaster.ts:62-85`, `:419`). Here an outside caller wrote a struct expression, so the next field broke every full literal: `limits` (#775) had to be added to each of the nine in `tests/overlay_mock_tests.rs`. Opened now, a later field is no break.
+
+**What pins it.** Each struct's doc carries a compiled example of the setter form, the `compile_fail,E0639` functional update naming no field (`fn rebuilt`) and its compiling twin (`fn kept`), and `assert_no_drop!` follows it; `tests/arch_non_exhaustive_pins_819.rs` finds both pinned (`DOC_PINS` 25 to 27; 33 `#[non_exhaustive]` types under `src/`, 27 pinned, 6 listed, `LISTED` unchanged); in `tests/arch_non_exhaustive_843d.rs` the two names leave the pending list (`PENDING_LEN` 20 to 18, 15 attributed all-public structs from 13) and the setter rule holds for all sixteen fields. `tests/overlay_config_setters_843d8b.rs` (3 tests, no network): `each_setter_of_the_two_overlay_configs_sets_its_field_alone_843d8b`, `the_migration_lines_build_what_assignment_builds_843d8b`, `the_two_defaults_are_unchanged_by_value_843d8b` (the sixteen defaults as literals). RED, on scratch copies unpacked by `git archive`: the base `d892e206` with the new file and three rewritten files overlaid does not compile, 47 errors, every one E0599 (19 in the new file, 11 in `overlay_mock_tests.rs`, 12 in `lookup_limits_configured_775.rs`, 5 in `overlay_integration_tests.rs`); the tip less the two attribute lines fails both `compile_fail,E0639` doc tests (they compile) and `arch_non_exhaustive_843d.rs` names both structs (2 of 6).
+
+**The break, measured.** `cargo semver-checks check-release --baseline-rev d892e206 --all-features --release-type patch` (0.51.0): 229 checks, 228 pass, 31 skip, one lint fires, `struct_marked_non_exhaustive`, on the two structs alone. The rustdoc JSON of base and tip (nightly, `--all-features`) differs in the two structs (the attribute, the doc, one more impl each), two inherent impls and their sixteen methods, and nothing else of the API (the attribute text of `TopicBroadcaster`'s `broadcast` and `broadcast_many` carries a compiler-interned number that moved, `clippy#5009` to `clippy#5011`, in `async_trait`'s lint attribute). The dependents name neither struct (read-only, `git grep -c` at each clone's remote-tracking ref): `bsv-wallet-toolbox-rs` and `bsv-wallet-cli` on `beta` and `main`, `bsv-overlay-cloudflare` and `rust-message-box` on `main`, none.
+
+**Migration.** One line per shape; the fields stay public, so assignment on a `default()` compiles too (`let mut c = LookupResolverConfig::default(); c.limits = limits;`).
+- A functional update over the default: `LookupResolverConfig { facilitator: Some(facilitator), host_overrides: Some(overrides), ..Default::default() }` becomes `LookupResolverConfig::default().with_facilitator(Some(facilitator)).with_host_overrides(Some(overrides))`.
+- A functional update over another base: `LookupResolverConfig { limits, ..base }` becomes `base.with_limits(limits)` (the base is now evaluated ahead of the field values).
+- A full literal: `TopicBroadcasterConfig { network_preset, facilitator, resolver, require_ack_from_all_hosts: RequireAck::None, require_ack_from_any_host: RequireAck::Any, require_ack_from_specific_hosts: specific }` becomes `TopicBroadcasterConfig::default().with_network_preset(network_preset).with_facilitator(facilitator).with_resolver(resolver).with_require_ack_from_all_hosts(RequireAck::None).with_require_ack_from_any_host(RequireAck::Any).with_require_ack_from_specific_hosts(specific)`; a field whose value is the default's may be left out.
+- A pattern over either ends in `..`.
+
+This crate's own 107 struct expressions of the two in 56 files under `tests/` (94 `LookupResolverConfig`, 13 `TopicBroadcasterConfig`; 81 over `Default::default()`, 15 over another base, 11 full literals; 349 field initializers) moved by those three rules through one script, every value expression byte for byte and every named field kept (`docs/lanes/fix-843d8b.md` carries the script, its sha256 and the re-derivation); no assertion of those files moved.
+
+### Notes: cross-SDK parity (#843d8b)
+
+The shape alone: no wire byte, verdict, default or error text moves, and no row of the root `CLAUDE.md` divergence list is touched. The reference's two records at `ts-stack@edf6e03` (`packages/sdk/src/overlay-tools/`), each handed to a constructor that takes `config = {}`, beside this crate's:
+
+| `LookupResolverConfig` (`LookupResolver.ts:658-690`, nine optional members) | this crate (ten fields) |
+|---|---|
+| `limits?` | `limits` |
+| `networkPreset?` | `network_preset` |
+| `facilitator?` | `facilitator` |
+| `slapTrackers?` | `slap_trackers` |
+| `hostOverrides?` | `host_overrides` |
+| `additionalHosts?` | `additional_hosts` |
+| `cache?: CacheOptions` (`:588-595`, three members) | three flat fields: `hosts_cache_ttl_ms`, `hosts_cache_max_entries`, `tx_memo_ttl_ms` |
+| no member | `tx_memo_max_entries` |
+| `reputationStorage?` | no field |
+| `telemetry?` | no field |
+
+| `SHIPBroadcasterConfig` (`SHIPBroadcaster.ts:62-85`, six optional members at `:70-84`) | this crate (six fields) |
+|---|---|
+| `networkPreset?` | `network_preset` |
+| `facilitator?` | `facilitator` |
+| `resolver?` | `resolver` |
+| `requireAcknowledgmentFromAllHostsForTopics?` | `require_ack_from_all_hosts` |
+| `requireAcknowledgmentFromAnyHostForTopics?` | `require_ack_from_any_host` |
+| `requireAcknowledgmentFromSpecificHostsForTopics?` | `require_ack_from_specific_hosts` |
+
+A caller of the reference names only the members it sets; with the setters a caller here does the same. go-sdk@2ca481c takes a pointer to a struct whose zero fields read as defaults (`NewLookupResolver(cfg *LookupResolver)`, `overlay/lookup/resolver.go:31,43`; `NewBroadcaster(topics, cfg *BroadcasterConfig)`, `overlay/topic/broadcaster.go:44,65`); its members are not compared here.
+
 ### Tests: the nested-result linear pin times each body several times and takes the minimum (#432)
 
 - **What was red.** `nested_result_snapshot_scales_with_body_size_on_success_and_error` (`tests/wallet_http_json_linear_432.rs`) failed on two of six `macos-15-intel` legs on 2026-11-16 (`status=400 depth=8000 / depth=2000: time ratio 2.964`, `status=200 depth=4000 / depth=2000: time ratio 3.563`) with no change to the walk. It timed each 4 MiB body three times in a row, with no warm-up, and compared the medians: each sample is a whole HTTP round trip of a few tens of milliseconds, so two disturbed samples of one body moved its median past the bound.
