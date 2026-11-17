@@ -52,23 +52,19 @@ fn limits(set: impl FnOnce(&mut LookupLimits)) -> LookupLimits {
 }
 
 fn overriding(service: &str, hosts: &[&str], limits: LookupLimits) -> LookupResolverConfig {
-    LookupResolverConfig {
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
+    LookupResolverConfig::default()
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(HashMap::from([(
             service.to_string(),
             hosts.iter().map(|host| host.to_string()).collect(),
-        )])),
-        limits,
-        ..Default::default()
-    }
+        )])))
+        .with_limits(limits)
 }
 
 fn tracking(trackers: &[&str], limits: LookupLimits) -> LookupResolverConfig {
-    LookupResolverConfig {
-        slap_trackers: Some(trackers.iter().map(|t| t.to_string()).collect()),
-        limits,
-        ..Default::default()
-    }
+    LookupResolverConfig::default()
+        .with_slap_trackers(Some(trackers.iter().map(|t| t.to_string()).collect()))
+        .with_limits(limits)
 }
 
 #[tokio::test]
@@ -80,10 +76,10 @@ async fn a_configured_output_bound_is_the_limit_and_neutral_775() {
         (OVER, Ok(output_list(3, 1))),
         (AT, Ok(output_list(2, 1))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[OVER, AT], limits(|l| l.max_outputs = 2))
-    });
+    let resolver = LookupResolver::new(
+        overriding(SERVICE, &[OVER, AT], limits(|l| l.max_outputs = 2))
+            .with_facilitator(Some(facilitator)),
+    );
     resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await
@@ -107,10 +103,10 @@ async fn a_raised_output_bound_admits_no_answer_past_the_normalizers_4096_775() 
         (OVER, Ok(output_list(4097, 1))),
         (AT, Ok(output_list(4096, 1))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[OVER, AT], limits(|l| l.max_outputs = 8192))
-    });
+    let resolver = LookupResolver::new(
+        overriding(SERVICE, &[OVER, AT], limits(|l| l.max_outputs = 8192))
+            .with_facilitator(Some(facilitator)),
+    );
     resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await
@@ -133,10 +129,10 @@ async fn a_scripted_answer_past_the_response_bytes_is_neutral_775() {
         (OVER, Ok(output_list(2, 5))),
         (AT, Ok(output_list(2, 4))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[OVER, AT], limits(|l| l.max_response_bytes = 8))
-    });
+    let resolver = LookupResolver::new(
+        overriding(SERVICE, &[OVER, AT], limits(|l| l.max_response_bytes = 8))
+            .with_facilitator(Some(facilitator)),
+    );
     resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await
@@ -155,10 +151,10 @@ async fn a_query_charges_its_hosts_to_one_total_and_the_host_past_it_is_neutral_
         (ONE, Ok(output_list(1, 6))),
         (TWO, Ok(output_list(1, 6))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[ONE, TWO], limits(|l| l.max_total_bytes = 10))
-    });
+    let resolver = LookupResolver::new(
+        overriding(SERVICE, &[ONE, TWO], limits(|l| l.max_total_bytes = 10))
+            .with_facilitator(Some(facilitator)),
+    );
     resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await
@@ -183,10 +179,10 @@ async fn a_discovery_charges_its_trackers_to_one_total_775() {
     };
     let (facilitator, _asked) = Scripted::new(vec![(A, one), (B, advertising(SERVICE, &[HB]))]);
     // Room for one tracker's answer and not for two.
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..tracking(&[A, B], limits(|l| l.max_total_bytes = bytes + bytes / 2))
-    });
+    let resolver = LookupResolver::new(
+        tracking(&[A, B], limits(|l| l.max_total_bytes = bytes + bytes / 2))
+            .with_facilitator(Some(facilitator)),
+    );
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(hosts, [HA]);
     assert_eq!(record(A), Some((0, 1)));
@@ -210,10 +206,7 @@ async fn a_tracker_answer_is_cut_to_its_share_785() {
     let build = |limits| {
         let (facilitator, _asked) =
             Scripted::new(vec![(A, script(&[1, 1, 2, 3])), (B, script(&[2, 4, 5]))]);
-        LookupResolver::new(LookupResolverConfig {
-            facilitator: Some(facilitator),
-            ..tracking(&[A, B], limits)
-        })
+        LookupResolver::new(tracking(&[A, B], limits).with_facilitator(Some(facilitator)))
     };
 
     // `maxHostsPerTracker` 2: each answer's leading two distinct hosts.
@@ -254,13 +247,13 @@ async fn the_discovered_hosts_are_cut_to_max_hosts_785() {
     let (facilitator, _asked) = Scripted::new(script);
     // Three trackers of one host each against two hosts: a share of one
     // each (the floor), then the whole cut to two.
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..tracking(
+    let resolver = LookupResolver::new(
+        tracking(
             &trackers.iter().map(String::as_str).collect::<Vec<_>>(),
             limits(|l| l.max_hosts = 2),
         )
-    });
+        .with_facilitator(Some(facilitator)),
+    );
     let found = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(found, hosts[..2]);
 }
@@ -276,10 +269,10 @@ async fn a_query_admits_the_leading_max_hosts_785() {
         (H2, Ok(output_list(0, 0))),
         (H3, Ok(output_list(0, 0))),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(facilitator),
-        ..overriding(SERVICE, &[H1, H2, H1, H3], limits(|l| l.max_hosts = 2))
-    });
+    let resolver = LookupResolver::new(
+        overriding(SERVICE, &[H1, H2, H1, H3], limits(|l| l.max_hosts = 2))
+            .with_facilitator(Some(facilitator)),
+    );
     resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await
@@ -331,14 +324,15 @@ async fn the_discovered_hosts_follow_the_trackers_arrival_order_785() {
         (A, advertising(SERVICE, &[HA])),
         (B, advertising(SERVICE, &[HB])),
     ]);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(std::sync::Arc::new(Delayed {
-            inner,
-            slow: A,
-            delay_ms: 300,
-        })),
-        ..tracking(&[A, B], LookupLimits::default())
-    });
+    let resolver = LookupResolver::new(
+        tracking(&[A, B], LookupLimits::default()).with_facilitator(Some(std::sync::Arc::new(
+            Delayed {
+                inner,
+                slow: A,
+                delay_ms: 300,
+            },
+        ))),
+    );
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(hosts, [HB, HA]);
 }
@@ -530,12 +524,11 @@ mod http {
         limits: bsv_rs::overlay::LookupLimits,
     ) -> bsv_rs::overlay::LookupResolver {
         let hosts: Vec<&str> = hosts.iter().map(String::as_str).collect();
-        bsv_rs::overlay::LookupResolver::new(bsv_rs::overlay::LookupResolverConfig {
-            facilitator: Some(std::sync::Arc::new(HttpsOverlayLookupFacilitator::new(
-                true,
+        bsv_rs::overlay::LookupResolver::new(
+            super::overriding(service, &hosts, limits).with_facilitator(Some(std::sync::Arc::new(
+                HttpsOverlayLookupFacilitator::new(true),
             ))),
-            ..super::overriding(service, &hosts, limits)
-        })
+        )
     }
 
     async fn outputs_of(resolver: &bsv_rs::overlay::LookupResolver, service: &str) -> usize {

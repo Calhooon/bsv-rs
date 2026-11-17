@@ -236,46 +236,44 @@ pub fn setup(name: &str) -> Harness {
     let stage = Arc::new(AtomicUsize::new(0));
     let queries = Arc::new(AtomicUsize::new(0));
     let resolver = || {
-        LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Mainnet,
-            host_overrides: Some(
-                [
-                    ("ls_kvstore".into(), vec![host.clone()]),
-                    ("ls_ship".into(), vec![host.clone()]),
-                ]
-                .into(),
-            ),
-            slap_trackers: Some(vec![]),
-            facilitator: Some(Arc::new(Lookup {
-                case: case.clone(),
-                stage: stage.clone(),
-                queries: queries.clone(),
-                advertisement: OutputListItem {
-                    beef: advertisement.to_beef(true).unwrap(),
-                    output_index: 0,
-                    context: None,
-                    txid: None,
-                },
-            })),
-            ..Default::default()
-        })
+        LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Mainnet)
+                .with_host_overrides(Some(
+                    [
+                        ("ls_kvstore".into(), vec![host.clone()]),
+                        ("ls_ship".into(), vec![host.clone()]),
+                    ]
+                    .into(),
+                ))
+                .with_slap_trackers(Some(vec![]))
+                .with_facilitator(Some(Arc::new(Lookup {
+                    case: case.clone(),
+                    stage: stage.clone(),
+                    queries: queries.clone(),
+                    advertisement: OutputListItem {
+                        beef: advertisement.to_beef(true).unwrap(),
+                        output_index: 0,
+                        context: None,
+                        txid: None,
+                    },
+                }))),
+        )
     };
     let sent = Arc::new(Mutex::new(vec![]));
     let fail = Arc::new(AtomicBool::new(false));
     let broadcaster = TopicBroadcaster::new(
         vec!["tm_kvstore".into()],
-        TopicBroadcasterConfig {
-            resolver: Some(Arc::new(resolver())),
-            facilitator: Some(Arc::new(Ship {
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(Arc::new(resolver())))
+            .with_facilitator(Some(Arc::new(Ship {
                 wallet: wallet.clone(),
                 competing: case["competing"]["txid"].as_str().unwrap().into(),
                 stage: stage.clone(),
                 sent: sent.clone(),
                 fail: fail.clone(),
                 host: host.clone(),
-            })),
-            ..Default::default()
-        },
+            }))),
     )
     .unwrap();
     let store = if case["kind"] == "global" {

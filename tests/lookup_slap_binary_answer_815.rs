@@ -79,11 +79,11 @@ async fn a_binary_slap_answer_admits_its_one_satoshi_host_815() {
         .mount(&tracker)
         .await;
 
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-        slap_trackers: Some(vec![tracker.uri()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+            .with_slap_trackers(Some(vec![tracker.uri()])),
+    );
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();
     assert_eq!(hosts, [admitted]);
 }

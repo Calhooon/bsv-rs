@@ -88,15 +88,15 @@ impl OverlayLookupFacilitator for Answering {
 /// A resolver whose one host for `service` (an `.invalid` name, never
 /// dialled) answers `script`'s output.
 pub fn answering(service: &str, script: LockingScript) -> Arc<LookupResolver> {
-    Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Answering(vec![output_of(script)]))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            service.to_string(),
-            vec![format!("https://{service}.invalid")],
-        )])),
-        ..Default::default()
-    }))
+    Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Answering(vec![output_of(script)]))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                service.to_string(),
+                vec![format!("https://{service}.invalid")],
+            )]))),
+    ))
 }
 
 /// A facilitator whose `freeform` host answers a freeform result and whose
@@ -135,16 +135,16 @@ pub fn answering_beside_freeform(
     door: &str,
 ) -> Arc<LookupResolver> {
     let freeform = format!("https://freeform.{door}-815.invalid");
-    Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(BesideFreeform {
-            freeform: freeform.clone(),
-            outputs: vec![output_of(script)],
-        })),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            service.to_string(),
-            vec![freeform, format!("https://list.{door}-815.invalid")],
-        )])),
-        ..Default::default()
-    }))
+    Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(BesideFreeform {
+                freeform: freeform.clone(),
+                outputs: vec![output_of(script)],
+            })))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                service.to_string(),
+                vec![freeform, format!("https://list.{door}-815.invalid")],
+            )]))),
+    ))
 }

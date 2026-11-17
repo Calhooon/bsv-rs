@@ -223,12 +223,12 @@ async fn run(name: &str, tag: &str) -> (Vec<OutputListItem>, u64, Vec<String>) {
         answers.insert(url.clone(), outputs);
         hosts.push(url);
     }
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(ByHost(answers))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(SERVICE.to_string(), hosts.clone())])),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(ByHost(answers))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(SERVICE.to_string(), hosts.clone())]))),
+    );
     let answer = resolver
         .query(&LookupQuestion::new(SERVICE, json!({})), None)
         .await

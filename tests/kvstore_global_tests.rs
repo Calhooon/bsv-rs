@@ -81,13 +81,13 @@ fn hermetic_store_with_wallet(wallet: MockWallet) -> GlobalKVStore<MockWallet> {
     let config = KVStoreConfig::default();
     let mut host_overrides = std::collections::HashMap::new();
     host_overrides.insert(config.service_name.clone(), Vec::<String>::new());
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(FailingLookupFacilitator)),
-        slap_trackers: Some(Vec::new()),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(Arc::new(FailingLookupFacilitator)))
+            .with_slap_trackers(Some(Vec::new()))
+            .with_host_overrides(Some(host_overrides)),
+    );
     GlobalKVStore::with_resolver(wallet, config, NetworkPreset::Local, resolver)
 }
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

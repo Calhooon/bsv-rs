@@ -99,22 +99,22 @@ pub async fn setup_with_options(
     });
     let token = Arc::new(Mutex::new(None));
     let store = if global {
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            host_overrides: Some(
-                [(
-                    config.service_name.clone(),
-                    vec![format!(
-                        "https://kvstore-{}.invalid",
-                        NEXT_LOOKUP.fetch_add(1, Ordering::Relaxed)
-                    )],
-                )]
-                .into(),
-            ),
-            slap_trackers: Some(vec![]),
-            facilitator: Some(Arc::new(Lookup(token.clone()))),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_host_overrides(Some(
+                    [(
+                        config.service_name.clone(),
+                        vec![format!(
+                            "https://kvstore-{}.invalid",
+                            NEXT_LOOKUP.fetch_add(1, Ordering::Relaxed)
+                        )],
+                    )]
+                    .into(),
+                ))
+                .with_slap_trackers(Some(vec![]))
+                .with_facilitator(Some(Arc::new(Lookup(token.clone())))),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
         Store::Global(match options {

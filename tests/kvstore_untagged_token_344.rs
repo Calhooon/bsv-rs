@@ -55,16 +55,16 @@ impl OverlayLookupFacilitator for TokenLookup {
 fn store(case: &Value) -> GlobalKVStore<Counting> {
     let config = KVStoreConfig::default();
     let source = signaction_reference_326::source_of(&script(case).to_binary(), 1);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some(std::collections::HashMap::from([(
-            config.service_name.clone(),
-            vec!["https://kvstore-344.invalid".to_owned()],
-        )])),
-        slap_trackers: Some(Vec::new()),
-        facilitator: Some(Arc::new(TokenLookup(source.to_beef(true).unwrap()))),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec!["https://kvstore-344.invalid".to_owned()],
+            )])))
+            .with_slap_trackers(Some(Vec::new()))
+            .with_facilitator(Some(Arc::new(TokenLookup(source.to_beef(true).unwrap())))),
+    );
     GlobalKVStore::with_resolver(
         Counting::of_scalar(9),
         config,
@@ -204,19 +204,19 @@ async fn a_freeform_host_beside_a_list_answers_the_list_at_the_kvstore_door_815(
     let case = cases().remove(0);
     let config = KVStoreConfig::default();
     let source = signaction_reference_326::source_of(&script(&case).to_binary(), 1);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some(std::collections::HashMap::from([(
-            config.service_name.clone(),
-            vec![
-                "https://freeform.kvstore-815.invalid".to_owned(),
-                "https://list.kvstore-815.invalid".to_owned(),
-            ],
-        )])),
-        slap_trackers: Some(Vec::new()),
-        facilitator: Some(Arc::new(ByHost(source.to_beef(true).unwrap()))),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec![
+                    "https://freeform.kvstore-815.invalid".to_owned(),
+                    "https://list.kvstore-815.invalid".to_owned(),
+                ],
+            )])))
+            .with_slap_trackers(Some(Vec::new()))
+            .with_facilitator(Some(Arc::new(ByHost(source.to_beef(true).unwrap())))),
+    );
     let store = GlobalKVStore::with_resolver(
         Counting::of_scalar(9),
         config,

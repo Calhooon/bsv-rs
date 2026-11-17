@@ -285,29 +285,27 @@ async fn broadcast(n: usize, topic: &str, uri: &str) -> Option<String> {
         &format!("https://host-{n}.ship-steak-door-815-rs.invalid"),
         topic,
     );
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Scripted(LookupAnswer::OutputList {
-            outputs: vec![output],
-        }))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_ship".to_string(),
-            vec![format!(
-                "https://ls-ship-{n}.ship-steak-door-815-rs.invalid"
-            )],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Scripted(LookupAnswer::OutputList {
+                outputs: vec![output],
+            }))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_ship".to_string(),
+                vec![format!(
+                    "https://ls-ship-{n}.ship-steak-door-815-rs.invalid"
+                )],
+            )]))),
+    ));
     let b = TopicBroadcaster::new(
         vec![topic.to_string()],
-        TopicBroadcasterConfig {
-            resolver: Some(resolver),
-            facilitator: Some(Arc::new(Rerouted {
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver))
+            .with_facilitator(Some(Arc::new(Rerouted {
                 door: HttpsOverlayBroadcastFacilitator::new(true),
                 to: uri.to_string(),
-            })),
-            ..Default::default()
-        },
+            }))),
     )
     .unwrap();
     b.broadcast_tx(&subject).await.err().map(|f| f.code)

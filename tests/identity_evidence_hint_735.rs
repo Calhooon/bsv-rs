@@ -114,15 +114,15 @@ async fn host(response: ResponseTemplate) -> MockServer {
 }
 
 fn resolver(host: &str) -> Arc<LookupResolver> {
-    Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec![host.to_string()],
-        )])),
-        ..Default::default()
-    }))
+    Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec![host.to_string()],
+            )]))),
+    ))
 }
 
 /// How many identities and certificates the two parsers return, and how
