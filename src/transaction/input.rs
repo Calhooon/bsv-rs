@@ -247,6 +247,12 @@ impl TransactionInput {
     }
 }
 
+/// Shared across threads: a `RefCell` added under it fails every build (#843d1).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<TransactionInput>();
+};
+
 impl Clone for TransactionInput {
     fn clone(&self) -> Self {
         Self {

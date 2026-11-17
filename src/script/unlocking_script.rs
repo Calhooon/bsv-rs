@@ -70,8 +70,8 @@ impl UnlockingScript {
         self.0.to_binary()
     }
 
-    /// Returns the chunks.
-    pub fn chunks(&self) -> Vec<ScriptChunk> {
+    /// Returns the chunks, lent from the script ([`Script::chunks`]).
+    pub fn chunks(&self) -> &[ScriptChunk] {
         self.0.chunks()
     }
 
@@ -100,6 +100,12 @@ impl UnlockingScript {
         true
     }
 }
+
+/// Shared across threads: a `RefCell` added under it fails every build (#843d1).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<UnlockingScript>();
+};
 
 impl Default for UnlockingScript {
     fn default() -> Self {

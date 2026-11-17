@@ -78,6 +78,12 @@ pub struct BeefTx {
     raw_dropped: bool,
 }
 
+/// Shared across threads: a `RefCell` added under it fails every build (#843d1).
+const _: () = {
+    const fn shareable<T: Send + Sync>() {}
+    shareable::<BeefTx>();
+};
+
 impl BeefTx {
     /// Creates a BeefTx from a parsed Transaction.
     pub fn from_tx(tx: Transaction, bump_index: Option<usize>) -> Self {

@@ -103,7 +103,8 @@ fn the_length_sum_is_the_bytes_written_bytes_00076_to_00079_seed_000647_tx_00040
         let chunks = match (id, entry["script"]["hex"].as_str()) {
             (_, Some(hex)) => Script::from_binary(&from_hex(hex).unwrap())
                 .unwrap()
-                .chunks(),
+                .chunks()
+                .to_vec(),
             ("seed-000785", None) => {
                 let p = pushes
                     .iter()
@@ -111,7 +112,7 @@ fn the_length_sum_is_the_bytes_written_bytes_00076_to_00079_seed_000647_tx_00040
                     .unwrap();
                 let mut s = Script::new();
                 s.write_bin(&data(p));
-                s.chunks()
+                s.chunks().to_vec()
             }
             ("tx-00040", None) => {
                 let rec = &v["op_return_push"];
@@ -123,7 +124,7 @@ fn the_length_sum_is_the_bytes_written_bytes_00076_to_00079_seed_000647_tx_00040
                     rec["data_len"].as_u64().unwrap()
                         as usize
                 ]);
-                s.chunks()
+                s.chunks().to_vec()
             }
             _ => panic!("{id}: no rebuild for a script recorded by length"),
         };
@@ -161,6 +162,10 @@ fn the_length_sum_is_the_bytes_written_at_each_push_edge_arith_00643_seed_000785
         let len = p["len"].as_u64().unwrap();
         let mut s = Script::new();
         s.write_bin(&data(p));
-        assert_two_paths_agree(&format!("a push of {len}"), s.chunks(), &p["reference"]);
+        assert_two_paths_agree(
+            &format!("a push of {len}"),
+            s.chunks().to_vec(),
+            &p["reference"],
+        );
     }
 }

@@ -293,8 +293,8 @@ async fn a_wallet_key_in_an_uncompressed_form_is_pushed_as_returned_782() {
         assert_eq!(script.to_hex(), text(&case["locking_script"]), "{name}");
         let pushes: Vec<Vec<u8>> = script
             .chunks()
-            .into_iter()
-            .filter_map(|chunk| chunk.data)
+            .iter()
+            .filter_map(|chunk| chunk.data.clone())
             .filter(|data| data.len() == 65)
             .collect();
         assert_eq!(pushes.len(), 1, "{name}: one 65-byte push");
