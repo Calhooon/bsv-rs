@@ -269,7 +269,12 @@ fn the_default_headroom_is_stated_per_output_size() {
     // (output-script bytes, 16 MiB default onset, 32 MiB onset). 25 B is a
     // plain-payment (P2PKH) locking script's exact size; 256 B and 1 KiB are
     // data-carrying outputs.
-    let cells: &[(usize, usize, usize)] = &[(25, 702, 993), (256, 251, 354), (1024, 127, 180)];
+    // Since the #749 fold also charges the proof (`MerklePath`) a stub carries —
+    // ~40 B for the single-leaf BUMP these one-parent sweeps use — three cells
+    // fell by one output from their pre-fold values (702→701, 993→992, 251→250):
+    // the honest sweeps now refused that 0.8.11 admitted. The others are
+    // unchanged (the extra proof bytes did not cross their integer boundary).
+    let cells: &[(usize, usize, usize)] = &[(25, 701, 992), (256, 250, 354), (1024, 127, 180)];
     for &(script_bytes, onset16, onset32) in cells {
         let script = filler_script(script_bytes);
         // The shipped default (16 MiB) admits exactly `onset16` and refuses one
@@ -348,12 +353,26 @@ fn a_shared_budget_caps_the_total_across_concurrent_links_and_refills_on_release
     // it — is refused with the named resource error BEFORE it allocates, and the
     // first's share returns to the pool when it is dropped, admitting the next.
     let (bytes, subject, parent_wire) = shared_parent_beef_wire(20, 20, &filler_script(4 * 1024));
-    let one_link = parent_wire * 19; // 20 inputs: 1 full link + 19 metered repeats
+    // Measure one link's exact draw — its ~19 re-materialized parent-wide stubs
+    // AND the proof the #749 fold now charges — from a default-sized pool, read
+    // while the link is still alive (its reservation held), then released.
+    let gauge = BeefLinkBudget::shared(BeefLinkLimits::DEFAULT_MAX_LINK_BYTES);
+    let gauged = Transaction::from_beef_with_budget(&bytes, None, &gauge)
+        .expect("one link fits a default-sized pool");
+    let one_link = BeefLinkLimits::DEFAULT_MAX_LINK_BYTES
+        - gauge
+            .remaining()
+            .expect("the shared pool reports its remaining bytes");
+    drop(gauged);
     assert!(
         one_link < BeefLinkLimits::DEFAULT_MAX_LINK_BYTES,
         "one link stays under the per-link cap the shared budget also enforces"
     );
-    // Room for one link and no more (a second needs 19× the slack left over).
+    assert!(
+        parent_wire < one_link,
+        "one parent's bytes are the slack, smaller than a whole link"
+    );
+    // Room for one link and no more (a second needs a whole link, past the slack).
     let pool = BeefLinkBudget::shared(one_link + parent_wire);
 
     let first = Transaction::from_beef_with_budget(&bytes, None, &pool)
