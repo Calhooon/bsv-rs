@@ -24,3 +24,12 @@ src/compat/bip39/wordlists/*.txt -text
 # LF-terminated line; a CRLF checkout puts a CR in every line and the parser
 # refuses it (#249, the same rule as the wordlists).
 src/wallet/collation_latin1.txt -text
+# The recorded chain headers and the testnet header vector are read byte for
+# byte (80-byte headers end to end; tests/data/chain_headers/README.md gives
+# each file's source). Until this line only git's NUL heuristic kept the four
+# .bin files from conversion: a file of pinned bytes that held no NUL in its
+# leading 8000 bytes would have been converted as text (the strength read of
+# pull request #1021, row (b); lane after-tag-hygiene). The other files under
+# the two paths are held with LF in the index and are checked out as held.
+tests/data/** -text
+tests/chain_vectors/** -text

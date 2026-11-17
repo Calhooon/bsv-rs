@@ -70,6 +70,15 @@
 //! passes; so does any sentence of step 23 not in `ADVISORY_RECORD_849`, the clause of point (iv)
 //! that a sitting owes `SECURITY.md` no edit for its advisory among them. Such a change is
 //! visible in its diff and is a reviewer's matter.
+//!
+//! Line endings (lane after-tag-hygiene, rows (a) and (b) of the strength read of pull request
+//! #1021): `.gitattributes` holds `* text=auto eol=lf` above every `-text` line and a `-text`
+//! line for each path of pinned bytes (`gitattributes_holds_the_lf_rule_above_every_byte_path_it_names`).
+//! The bound: the two attributes it names, in the root file alone. A later line that gives a
+//! listed path `text` again, a line of another pattern for every path (`**`, `/**`) or a narrower
+//! one that sets `eol=crlf` or unsets `eol` (`-eol`, `!eol`), and a `.gitattributes` in a
+//! directory below the root (git reads it ahead of the root's for the paths under it) pass it:
+//! each is visible in its diff and is a reviewer's matter.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
 mod arch_support;
@@ -81,8 +90,8 @@ const SYNC_FILE: &str = ".github/workflows/sync-main-into-beta.yml";
 
 fn read(path: &str) -> String {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // A Windows checkout converts the workflows to CRLF (`.gitattributes` keeps only the
-    // vectors, fixtures and corpora byte for byte); the needles are written with `\n`.
+    // A Windows checkout made before `.gitattributes`' `* text=auto eol=lf`, or with the
+    // rule removed, holds the workflows in CRLF; the needles are written with `\n`.
     fs::read_to_string(root.join(path))
         .unwrap_or_else(|e| panic!("read {path}: {e}"))
         .replace("\r\n", "\n")
@@ -2818,4 +2827,134 @@ fn a_release_page_made_early_with_write_elsewhere_or_a_scheduled_reconciler_is_r
         release_pages(&release, &scheduled),
         ["front-pages.yml: fires on `schedule:`; the reconciler runs on a dispatch alone"]
     );
+}
+
+/// The rule that checks every text file out as the repository holds it (lane fix-windows-crlf).
+const LF_RULE: &str = "* text=auto eol=lf";
+
+/// Every path of pinned bytes `.gitattributes` keeps from any conversion: the five of pull
+/// request #1021's day and the two its strength read named (row (b), lane after-tag-hygiene).
+const BYTE_PATHS: &[&str] = &[
+    "tests/vectors/**",
+    "tests/fixtures/**",
+    "fuzz/corpus/**",
+    "src/compat/bip39/wordlists/*.txt",
+    "src/wallet/collation_latin1.txt",
+    "tests/data/**",
+    "tests/chain_vectors/**",
+];
+
+/// What `.gitattributes` must say about line endings: the rule `* text=auto eol=lf`, whole and
+/// once, no other line for the pattern `*` (git takes the last line that matches a path, so a
+/// second one would replace the rule), the rule above every `-text` line (a `-text` line above
+/// it is overridden by it), and a `-text` line for each path of `BYTE_PATHS`. A comment and a
+/// blank line are not read.
+fn line_ending_refusals(text: &str) -> Vec<String> {
+    let lines: Vec<(usize, Vec<&str>)> = text
+        .lines()
+        .enumerate()
+        .map(|(n, l)| (n + 1, l.split_whitespace().collect::<Vec<_>>()))
+        .filter(|(_, words)| !words.is_empty() && !words[0].starts_with('#'))
+        .collect();
+    let mut errors = Vec::new();
+    let rule: Vec<&str> = LF_RULE.split_whitespace().collect();
+    let stars: Vec<&(usize, Vec<&str>)> = lines.iter().filter(|(_, w)| w[0] == "*").collect();
+    let rule_line = match stars.as_slice() {
+        [] => {
+            errors.push(format!(
+                ".gitattributes: no line for `*`; `{LF_RULE}` is the rule"
+            ));
+            None
+        }
+        [(n, words)] if *words == rule => Some(*n),
+        [(n, words)] => {
+            errors.push(format!(
+                ".gitattributes:{n}: `{}` is not `{LF_RULE}` whole",
+                words.join(" ")
+            ));
+            None
+        }
+        many => {
+            errors.push(format!(
+                ".gitattributes: {} lines for `*` (at {}); `{LF_RULE}` alone is the rule",
+                many.len(),
+                many.iter()
+                    .map(|(n, _)| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            None
+        }
+    };
+    for (n, words) in &lines {
+        if words[1..].contains(&"-text") && rule_line.is_some_and(|r| r > *n) {
+            errors.push(format!(
+                ".gitattributes:{n}: `{}` is above `{LF_RULE}`, which then overrides it",
+                words.join(" ")
+            ));
+        }
+    }
+    for path in BYTE_PATHS {
+        if !lines.iter().any(|(_, w)| w.as_slice() == [*path, "-text"]) {
+            errors.push(format!(
+                ".gitattributes: no line `{path} -text`; its bytes are pinned"
+            ));
+        }
+    }
+    errors
+}
+
+/// Rows (a) and (b) of the strength read of pull request #1021: until this test nothing on
+/// Linux or macOS turned red when the LF rule was removed, weakened or moved below a `-text`
+/// line (the six document tests that need it are red on a Windows checkout alone), and two
+/// paths of pinned bytes had no `-text` line. `read` sets a CR aside, so the test reads a CRLF
+/// checkout of `.gitattributes` as it reads an LF one.
+#[test]
+fn gitattributes_holds_the_lf_rule_above_every_byte_path_it_names() {
+    let text = read(".gitattributes");
+    assert_eq!(line_ending_refusals(&text), Vec::<String>::new());
+    assert_eq!(
+        line_ending_refusals(&text.replace('\n', "\r\n")),
+        Vec::<String>::new(),
+        "a CRLF text is read as the LF one"
+    );
+
+    let rule = format!("{LF_RULE}\n");
+    let removed = text.replacen(&rule, "", 1);
+    assert_eq!(
+        line_ending_refusals(&removed),
+        [format!(
+            ".gitattributes: no line for `*`; `{LF_RULE}` is the rule"
+        )]
+    );
+    let moved = format!("{removed}{rule}");
+    let above = line_ending_refusals(&moved);
+    assert_eq!(above.len(), BYTE_PATHS.len(), "{above:?}");
+    assert!(
+        above
+            .iter()
+            .all(|e| e.ends_with(&format!("is above `{LF_RULE}`, which then overrides it"))),
+        "{above:?}"
+    );
+    let weakened = text.replacen(&rule, "* text=auto\n", 1);
+    let refusals = line_ending_refusals(&weakened);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(
+        refusals[0].ends_with(&format!("`* text=auto` is not `{LF_RULE}` whole")),
+        "{refusals:?}"
+    );
+    let replaced = format!("{text}* -text\n");
+    let refusals = line_ending_refusals(&replaced);
+    assert_eq!(refusals.len(), 1, "{refusals:?}");
+    assert!(refusals[0].contains("2 lines for `*`"), "{refusals:?}");
+    for path in BYTE_PATHS {
+        let line = format!("{path} -text\n");
+        assert!(text.contains(&line), "{path}");
+        assert_eq!(
+            line_ending_refusals(&text.replacen(&line, "", 1)),
+            [format!(
+                ".gitattributes: no line `{path} -text`; its bytes are pinned"
+            )]
+        );
+    }
 }

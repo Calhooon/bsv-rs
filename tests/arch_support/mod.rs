@@ -21,9 +21,9 @@ pub struct Token<'a> {
 }
 
 /// A crate file's text with its line endings normalized to `\n`: a Windows
-/// checkout converts the sources to CRLF (`.gitattributes` keeps only the
-/// vectors, fixtures and corpora byte for byte), and the rules' needles are
-/// written with `\n` (bsv-rs#367).
+/// checkout made before `.gitattributes`' `* text=auto eol=lf` (lane
+/// fix-windows-crlf), or with the rule removed, holds the sources in CRLF, and
+/// the rules' needles are written with `\n` (bsv-rs#367).
 pub fn read(file: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
     normalize(&fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display())))
