@@ -48,22 +48,12 @@ fn witnesses() -> Vec<Witness> {
 }
 
 fn validate(input: &Input) -> bsv_rs::Result<()> {
-    validate_create_action_args(&CreateActionArgsRaw {
-        description: "pay the invoice".to_string(),
-        input_beef: None,
-        inputs: vec![CreateActionInputRaw {
-            outpoint: format!("{}.0", "11".repeat(32)),
-            input_description: "spend the coin".to_string(),
-            unlocking_script: input.unlocking_script.clone(),
-            unlocking_script_length: input.unlocking_script_length,
-            sequence_number: None,
-        }],
-        outputs: vec![],
-        lock_time: None,
-        version: None,
-        labels: vec![],
-        options: None,
-    })
+    let mut spend = CreateActionInputRaw::new(format!("{}.0", "11".repeat(32)), "spend the coin");
+    spend.unlocking_script = input.unlocking_script.clone();
+    spend.unlocking_script_length = input.unlocking_script_length;
+    validate_create_action_args(
+        &CreateActionArgsRaw::new("pay the invoice").with_inputs(vec![spend]),
+    )
     .map(|_| ())
 }
 

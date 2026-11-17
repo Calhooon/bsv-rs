@@ -82,12 +82,12 @@ pub use types::{
     BroadcastResult,
     BroadcastSuccess,
     // Core types
-    CertifierInfo,
     Contact,
     ContactsManagerConfig,
     DefaultIdentityValues,
     DisplayableIdentity,
-    IdentityCertificate,
+    IdentityCertificate,   // the wallet's record, re-exported (#843)
+    IdentityCertifier,     // the wallet's certifier record, re-exported (#843; `CertifierInfo` until then)
     IdentityClientConfig,
     IdentityQuery,
     IdentityResolutionResult,
@@ -202,24 +202,22 @@ let query = IdentityQuery::by_attribute("email", "user@example.com")
     .with_offset(5);
 ```
 
-### IdentityCertificate
+### IdentityCertificate and IdentityCertifier
 
-Enriched certificate with decrypted fields and certifier information:
+Since #843's structs lane these are the wallet's types, re-exported (`wallet::IdentityCertificate`, `wallet::IdentityCertifier`; `Wallet.interfaces.ts:870,877` at `ts-stack@edf6e03`): one declaration, where this module declared its own `IdentityCertificate` (a `VerifiableCertificate` with display data) and `CertifierInfo` (the same four members as the wallet's certifier record, with a `Default` the wallet's has none of). A wallet's `discoverByIdentityKey` or `discoverByAttributes` entry is therefore an `identity::IdentityCertificate` as it came:
 
 ```rust
-pub struct IdentityCertificate {
-    pub certificate: VerifiableCertificate,
-    pub certifier_info: CertifierInfo,
-    pub publicly_revealed_keyring: IndexMap<String, String>, // base64 text (#268); the token's order (#394)
-    pub decrypted_fields: IndexMap<String, String>,          // the keyring's order (#394)
+pub struct IdentityCertificate {              // wallet/types.rs
+    pub certificate: WalletCertificate,       // flat in JSON: type, subject, serialNumber, certifier, revocationOutpoint, signature, fields
+    pub certifier_info: IdentityCertifier,    // name, icon_url, description, trust
+    pub publicly_revealed_keyring: IndexMap<String, String>,
+    pub decrypted_fields: IndexMap<String, String>,
 }
-
-// Access methods
-let type_id = cert.type_base64();
-let subject = cert.subject_hex();
-let certifier = cert.certifier_hex();
-let known_type = cert.known_type(); // Option<KnownCertificateType>
 ```
+
+The four helper methods of the old record (`type_base64`, `subject_hex`, `certifier_hex`, `known_type`) went with it: read `cert.certificate.certificate_type`, `.subject`, `.certifier`, and `KnownCertificateType::from_type_id(&cert.certificate.certificate_type)`.
+
+The lookup parsers keep their own crate-private record, `RevealedCertificate` (`types.rs`: the `VerifiableCertificate` read from the token, its certifier's display record, the decrypted fields), which no public door returns (the discovery doors return `VerifiableCertificate`s, `query` an `IdentityResolutionResult`).
 
 **Reading a published certificate** (#261): the parsers read the JSON the
 reference's `publiclyRevealAttributes` publishes (`{...certificate, keyring}`,
@@ -231,22 +229,9 @@ write it, and one that is not skips its output, never the resolution
 (`IdentityClient.ts:823-825`); the keyring's values are held as their base64
 text (#268), decoded only where the anyone wallet decrypts; a `revocationOutpoint`
 of the txid alone, the reference's default issuance's, reads as index 0
-(`revocation_outpoint_from_str`, #268). `decrypted_fields` comes from
+(`revocation_outpoint_from_str`, #268). The decrypted fields come from
 `VerifiableCertificate::decrypt_fields` with `ProtoWallet::anyone()`: each
 field's text is decoded and decrypted there and nowhere earlier.
-
-### CertifierInfo
-
-Information about a certificate certifier:
-
-```rust
-pub struct CertifierInfo {
-    pub name: String,
-    pub icon_url: String,
-    pub description: String,
-    pub trust: u8,  // Trust level 0-10
-}
-```
 
 ## IdentityClient
 
@@ -364,7 +349,8 @@ client.remove_contact("02abc123...").await?;
 // Get the wallet's identity key
 let my_key = client.get_identity_key().await?;
 
-// Parse an identity certificate into displayable format (static method)
+// Parse a wallet's discovery entry into displayable format (static method;
+// takes `wallet::IdentityCertificate` since #843, as the reference's `parseIdentity`)
 let displayable = IdentityClient::<ProtoWallet>::parse_identity(&cert);
 ```
 
@@ -561,3 +547,7 @@ Key compatibility points:
 ## Open enums (#843d9)
 
 `KnownCertificateType`: `#[non_exhaustive]` since #843d9 (the freeze plan's row 9), each defined inside `crate::util::non_exhaustive::non_exhaustive_enum!` under its public path, which writes into its doc the every-variant `compile_fail` match and its wildcard twin from the definition (`tests/arch_non_exhaustive_pins_819.rs` holds the pin, `tests/arch_non_exhaustive_843d.rs` that every `pub enum` is open or a row of `CLOSED_ENUMS`). A later variant is additive: a `match` outside the crate ends in a wildcard arm, and at a door that arm refuses, it never skips. Inside the crate the attribute binds nothing: every match under `src/` stays exhaustive, and no wildcard arm is added for it. Building a variant and serde are unchanged. `KnownCertificateType::all()` is held against the definition by `all_holds_every_known_certificate_type_and_each_id_reads_back_843d9` (`types_tests.rs`). `BroadcastResult` waits on the freeze plan's row 4.
+
+## Open structs and the unified record (#843's structs lane)
+
+`IdentityResolutionResult` is `#[non_exhaustive]` (a record this crate produces; `IdentityResolutionResult::new(identity, certificates)`), pinned by its `compile_fail` doc test and `assert_no_drop!`. `IdentityClient::parse_identity` takes `&wallet::IdentityCertificate` (the captain's ruling (f) of 2026-11-17), its body the same reading (the type's known fields, the certifier's name and icon), its abbreviation cut by character since the subject is a wallet's text; the reference's display validation is not ported (the root list's row). Pinned by `tests/identity_parse_identity_843.rs`, the door `tests/identity_tests.rs` could not reach before. The two `BroadcastSuccess` records and `BroadcastResult` wait on the one broadcast answer type (the freeze plan's row 4); the two configurations on row 8c.

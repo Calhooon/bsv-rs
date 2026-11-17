@@ -30,24 +30,10 @@ use super::rank_change_receiver::RankChangeReceiver;
 use std::sync::{PoisonError, RwLock};
 use tokio::sync::broadcast;
 
+pub use super::rank_change_receiver::RankChangeEvent;
+
 /// Default capacity for the rank change broadcast channel.
 const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 64;
-
-/// Event emitted when a host's reputation score changes.
-///
-/// Subscribers receive this event whenever `record_success()` or `record_failure()`
-/// causes a change in a host's computed reputation score.
-#[derive(Debug, Clone)]
-pub struct RankChangeEvent {
-    /// The host whose rank changed.
-    pub host: String,
-    /// The previous reputation score (lower = better).
-    pub old_rank: f64,
-    /// The new reputation score (lower = better).
-    pub new_rank: f64,
-    /// Human-readable reason for the change.
-    pub reason: String,
-}
 
 /// Storage trait for persisting reputation data.
 ///

@@ -5,6 +5,10 @@
 
 use crate::auth::VerifiableCertificate;
 use crate::overlay::NetworkPreset;
+
+/// The wallet's discovery record and its certifier, re-exported (#843; this
+/// module's own `IdentityCertificate` and `CertifierInfo` until then).
+pub use crate::wallet::{IdentityCertificate, IdentityCertifier};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -526,7 +530,24 @@ impl IdentityQuery {
 // ============================================================================
 
 /// Result of identity resolution containing the identity and associated certificates.
+///
+/// A record this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test
+/// double's) with [`IdentityResolutionResult::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::identity::IdentityResolutionResult) -> bsv_rs::identity::IdentityResolutionResult {
+///     bsv_rs::identity::IdentityResolutionResult { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::identity::IdentityResolutionResult) -> bsv_rs::identity::IdentityResolutionResult {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct IdentityResolutionResult {
     /// The resolved displayable identity.
     pub identity: DisplayableIdentity,
@@ -534,55 +555,54 @@ pub struct IdentityResolutionResult {
     pub certificates: Vec<VerifiableCertificate>,
 }
 
-// ============================================================================
-// Certifier Info
-// ============================================================================
+crate::util::non_exhaustive::assert_no_drop!(
+    IdentityResolutionResult,
+    bsv_rs::identity::IdentityResolutionResult
+);
 
-/// Information about a certificate certifier.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CertifierInfo {
-    /// Certifier's display name.
-    pub name: String,
-    /// Certifier's icon URL.
-    pub icon_url: String,
-    /// Description of the certifier.
-    pub description: String,
-    /// Trust level (1-10).
-    pub trust: u8,
-}
-
-impl Default for CertifierInfo {
-    fn default() -> Self {
+impl IdentityResolutionResult {
+    /// The identity and the certificates it was read from.
+    #[must_use]
+    pub fn new(identity: DisplayableIdentity, certificates: Vec<VerifiableCertificate>) -> Self {
         Self {
-            name: "Unknown Certifier".to_string(),
-            icon_url: DefaultIdentityValues::BADGE_ICON_URL.to_string(),
-            description: "No information available".to_string(),
-            trust: 0,
+            identity,
+            certificates,
         }
     }
 }
 
 // ============================================================================
-// Identity Certificate (enriched)
+// A revealed certificate, as the lookup parsers hold it
 // ============================================================================
 
-/// An identity certificate with decrypted fields and certifier information.
-///
-/// This extends the base certificate with information needed for display.
+/// The certifier a lookup parser could name nothing about: the display
+/// defaults the reference's `parseIdentity` falls back on.
+#[cfg(test)]
+pub(crate) fn unknown_certifier() -> IdentityCertifier {
+    IdentityCertifier {
+        name: "Unknown Certifier".to_string(),
+        icon_url: DefaultIdentityValues::BADGE_ICON_URL.to_string(),
+        description: "No information available".to_string(),
+        trust: 0,
+    }
+}
+
+/// A revealed certificate as the `ls_identity` parsers hold it: the
+/// verifiable certificate read from the token (its keyring with it), its
+/// certifier's display record and the decrypted fields. Crate-private since
+/// #843: the public record is the wallet's `IdentityCertificate`
+/// (`Wallet.interfaces.ts:877`), which `parse_identity` takes.
 #[derive(Debug, Clone)]
-pub struct IdentityCertificate {
+pub(crate) struct RevealedCertificate {
     /// The base verifiable certificate.
     pub certificate: VerifiableCertificate,
     /// Information about the certifier.
-    pub certifier_info: CertifierInfo,
-    /// Publicly revealed keyring: field name -> encrypted key, base64 text (`Wallet.interfaces.ts:879`, #268).
-    pub publicly_revealed_keyring: IndexMap<String, String>,
+    pub certifier_info: IdentityCertifier,
     /// Decrypted field values.
     pub decrypted_fields: IndexMap<String, String>,
 }
 
-impl IdentityCertificate {
+impl RevealedCertificate {
     /// Get the certificate type as a base64 string.
     pub fn type_base64(&self) -> String {
         self.certificate.certificate.type_base64()
@@ -596,11 +616,6 @@ impl IdentityCertificate {
     /// Get the certifier's public key as hex.
     pub fn certifier_hex(&self) -> String {
         self.certificate.certifier().to_hex()
-    }
-
-    /// Check if this is a known certificate type.
-    pub fn known_type(&self) -> Option<KnownCertificateType> {
-        KnownCertificateType::from_type_id(&self.type_base64())
     }
 }
 

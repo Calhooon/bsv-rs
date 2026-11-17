@@ -72,12 +72,7 @@ async fn compare(global: bool, remove: bool) {
     });
     *h.lookup.lock().unwrap() = sources
         .iter()
-        .map(|(tx, _)| bsv_rs::overlay::OutputListItem {
-            beef: tx.to_beef(true).unwrap(),
-            output_index: 0,
-            context: None,
-            txid: None,
-        })
+        .map(|(tx, _)| bsv_rs::overlay::OutputListItem::new(tx.to_beef(true).unwrap(), 0))
         .collect();
     if remove {
         h.store.remove().await

@@ -60,12 +60,7 @@ impl OverlayLookupFacilitator for Scripted {
 pub fn output_list(count: usize, beef_bytes: usize) -> LookupAnswer {
     LookupAnswer::OutputList {
         outputs: (0..count)
-            .map(|index| OutputListItem {
-                beef: vec![7; beef_bytes],
-                output_index: index as u32,
-                context: None,
-                txid: None,
-            })
+            .map(|index| OutputListItem::new(vec![7; beef_bytes], index as u32))
             .collect(),
     }
 }

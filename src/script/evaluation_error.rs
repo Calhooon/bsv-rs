@@ -66,7 +66,25 @@ impl fmt::Display for ScriptResource {
 
 /// The resource a [`ScriptEvaluationError`] ran out of, with the limit and
 /// the attempted usage (the reference's `ScriptResourceLimitError` fields).
+///
+/// A record the interpreter produces and one that has grown (`work_spent`),
+/// so it is `#[non_exhaustive]` (#843): read the fields, end a pattern over
+/// it in `..`, and build one with [`ScriptResourceLimit::new`] and
+/// [`ScriptResourceLimit::with_work_spent`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::script::ScriptResourceLimit) -> bsv_rs::script::ScriptResourceLimit {
+///     bsv_rs::script::ScriptResourceLimit { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::script::ScriptResourceLimit) -> bsv_rs::script::ScriptResourceLimit {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ScriptResourceLimit {
     /// The resource the refused operation would exceed.
     pub resource: ScriptResource,
@@ -76,6 +94,32 @@ pub struct ScriptResourceLimit {
     pub attempted: u64,
     /// Work already charged, only for `Work`; always at or below `limit`.
     pub work_spent: Option<u64>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(
+    ScriptResourceLimit,
+    bsv_rs::script::ScriptResourceLimit
+);
+
+impl ScriptResourceLimit {
+    /// The limit of `resource` (bytes for a memory resource, units for work)
+    /// and the usage the refused operation would require; no work recorded.
+    #[must_use]
+    pub const fn new(resource: ScriptResource, limit: u64, attempted: u64) -> Self {
+        Self {
+            resource,
+            limit,
+            attempted,
+            work_spent: None,
+        }
+    }
+
+    /// Sets the work already charged (read for `Work` alone).
+    #[must_use]
+    pub const fn with_work_spent(mut self, work_spent: u64) -> Self {
+        self.work_spent = Some(work_spent);
+        self
+    }
 }
 
 /// The interpreter's sentence for the limit (#228), the one place its words
@@ -111,7 +155,26 @@ impl fmt::Display for ScriptResourceLimit {
 
 /// A script evaluation that failed: the message, the spend it was evaluating
 /// and the interpreter's state at the failure.
+///
+/// A record the interpreter produces and one that has grown
+/// (`resource_limit`, 0.3.23), so it is `#[non_exhaustive]` (#843): read the
+/// fields, end a pattern over it in `..`, and build one with
+/// [`ScriptEvaluationError::new`] and
+/// [`ScriptEvaluationError::with_resource_limit`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::script::ScriptEvaluationError) -> bsv_rs::script::ScriptEvaluationError {
+///     bsv_rs::script::ScriptEvaluationError { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::script::ScriptEvaluationError) -> bsv_rs::script::ScriptEvaluationError {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ScriptEvaluationError {
     /// The error message describing what went wrong.
     pub message: String,
@@ -142,6 +205,11 @@ pub struct ScriptEvaluationError {
     /// error as invalid.
     pub resource_limit: Option<ScriptResourceLimit>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    ScriptEvaluationError,
+    bsv_rs::script::ScriptEvaluationError
+);
 
 impl ScriptEvaluationError {
     /// Creates a new script evaluation error with the given context.

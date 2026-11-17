@@ -119,13 +119,9 @@ fn a_script_verdict_is_never_a_resource_limit() {
 // ---------------------------------------------------------------------------
 
 fn limit_text(resource: ScriptResource, work_spent: Option<u64>) -> String {
-    ScriptResourceLimit {
-        resource,
-        limit: 1_000,
-        attempted: 1_001,
-        work_spent,
-    }
-    .to_string()
+    let mut limit = ScriptResourceLimit::new(resource, 1_000, 1_001);
+    limit.work_spent = work_spent;
+    limit.to_string()
 }
 
 #[test]

@@ -25,11 +25,12 @@ use super::contacts::ContactsManager;
 #[cfg(test)]
 use super::types::BroadcastSuccess;
 use super::types::{
-    BroadcastFailure, BroadcastResult, CertificateFieldNameUnder50Bytes, CertifierInfo, Contact,
-    ContactsManagerConfig, DefaultIdentityValues, DisplayableIdentity, IdentityCertificate,
-    IdentityClientConfig, IdentityQuery, IdentityResolutionResult, KnownCertificateType,
+    BroadcastFailure, BroadcastResult, CertificateFieldNameUnder50Bytes, Contact,
+    ContactsManagerConfig, DefaultIdentityValues, DisplayableIdentity, IdentityClientConfig,
+    IdentityQuery, IdentityResolutionResult, KnownCertificateType, RevealedCertificate,
     StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
+use crate::wallet::{IdentityCertificate, IdentityCertifier};
 
 use indexmap::IndexMap;
 use std::collections::HashMap;
@@ -71,11 +72,39 @@ impl<W: WalletInterface> IdentityClient<W> {
     ///
     /// This is the main parsing function that converts certificate data
     /// into a user-friendly display format.
+    ///
+    /// Takes the wallet's discovery record (`wallet::IdentityCertificate`,
+    /// re-exported at `identity::IdentityCertificate`), as the reference's
+    /// `parseIdentity` does (`IdentityClient.ts:1044` at `ts-stack@edf6e03`),
+    /// so an entry of a wallet's `discoverByIdentityKey` or
+    /// `discoverByAttributes` answer is parsed as it came (#843; this
+    /// module's own record until then).
     pub fn parse_identity(cert: &IdentityCertificate) -> DisplayableIdentity {
-        let type_id = cert.type_base64();
-        let known_type = KnownCertificateType::from_type_id(&type_id);
-        let decrypted = &cert.decrypted_fields;
-        let certifier_info = &cert.certifier_info;
+        Self::displayable(
+            &cert.certificate.certificate_type,
+            &cert.certificate.subject,
+            &cert.decrypted_fields,
+            &cert.certifier_info,
+        )
+    }
+
+    /// A revealed certificate the lookup parsers read, displayed.
+    fn parse_revealed(cert: &RevealedCertificate) -> DisplayableIdentity {
+        Self::displayable(
+            &cert.type_base64(),
+            &cert.subject_hex(),
+            &cert.decrypted_fields,
+            &cert.certifier_info,
+        )
+    }
+
+    fn displayable(
+        type_id: &str,
+        subject: &str,
+        decrypted: &IndexMap<String, String>,
+        certifier_info: &IdentityCertifier,
+    ) -> DisplayableIdentity {
+        let known_type = KnownCertificateType::from_type_id(type_id);
 
         let (name, avatar_url, badge_label, badge_icon_url, badge_click_url) = match known_type {
             Some(KnownCertificateType::XCert) => {
@@ -217,18 +246,17 @@ impl<W: WalletInterface> IdentityClient<W> {
             }
         };
 
-        // Build abbreviated key
-        let subject = cert.subject_hex();
-        let abbreviated_key = if subject.len() > 10 {
-            format!("{}...", &subject[..10])
-        } else {
-            subject.clone()
+        // Build abbreviated key: the leading ten characters (the subject is a
+        // caller's text since #843, so the cut is by character, never a byte)
+        let abbreviated_key = match subject.char_indices().nth(10) {
+            Some((cut, _)) => format!("{}...", &subject[..cut]),
+            None => subject.to_string(),
         };
 
         DisplayableIdentity {
             name,
             avatar_url,
-            identity_key: subject,
+            identity_key: subject.to_string(),
             abbreviated_key,
             badge_icon_url,
             badge_label,
@@ -239,7 +267,7 @@ impl<W: WalletInterface> IdentityClient<W> {
     /// Try to parse identity information from unknown certificate types.
     fn try_parse_generic_identity(
         decrypted: &IndexMap<String, String>,
-        certifier_info: &CertifierInfo,
+        certifier_info: &IdentityCertifier,
     ) -> (String, String, String, String, String) {
         // Try to find a name from common field patterns
         let name = decrypted
@@ -644,7 +672,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
         Ok(trust::ordered_by_trust(certificates)
             .iter()
-            .map(Self::parse_identity)
+            .map(Self::parse_revealed)
             .collect())
     }
 
@@ -729,7 +757,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                         if let Some(contact) = contacts_map.get(&subject) {
                             identities.push(contact.to_displayable_identity());
                         } else {
-                            identities.push(Self::parse_identity(&cert));
+                            identities.push(Self::parse_revealed(&cert));
                         }
                     }
                 }
@@ -931,7 +959,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         Ok(certificates
             .into_iter()
             .map(|cert| IdentityResolutionResult {
-                identity: Self::parse_identity(&cert),
+                identity: Self::parse_revealed(&cert),
                 certificates: vec![cert.certificate],
             })
             .collect())
@@ -992,7 +1020,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     async fn parse_output_to_certificate(
         &self,
         output: &OutputListItem,
-    ) -> Result<Option<IdentityCertificate>> {
+    ) -> Result<Option<RevealedCertificate>> {
         // Step 1: The BEEF's subject (#721) under the reference's evidence
         // check, a refused one skipped, a limit the discovery's refusal
         // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730)
@@ -1037,7 +1065,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let keyring = record.maps.keyring;
 
         // Create the verifiable certificate with the keyring
-        let mut verifiable_cert = VerifiableCertificate::new(certificate, keyring.clone());
+        let mut verifiable_cert = VerifiableCertificate::new(certificate, keyring);
 
         // Step 7: Verify the certificate signature
         match verifiable_cert.verify() {
@@ -1055,18 +1083,17 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .unwrap_or_default();
 
         // Step 9: Build certifier info (default for now, could be enhanced via registry lookup)
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "SocialCert".to_string(),
             icon_url: "https://socialcert.net/favicon.ico".to_string(),
             description: "Social identity verification".to_string(),
             trust: 5,
         };
 
-        // Step 10: Create and return the IdentityCertificate
-        Ok(Some(IdentityCertificate {
+        // Step 10: Create and return the revealed certificate
+        Ok(Some(RevealedCertificate {
             certificate: verifiable_cert,
             certifier_info,
-            publicly_revealed_keyring: keyring,
             decrypted_fields,
         }))
     }
@@ -1162,7 +1189,7 @@ mod tests {
             "https://example.com/avatar.png".to_string(),
         );
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "SocialCert".to_string(),
             icon_url: "https://socialcert.net/icon.png".to_string(),
             description: "Social verification".to_string(),
@@ -1188,7 +1215,7 @@ mod tests {
         decrypted.insert("firstName".to_string(), "Alice".to_string());
         decrypted.insert("lastName".to_string(), "Smith".to_string());
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "TestCert".to_string(),
             icon_url: "https://test.com/icon.png".to_string(),
             description: "Test".to_string(),
@@ -1210,7 +1237,7 @@ mod tests {
     #[test]
     fn test_parse_identity_no_fields() {
         let decrypted = IndexMap::new();
-        let certifier_info = CertifierInfo::default();
+        let certifier_info = crate::identity::types::unknown_certifier();
 
         let (name, avatar, badge, icon, click_url) =
             IdentityClient::<crate::wallet::ProtoWallet>::try_parse_generic_identity(
@@ -1312,7 +1339,7 @@ mod tests {
         let mut decrypted = IndexMap::new();
         decrypted.insert("email".to_string(), "alice@example.com".to_string());
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "Email Certifier".to_string(),
             icon_url: "https://email-certifier.com/icon.png".to_string(),
             description: "Email verification".to_string(),
@@ -1339,7 +1366,7 @@ mod tests {
         let mut decrypted = IndexMap::new();
         decrypted.insert("phoneNumber".to_string(), "+1-555-123-4567".to_string());
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "Phone Certifier".to_string(),
             icon_url: "https://phone-certifier.com/icon.png".to_string(),
             description: "Phone verification".to_string(),
@@ -1367,7 +1394,7 @@ mod tests {
             "https://example.com/john.png".to_string(),
         );
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "IdentiCert".to_string(),
             icon_url: "https://identicert.com/icon.png".to_string(),
             description: "Government ID verification".to_string(),
@@ -1397,7 +1424,7 @@ mod tests {
             "https://example.org/icon.png".to_string(),
         );
 
-        let certifier_info = CertifierInfo {
+        let certifier_info = IdentityCertifier {
             name: "Registrant Certifier".to_string(),
             icon_url: "https://registrant.com/icon.png".to_string(),
             description: "Organization registration".to_string(),
@@ -1619,22 +1646,6 @@ mod tests {
         let attrs_map = query.attributes.as_ref().unwrap();
         assert_eq!(attrs_map.get("firstName"), Some(&"John".to_string()));
         assert_eq!(attrs_map.get("lastName"), Some(&"Doe".to_string()));
-    }
-
-    // =========================================================================
-    // CertifierInfo tests
-    // =========================================================================
-
-    #[test]
-    fn test_certifier_info_default() {
-        let info = CertifierInfo::default();
-
-        // Default certifier info should have reasonable defaults
-        assert_eq!(info.name, "Unknown Certifier");
-        assert_eq!(info.description, "No information available");
-        assert_eq!(info.trust, 0);
-        // Icon URL should use default badge icon
-        assert!(!info.icon_url.is_empty());
     }
 
     // =========================================================================

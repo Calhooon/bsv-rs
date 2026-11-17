@@ -162,7 +162,6 @@ pub use types::{
     AuthenticatedResult,
     // Basket types
     BasketInsertion,
-    Certificate,
     CertificateResult,
     // Security and protocols
     Counterparty,

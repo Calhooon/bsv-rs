@@ -19,7 +19,7 @@
 //! Also `query`'s filter (#746): a certificate is kept only when it matches
 //! every field its question carries, the attributes since #751.
 
-use crate::identity::types::{IdentityCertificate, IdentityQuery};
+use crate::identity::types::{IdentityQuery, RevealedCertificate};
 use indexmap::IndexMap;
 use regex::Regex;
 use std::sync::OnceLock;
@@ -37,7 +37,7 @@ const STOP_WORDS: &str = " a about above after again against all am an and any a
 /// lower-cased against the asked text lower-cased, the attributes by
 /// [`keeps`] over the decrypted fields; a field the question does not carry
 /// filters nothing.
-pub(super) fn is_asked(cert: &IdentityCertificate, query: &IdentityQuery) -> bool {
+pub(super) fn is_asked(cert: &RevealedCertificate, query: &IdentityQuery) -> bool {
     let verifiable = &cert.certificate;
     query
         .identity_key

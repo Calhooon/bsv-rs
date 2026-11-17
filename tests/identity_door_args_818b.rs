@@ -351,12 +351,7 @@ fn proven_spend(byte: &str, lock: LockingScript) -> Vec<u8> {
 /// question carrying the text as given; until #818b the padded key dropped it.
 #[tokio::test]
 async fn a_padded_or_upper_case_key_keeps_its_subjects_certificate_818b() {
-    let output = || OutputListItem {
-        beef: proven_spend("11", token_of("reference")),
-        output_index: 0,
-        context: None,
-        txid: None,
-    };
+    let output = || OutputListItem::new(proven_spend("11", token_of("reference")), 0);
     let (client, _) = client_answering(vec![output()]);
     let all = client.query(IdentityQuery::default()).await.unwrap();
     assert_eq!(all.len(), 1);

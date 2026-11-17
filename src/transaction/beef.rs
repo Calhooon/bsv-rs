@@ -56,7 +56,24 @@ use collect::AfterFrame;
 pub use link::{BeefLinkBudget, BeefLinkLimits, LinkedTransaction};
 
 /// Result of sorting transactions in a BEEF.
+///
+/// An answer this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test double's)
+/// with [`SortResult::new`] and the `with_` setters.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::SortResult) -> bsv_rs::transaction::SortResult {
+///     bsv_rs::transaction::SortResult { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::SortResult) -> bsv_rs::transaction::SortResult {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct SortResult {
     /// TXIDs of inputs that are missing from the BEEF.
     pub missing_inputs: Vec<String>,
@@ -70,13 +87,88 @@ pub struct SortResult {
     pub txid_only: Vec<String>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(SortResult, bsv_rs::transaction::SortResult);
+
+impl SortResult {
+    /// An empty result: no list holds a txid.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the txids of the inputs missing from the BEEF.
+    #[must_use]
+    pub fn with_missing_inputs(mut self, txids: Vec<String>) -> Self {
+        self.missing_inputs = txids;
+        self
+    }
+
+    /// Sets the txids of the transactions that are not valid.
+    #[must_use]
+    pub fn with_not_valid(mut self, txids: Vec<String>) -> Self {
+        self.not_valid = txids;
+        self
+    }
+
+    /// Sets the txids of the valid transactions.
+    #[must_use]
+    pub fn with_valid(mut self, txids: Vec<String>) -> Self {
+        self.valid = txids;
+        self
+    }
+
+    /// Sets the txids of the transactions that have missing inputs.
+    #[must_use]
+    pub fn with_with_missing_inputs(mut self, txids: Vec<String>) -> Self {
+        self.with_missing_inputs = txids;
+        self
+    }
+
+    /// Sets the txids of the txid-only entries.
+    #[must_use]
+    pub fn with_txid_only(mut self, txids: Vec<String>) -> Self {
+        self.txid_only = txids;
+        self
+    }
+}
+
 /// Result of BEEF validation.
+///
+/// An answer this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test double's)
+/// with [`BeefValidationResult::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::BeefValidationResult) -> bsv_rs::transaction::BeefValidationResult {
+///     bsv_rs::transaction::BeefValidationResult { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::BeefValidationResult) -> bsv_rs::transaction::BeefValidationResult {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct BeefValidationResult {
     /// Whether the BEEF is structurally valid.
     pub valid: bool,
     /// Merkle roots keyed by block height (to be verified by chain tracker).
     pub roots: HashMap<u32, String>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(
+    BeefValidationResult,
+    bsv_rs::transaction::BeefValidationResult
+);
+
+impl BeefValidationResult {
+    /// The verdict and the merkle roots it rests on, keyed by block height.
+    #[must_use]
+    pub fn new(valid: bool, roots: HashMap<u32, String>) -> Self {
+        Self { valid, roots }
+    }
 }
 
 /// Memory hints for [`Beef::from_binary_with_limits`]: how many entries of

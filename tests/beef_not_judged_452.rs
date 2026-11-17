@@ -166,15 +166,11 @@ fn spending(case: Case) -> Transaction {
     tx
 }
 
-#[allow(deprecated)] // Set a disagreeing copy deliberately; supplied ChainParams supersede it (#451).
-fn tip(height: u32, obsolete_genesis: u32) -> ChainTip {
-    ChainTip {
-        height,
-        median_time_past: 0,
-        genesis_height: obsolete_genesis,
-        csv_height: 0,
-        next_block_time: None,
-    }
+/// The tip at `height`. It names no Genesis height since #843 (its copy,
+/// deprecated by #451, is removed), so nothing in it can disagree with the
+/// chain parameters these tests supply.
+fn tip(height: u32) -> ChainTip {
+    ChainTip::new(height, 0).with_csv_height(0)
 }
 
 fn chain(case: Case) -> ChainParams {
@@ -234,7 +230,7 @@ impl AsyncByteSource for Chunk {
 
 async fn stream_case(case: Case) {
     let tx = spending(case);
-    for tip in [Some(tip(case.tip_height(), GENESIS)), None] {
+    for tip in [Some(tip(case.tip_height())), None] {
         if matches!(case, Case::Tip | Case::Spend) && tip.is_none() {
             continue;
         }
@@ -268,7 +264,7 @@ async fn stream_case(case: Case) {
 
 async fn whole_case(case: Case) {
     let tx = spending(case);
-    for tip in [Some(tip(case.tip_height(), GENESIS)), None] {
+    for tip in [Some(tip(case.tip_height())), None] {
         if matches!(case, Case::Tip | Case::Spend) && tip.is_none() {
             continue;
         }
@@ -324,7 +320,7 @@ async fn a_zero_activation_is_not_judged_by_the_whole_path_452() {
 #[tokio::test]
 async fn chain_params_alone_decide_when_the_tip_disagrees_451() {
     let tx = spending(Case::Tip);
-    let tracker = tracker(&tx, Some(tip(CHRONICLE, u32::MAX)));
+    let tracker = tracker(&tx, Some(tip(CHRONICLE)));
     assert!(tx
         .verify_with_chain_params(&tracker, None, None, &ChainParams::mainnet())
         .await
@@ -337,13 +333,14 @@ async fn chain_params_alone_decide_when_the_tip_disagrees_451() {
             .is_valid()
     );
 
-    // P2SH output rejection previously read the obsolete field, even though
-    // the input's word already read ChainParams. Exercise that distinct site.
+    // P2SH output rejection once read the tip's copy of the Genesis height
+    // (removed with #843), even though the input's word already read
+    // ChainParams. Exercise that distinct site.
     let mut p2sh = tx.clone();
     p2sh.outputs_mut()[0].locking_script =
         LockingScript::from_hex("a914000000000000000000000000000000000000000087").unwrap();
-    for (height, obsolete, refused) in [(GENESIS - 1, u32::MAX, true), (GENESIS - 2, 1, false)] {
-        let tracker = tracker_for_p2sh(&p2sh, height, obsolete);
+    for (height, refused) in [(GENESIS - 1, true), (GENESIS - 2, false)] {
+        let tracker = tracker_for_p2sh(&p2sh, height);
         let verdict = StreamVerifier::new(p2sh.to_beef(false).unwrap().as_slice(), &tracker, None)
             .with_chain_params(ChainParams::mainnet())
             .run()
@@ -362,14 +359,14 @@ async fn chain_params_alone_decide_when_the_tip_disagrees_451() {
     }
 }
 
-fn tracker_for_p2sh(tx: &Transaction, height: u32, obsolete: u32) -> MockChainTracker {
-    tracker(tx, Some(tip(height, obsolete)))
+fn tracker_for_p2sh(tx: &Transaction, height: u32) -> MockChainTracker {
+    tracker(tx, Some(tip(height)))
 }
 
 #[tokio::test]
 async fn a_not_judged_error_names_the_unproven_ancestor_452() {
     let ancestor = spending(Case::Coin);
-    let tracker = tracker(&ancestor, Some(tip(CHRONICLE, GENESIS)));
+    let tracker = tracker(&ancestor, Some(tip(CHRONICLE)));
     let mut root = Transaction::new();
     let mut input = TransactionInput::with_source_transaction(ancestor.clone(), 0);
     input.set_unlocking_script(UnlockingScript::new());
@@ -391,7 +388,7 @@ async fn a_not_judged_error_names_the_unproven_ancestor_452() {
 async fn an_out_of_scope_word_precedes_a_missing_unlocking_script_452() {
     let mut tx = spending(Case::Coin);
     tx.inputs_mut()[1].unlocking_script = None;
-    let tracker = tracker(&tx, Some(tip(CHRONICLE, GENESIS)));
+    let tracker = tracker(&tx, Some(tip(CHRONICLE)));
     let error = tx
         .verify_with_chain_params(&tracker, None, None, &ChainParams::mainnet())
         .await

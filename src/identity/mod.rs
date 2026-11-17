@@ -100,12 +100,13 @@ pub use types::{
     BroadcastSuccess,
     CertificateFieldNameUnder50Bytes,
     // Core types
-    CertifierInfo,
     Contact,
     ContactsManagerConfig,
     DefaultIdentityValues,
     DisplayableIdentity,
+    // The wallet's discovery record and its certifier, re-exported (#843)
     IdentityCertificate,
+    IdentityCertifier,
     IdentityClientConfig,
     IdentityQuery,
     IdentityResolutionResult,

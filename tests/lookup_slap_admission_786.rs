@@ -94,12 +94,7 @@ fn advertisement(host: &str, satoshis: u64) -> (String, OutputListItem) {
         .expect("the bytes are one transaction");
     (
         txid,
-        OutputListItem {
-            beef: beef.to_binary().expect("the BEEF is writable"),
-            output_index: 0,
-            context: None,
-            txid: None,
-        },
+        OutputListItem::new(beef.to_binary().expect("the BEEF is writable"), 0),
     )
 }
 
@@ -197,12 +192,8 @@ async fn the_reference_recorded_admissions_are_this_crates_786() {
             Some(case["satoshis"].as_u64().unwrap()),
             "{name}"
         );
-        let output = OutputListItem {
-            beef,
-            output_index: case["output_index"].as_u64().unwrap() as u32,
-            context: None,
-            txid: case["hint"].as_str().map(str::to_string),
-        };
+        let mut output = OutputListItem::new(beef, case["output_index"].as_u64().unwrap() as u32);
+        output.txid = case["hint"].as_str().map(str::to_string);
         let expected: Vec<String> = case["hosts"]
             .as_array()
             .unwrap()

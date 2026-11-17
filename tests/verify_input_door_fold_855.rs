@@ -512,12 +512,16 @@ fn evaluation(message: &str, limit: Option<ScriptResourceLimit>) -> Box<ScriptEv
     })
 }
 
-const WORK: ScriptResourceLimit = ScriptResourceLimit {
-    resource: ScriptResource::Work,
-    limit: 3,
-    attempted: 4,
-    work_spent: Some(3),
-};
+const WORK: ScriptResourceLimit =
+    ScriptResourceLimit::new(ScriptResource::Work, 3, 4).with_work_spent(3);
+
+/// `WORK` with one field changed: the record is `#[non_exhaustive]`, so a
+/// functional update of it does not compile outside the crate.
+fn work_with(change: fn(&mut ScriptResourceLimit)) -> ScriptResourceLimit {
+    let mut limit = WORK;
+    change(&mut limit);
+    limit
+}
 
 #[test]
 fn refusals_that_differ_compare_unequal_855() {
@@ -532,30 +536,15 @@ fn refusals_that_differ_compare_unequal_855() {
 
     let declined = |limit| InputRefusal::Declined(evaluation("w", Some(limit)));
     assert_eq!(declined(WORK), declined(WORK));
+    assert_ne!(declined(WORK), declined(work_with(|l| l.limit = 4)));
+    assert_ne!(declined(WORK), declined(work_with(|l| l.attempted = 5)));
     assert_ne!(
         declined(WORK),
-        declined(ScriptResourceLimit { limit: 4, ..WORK })
+        declined(work_with(|l| l.work_spent = Some(2)))
     );
     assert_ne!(
         declined(WORK),
-        declined(ScriptResourceLimit {
-            attempted: 5,
-            ..WORK
-        })
-    );
-    assert_ne!(
-        declined(WORK),
-        declined(ScriptResourceLimit {
-            work_spent: Some(2),
-            ..WORK
-        })
-    );
-    assert_ne!(
-        declined(WORK),
-        declined(ScriptResourceLimit {
-            resource: ScriptResource::Stack,
-            ..WORK
-        })
+        declined(work_with(|l| l.resource = ScriptResource::Stack))
     );
 
     // One error, two arms.
@@ -584,9 +573,12 @@ fn refusals_that_differ_compare_unequal_855() {
 // equality, whose four fields have rows of their own. One row per field: two
 // refusals differing in that field alone compare unequal, and two built alike
 // equal. The rows are checked against the destructure in the source (a field
-// added there without a row fails `every_compared_field_has_a_row_855`), and
-// `evaluation_fields` destructures `ScriptEvaluationError` exhaustively here,
-// so a field added to the type fails this file's build until it has a row.
+// added there without a row fails `every_compared_field_has_a_row_855`; the
+// source's destructure is exhaustive, so a field added to the type fails the
+// crate's build until it is compared), and against `ScriptResourceLimit`'s
+// declared fields, read from its source. Both records are `#[non_exhaustive]`
+// since #843, so no destructure in this file can be exhaustive (two were,
+// until then): the two source reads hold the rows.
 
 /// The base every evaluation row changes one field of: every field set to a
 /// value no row's change produces.
@@ -608,23 +600,12 @@ fn base_evaluation() -> ScriptEvaluationError {
 
 type EvaluationChange = fn(&mut ScriptEvaluationError);
 
-/// One change per field of `ScriptEvaluationError`, by its name. The
-/// destructure names every field, so a field added to the type does not
-/// compile here until a row for it is written.
+/// One change per field of `ScriptEvaluationError`, by its name. The record
+/// is `#[non_exhaustive]` since #843, so no destructure here can name every
+/// field (until then one did, and held this file's build); a field added to
+/// the type is caught by `every_compared_field_has_a_row_855`, which reads
+/// the source's own exhaustive destructure.
 fn evaluation_fields() -> Vec<(&'static str, EvaluationChange)> {
-    let ScriptEvaluationError {
-        message: _,
-        source_txid: _,
-        source_output_index: _,
-        context: _,
-        program_counter: _,
-        stack: _,
-        alt_stack: _,
-        if_stack: _,
-        stack_mem: _,
-        alt_stack_mem: _,
-        resource_limit: _,
-    } = base_evaluation();
     vec![
         ("message", |e| e.message = "x".into()),
         ("source_txid", |e| e.source_txid = "bb".repeat(32)),
@@ -640,35 +621,22 @@ fn evaluation_fields() -> Vec<(&'static str, EvaluationChange)> {
     ]
 }
 
-/// The nested fields of `resource_limit`, compared by the derived equality.
+/// The nested fields of `resource_limit`, compared by the derived equality:
+/// one row per field `ScriptResourceLimit` declares (`declared_resource_fields`
+/// reads them from its source, the record being `#[non_exhaustive]` since #843).
 fn resource_fields() -> Vec<(&'static str, EvaluationChange)> {
-    let ScriptResourceLimit {
-        resource: _,
-        limit: _,
-        attempted: _,
-        work_spent: _,
-    } = WORK;
     vec![
         ("resource_limit.resource", |e| {
-            e.resource_limit = Some(ScriptResourceLimit {
-                resource: ScriptResource::Stack,
-                ..WORK
-            })
+            e.resource_limit = Some(work_with(|l| l.resource = ScriptResource::Stack))
         }),
         ("resource_limit.limit", |e| {
-            e.resource_limit = Some(ScriptResourceLimit { limit: 4, ..WORK })
+            e.resource_limit = Some(work_with(|l| l.limit = 4))
         }),
         ("resource_limit.attempted", |e| {
-            e.resource_limit = Some(ScriptResourceLimit {
-                attempted: 5,
-                ..WORK
-            })
+            e.resource_limit = Some(work_with(|l| l.attempted = 5))
         }),
         ("resource_limit.work_spent", |e| {
-            e.resource_limit = Some(ScriptResourceLimit {
-                work_spent: Some(2),
-                ..WORK
-            })
+            e.resource_limit = Some(work_with(|l| l.work_spent = Some(2)))
         }),
     ]
 }
@@ -771,6 +739,25 @@ fn destructured_fields() -> Vec<String> {
         .collect()
 }
 
+/// The fields `ScriptResourceLimit` declares in its source, in order.
+fn declared_resource_fields() -> Vec<String> {
+    let source = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/script/evaluation_error.rs"
+    ))
+    .expect("the record's source");
+    let open = source
+        .find("pub struct ScriptResourceLimit {")
+        .expect("the record's declaration");
+    let close = source[open..].find("\n}\n").expect("the record's end") + open;
+    source[open..close]
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("pub "))
+        .filter_map(|field| field.split_once(':'))
+        .map(|(name, _)| name.trim().to_string())
+        .collect()
+}
+
 #[test]
 fn every_compared_field_has_a_row_855() {
     let destructured = destructured_fields();
@@ -791,6 +778,16 @@ fn every_compared_field_has_a_row_855() {
             "same_evaluation compares {field}"
         );
     }
+    // The nested record's declared fields are this file's resource rows.
+    let declared: Vec<String> = declared_resource_fields()
+        .into_iter()
+        .map(|field| format!("resource_limit.{field}"))
+        .collect();
+    let named: Vec<&str> = resource_fields().into_iter().map(|(f, _)| f).collect();
+    assert_eq!(
+        declared, named,
+        "ScriptResourceLimit's declared fields and this file's resource rows"
+    );
     // The table: four refusal-level rows, each evaluation field and each
     // nested resource field under both evaluation arms.
     assert_eq!(destructured.len(), 11);

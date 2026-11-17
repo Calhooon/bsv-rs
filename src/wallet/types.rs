@@ -171,7 +171,14 @@ pub const MAX_SATOSHIS: u64 = 2_100_000_000_000_000;
 // Network
 // =============================================================================
 
-/// The Bitcoin network.
+/// The Bitcoin network a wallet answers `getNetwork` with: the reference's
+/// `WalletNetwork`, `'mainnet' | 'testnet'` (`Wallet.interfaces.ts:219`).
+///
+/// Declared beside `compat::bip32::Network` on purpose (#843): that one
+/// selects an extended key's version bytes and lives under `compat`, a
+/// feature that does not depend on `wallet`; go-sdk keeps the same two
+/// apart (`wallet/interfaces.go:641`, `primitives/ec/privatekey.go:28` at
+/// `2ca481c`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Network {
@@ -258,6 +265,14 @@ impl TryFrom<u8> for SecurityLevel {
 /// - Lowercase letters, numbers, and single spaces only
 /// - Cannot contain consecutive spaces
 /// - Cannot end with " protocol"
+///
+/// Declared beside `overlay::Protocol` on purpose (#843): this is the
+/// reference's `WalletProtocol`, a `[level, name]` pair
+/// (`Wallet.interfaces.ts:244`), that one its `OverlayDiscoveryProtocol`,
+/// `'SHIP' | 'SLAP'` (`OverlayAdminTokenTemplate.ts:21`); go-sdk keeps the
+/// same two apart by package (`wallet/wallet.go:26`, `overlay/overlay.go:15`
+/// at `2ca481c`). A value built by literal on purpose: its two fields are
+/// the pair.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Protocol {
@@ -763,32 +778,6 @@ pub enum AcquisitionProtocol {
     /// Acquire via issuance.
     Issuance,
 }
-}
-
-/// A wallet certificate.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Certificate {
-    /// Certificate type (base64 encoded).
-    pub certificate_type: String,
-    /// Subject's public key (hex).
-    pub subject: PublicKey,
-    /// Serial number (base64 encoded).
-    pub serial_number: String,
-    /// Certifier's public key (hex).
-    pub certifier: PublicKey,
-    /// Revocation outpoint (optional).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub revocation_outpoint: Option<Outpoint>,
-    /// Certificate fields.
-    pub fields: indexmap::IndexMap<String, String>,
-    /// Signature (hex encoded).
-    #[serde(
-        with = "hex_bytes_option",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
-    pub signature: Option<Vec<u8>>,
 }
 
 /// Keyring revealer for certificates: `'certifier'` or the key's hex in JSON

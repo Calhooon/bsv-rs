@@ -110,17 +110,12 @@ impl Headers for Tipped {
     }
 }
 
-/// `finality/threshold-500000000`'s network (genesis at 10, CSV at 5: the
-/// candidate's cutoff is the tip's median time past) at a tip.
-#[allow(deprecated)] // The default path still reads ChainTip's Genesis height (#451).
+/// `finality/threshold-500000000`'s network (CSV at 5: the candidate's
+/// cutoff is the tip's median time past) at a tip. The tip names no Genesis
+/// height since #843 (the row's network has it at 10): the default path
+/// judges by mainnet's, which no verdict here rests on.
 fn tip(height: u32, median_time_past: u32) -> ChainTip {
-    ChainTip {
-        height,
-        median_time_past,
-        genesis_height: 10,
-        csv_height: 5,
-        next_block_time: None,
-    }
+    ChainTip::new(height, median_time_past).with_csv_height(5)
 }
 
 // ---------------------------------------------------------------------------
@@ -253,14 +248,7 @@ fn a_child_ahead_of_its_parent_is_released_by_it_beef_026() {
     assert_eq!(checked(&verdict), headers);
     // The child, mined at 170, spends block 9's coinbase: a tip at 169
     // (mainnet's activation heights) for its maturity.
-    #[allow(deprecated)] // The default path still reads ChainTip's Genesis height (#451).
-    let at_170 = ChainTip {
-        height: 169,
-        median_time_past: 1_231_731_025,
-        genesis_height: 620_538,
-        csv_height: 419_328,
-        next_block_time: None,
-    };
+    let at_170 = ChainTip::new(169, 1_231_731_025);
     let (verdict, _) = read(StreamVerifier::new(
         &bytes[..],
         Tipped(headers.clone(), at_170),

@@ -20,7 +20,25 @@ use super::{Outpoint, ReviewActionResult, SendWithResult, TxId};
 /// HTTP JSON substrate reads all five from a wallet's code-5 body
 /// (`HTTPWalletJSON.ts:199-241`); the binary wire carries the class and
 /// its words alone, as the reference's does.
+///
+/// A record that has grown (four members with #339), so it is
+/// `#[non_exhaustive]` (#843): build it with [`ReviewActionsRefusal::new`]
+/// or [`ReviewActionsRefusal::with_members`] and the `with_` setters; the
+/// fields stay readable, and a pattern over it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::wallet::ReviewActionsRefusal) -> bsv_rs::wallet::ReviewActionsRefusal {
+///     bsv_rs::wallet::ReviewActionsRefusal { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::wallet::ReviewActionsRefusal) -> bsv_rs::wallet::ReviewActionsRefusal {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ReviewActionsRefusal {
     /// The wallet's words; the reference's are `Undelayed createAction or
     /// signAction results require review.`
@@ -36,6 +54,11 @@ pub struct ReviewActionsRefusal {
     /// A noSend createAction's change outpoints (`noSendChange`, #339).
     pub no_send_change: Option<Vec<Outpoint>>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    ReviewActionsRefusal,
+    bsv_rs::wallet::ReviewActionsRefusal
+);
 
 /// The reference's words (`WERR_REVIEW_ACTIONS.ts:24`).
 const REVIEW_ACTIONS_WORDS: &str = "Undelayed createAction or signAction results require review.";
@@ -66,5 +89,40 @@ impl ReviewActionsRefusal {
             tx,
             no_send_change,
         }
+    }
+
+    /// Sets the wallet's words.
+    #[must_use]
+    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+        self.message = message.into();
+        self
+    }
+
+    /// Sets the batch's send results (`sendWithResults`).
+    #[must_use]
+    pub fn with_send_with_results(mut self, send_with_results: Vec<SendWithResult>) -> Self {
+        self.send_with_results = send_with_results;
+        self
+    }
+
+    /// Sets the transaction the action made (`txid`).
+    #[must_use]
+    pub fn with_txid(mut self, txid: TxId) -> Self {
+        self.txid = Some(txid);
+        self
+    }
+
+    /// Sets the action's atomic BEEF (`tx`).
+    #[must_use]
+    pub fn with_tx(mut self, tx: Vec<u8>) -> Self {
+        self.tx = Some(tx);
+        self
+    }
+
+    /// Sets a noSend createAction's change outpoints (`noSendChange`).
+    #[must_use]
+    pub fn with_no_send_change(mut self, no_send_change: Vec<Outpoint>) -> Self {
+        self.no_send_change = Some(no_send_change);
+        self
     }
 }

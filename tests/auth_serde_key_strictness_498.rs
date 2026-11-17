@@ -15,7 +15,7 @@
 use bsv_rs::auth::certificates::Certificate;
 use bsv_rs::auth::types::{AuthMessage, PeerSession};
 use bsv_rs::primitives::PrivateKey;
-use bsv_rs::wallet::types::{Certificate as WalletCertificate, KeyringRevealer};
+use bsv_rs::wallet::types::KeyringRevealer;
 use bsv_rs::wallet::KeyLinkageResult;
 use serde_json::{json, Value};
 
@@ -188,20 +188,4 @@ fn a_peer_session_identity_key_in_a_lenient_form_is_refused_498() {
     session.peer_identity_key = Some(PrivateKey::random().public_key());
     let json = serde_json::to_value(session).unwrap();
     refuses_each_member::<PeerSession>(json, &["peerIdentityKey"], "PeerSession");
-}
-
-#[test]
-fn a_wallet_certificate_subject_or_certifier_in_a_lenient_form_is_refused_498() {
-    let key = PrivateKey::random().public_key();
-    let json = serde_json::to_value(WalletCertificate {
-        certificate_type: "AQ==".into(),
-        subject: key.clone(),
-        serial_number: "Ag==".into(),
-        certifier: key,
-        revocation_outpoint: None,
-        fields: Default::default(),
-        signature: None,
-    })
-    .unwrap();
-    refuses_each_member::<WalletCertificate>(json, &["subject", "certifier"], "wallet Certificate");
 }

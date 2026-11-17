@@ -103,12 +103,10 @@ pub async fn setup(global: bool, count: usize) -> Harness {
     let mut beef = Beef::new();
     for (tx, index) in &sources {
         beef.merge_transaction(tx.clone());
-        lookup.lock().unwrap().push(OutputListItem {
-            beef: tx.to_beef(true).unwrap(),
-            output_index: *index,
-            context: None,
-            txid: None,
-        });
+        lookup
+            .lock()
+            .unwrap()
+            .push(OutputListItem::new(tx.to_beef(true).unwrap(), *index));
     }
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
         total_outputs: count as u32,
@@ -310,12 +308,10 @@ pub async fn unrelated_tokens() -> Vec<OutputListItem> {
         (10, "kvstore", "alpha"),
     ] {
         let lock = unrelated_lock(scalar, namespace, key).await;
-        tokens.push(OutputListItem {
-            beef: source(&lock, 0, 1).to_beef(true).unwrap(),
-            output_index: 0,
-            context: None,
-            txid: None,
-        });
+        tokens.push(OutputListItem::new(
+            source(&lock, 0, 1).to_beef(true).unwrap(),
+            0,
+        ));
     }
     tokens
 }

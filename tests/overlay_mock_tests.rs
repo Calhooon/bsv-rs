@@ -806,12 +806,7 @@ async fn test_mock_broadcast_call_count_tracking() {
 async fn test_mock_lookup_output_list_response() {
     let mock = MockLookupFacilitator::new();
 
-    let output = OutputListItem {
-        beef: vec![0xbe, 0xef, 0x01],
-        output_index: 0,
-        context: Some(vec![0x42]),
-        txid: None,
-    };
+    let output = OutputListItem::new(vec![0xbe, 0xef, 0x01], 0).with_context(vec![0x42]);
     let answer = LookupAnswer::OutputList {
         outputs: vec![output],
     };

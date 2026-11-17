@@ -333,12 +333,7 @@ fn advertisement_at(
         MerklePath::new(900, vec![vec![MerklePathLeaf::new_txid(0, tx.id())]]).unwrap(),
     );
     beef.merge_raw_tx(tx.to_binary(), Some(index)).unwrap();
-    bsv_rs::overlay::OutputListItem {
-        beef: beef.to_binary().unwrap(),
-        output_index: 0,
-        context: None,
-        txid: None,
-    }
+    bsv_rs::overlay::OutputListItem::new(beef.to_binary().unwrap(), 0)
 }
 
 /// #815, the pin the cold re-read of PR #801 asked for: a tracker's share

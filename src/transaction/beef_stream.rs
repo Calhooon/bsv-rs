@@ -135,14 +135,32 @@ mod evaluation;
 mod not_judged_tests;
 mod reason;
 mod spends;
+mod tip;
 use budget::WorkSpent;
 use deferred::{read_held, write_held, Deferred, TxFields};
 pub use evaluation::verify_stream_two_pass_with_chain_params;
 use evaluation::Evaluation;
 pub use reason::{Kind, Reason};
+pub use tip::ChainTip;
 
 /// A refusal: the offset of the byte it names, and the reason.
+///
+/// An answer this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, build one with [`Refusal::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::Refusal) -> bsv_rs::transaction::Refusal {
+///     bsv_rs::transaction::Refusal { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::Refusal) -> bsv_rs::transaction::Refusal {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Refusal {
     /// The stream offset of the byte the refusal names.
     pub offset: u64,
@@ -150,8 +168,12 @@ pub struct Refusal {
     pub reason: Reason,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(Refusal, bsv_rs::transaction::Refusal);
+
 impl Refusal {
-    fn new(offset: u64, reason: Reason) -> Self {
+    /// The refusal of the byte at `offset` for `reason`.
+    #[must_use]
+    pub fn new(offset: u64, reason: Reason) -> Self {
         Self { offset, reason }
     }
 
@@ -1478,28 +1500,6 @@ impl<R: Read> Iterator for BeefStream<R> {
 // The headers
 // ---------------------------------------------------------------------------
 
-/// Header context for checking mining in the next block (since 0.5.0).
-/// The activation heights belong to the caller's network. After CSV activation,
-/// finality uses median time past; before it the candidate block's time is needed.
-/// \[SRC\] bsv-script-lean@87f0461 docs/BLOCK-CONSENSUS.md:83-88.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ChainTip {
-    /// Active chain tip's height.
-    pub height: u32,
-    /// Tip's median time past, in seconds.
-    pub median_time_past: u32,
-    /// Default stream path's Genesis height; supplied `ChainParams` supersede it.
-    #[deprecated(
-        since = "0.9.0-beta.4",
-        note = "Use block::ChainParams::genesis_height; ChainTip's copy still serves the default stream path until its removal at the next api-break, when the default path judges by mainnet's heights as the reference does: a caller on another chain supplies its ChainParams."
-    )]
-    pub genesis_height: u32,
-    /// This network's CSV activation height.
-    pub csv_height: u32,
-    /// Candidate block time, required only for time locks before CSV.
-    pub next_block_time: Option<u32>,
-}
-
 /// Active-chain roots and optional mining context. Missing roots fail closed;
 /// missing tip context declines checks that need it.
 pub trait Headers {
@@ -2110,15 +2110,10 @@ impl BeefIndex {
         let n_inputs = body.input_count();
         if self.check_spends && !seen {
             if bump_index.is_none() {
-                // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
-                #[allow(deprecated)]
-                // The default path honors the tip's copy until its removal (#451).
+                // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204. Without
+                // chain parameters the default path judges by mainnet's (#451).
                 let genesis_height = evaluation.chain.as_ref().map_or_else(
-                    || {
-                        tip.map_or(crate::block::ChainParams::mainnet().genesis_height, |t| {
-                            t.genesis_height
-                        })
-                    },
+                    || crate::block::ChainParams::mainnet().genesis_height,
                     |chain| chain.genesis_height,
                 );
                 let after_genesis =

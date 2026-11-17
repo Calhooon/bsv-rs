@@ -23,7 +23,7 @@
 //! arrives, `:355-359`, the certifier cache by identityKey, `:321-323`; the ask
 //! additive, grouping by the key's bytes; the row closes when it lands there).
 
-use crate::identity::types::IdentityCertificate;
+use crate::identity::types::RevealedCertificate;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
@@ -33,9 +33,9 @@ const MAX_IDENTITY_RESULTS: usize = 256;
 /// The asked subject's certificates as the trust step orders them: the
 /// leading 256, a repeat of a type, serial number and certifier dropped, then
 /// the most trusted certifier's ahead, ties in the answer's order.
-pub(super) fn ordered_by_trust(certificates: Vec<IdentityCertificate>) -> Vec<IdentityCertificate> {
+pub(super) fn ordered_by_trust(certificates: Vec<RevealedCertificate>) -> Vec<RevealedCertificate> {
     let mut seen = HashSet::new();
-    let mut kept: Vec<IdentityCertificate> = certificates
+    let mut kept: Vec<RevealedCertificate> = certificates
         .into_iter()
         .take(MAX_IDENTITY_RESULTS)
         .filter(|c| {
@@ -58,29 +58,28 @@ mod tests {
     use super::*;
     use crate::auth::certificates::Certificate;
     use crate::auth::VerifiableCertificate;
-    use crate::identity::types::CertifierInfo;
     use crate::primitives::PrivateKey;
+    use crate::wallet::IdentityCertifier;
     use indexmap::IndexMap;
 
-    fn cert(serial: u8, certifier: u8, trust: u8) -> IdentityCertificate {
+    fn cert(serial: u8, certifier: u8, trust: u8) -> RevealedCertificate {
         let key = |n: u8| {
             let mut bytes = [0u8; 32];
             bytes[31] = n;
             PrivateKey::from_bytes(&bytes).unwrap().public_key()
         };
         let certificate = Certificate::new([1; 32], [serial; 32], key(9), key(certifier));
-        IdentityCertificate {
+        RevealedCertificate {
             certificate: VerifiableCertificate::new(certificate, IndexMap::new()),
-            certifier_info: CertifierInfo {
+            certifier_info: IdentityCertifier {
                 trust,
-                ..Default::default()
+                ..crate::identity::types::unknown_certifier()
             },
-            publicly_revealed_keyring: IndexMap::new(),
             decrypted_fields: IndexMap::new(),
         }
     }
 
-    fn order(certificates: Vec<IdentityCertificate>) -> Vec<(u8, u8)> {
+    fn order(certificates: Vec<RevealedCertificate>) -> Vec<(u8, u8)> {
         ordered_by_trust(certificates)
             .iter()
             .map(|c| (c.certificate.serial_number()[0], c.certifier_info.trust))

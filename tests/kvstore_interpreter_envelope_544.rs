@@ -27,7 +27,11 @@ fn vector() -> Value {
 fn the_interpreter_reads_only_what_the_reference_interpreter_reads_544() {
     let v = vector();
     let kvstore = &v["kvstore"];
-    let ctx = KVStoreContext::new(kvstore["context"]["key"].as_str().unwrap(), "kvstore");
+    let ctx = KVStoreContext::new(
+        kvstore["context"]["key"].as_str().unwrap(),
+        "kvstore",
+        kvstore["context"]["controller"].as_str().unwrap(),
+    );
     let cases = kvstore["cases"].as_array().unwrap();
     assert_eq!(cases.len(), 7);
     for case in cases {

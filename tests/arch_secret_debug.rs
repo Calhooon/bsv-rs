@@ -173,11 +173,6 @@ const ALLOWED: &[(&str, &str, &str)] = &[
         "`avatar_url`, `badge_*_url`: the contact record's published image and link",
     ),
     (
-        "src/identity/types.rs",
-        "CertifierInfo",
-        "`icon_url`: a certifier's published icon",
-    ),
-    (
         "src/wallet/types.rs",
         "IdentityCertifier",
         "`icon_url`: a certifier's published icon (BRC-100 discovery result)",

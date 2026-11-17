@@ -732,11 +732,7 @@ fn the_http_shapes_holding_headers_print_no_header_value_but_the_public_ones() {
         body: vec![],
     };
     let options = AuthFetchOptions::default().with_headers(list.clone().into_iter().collect());
-    let answer = Response {
-        status: 200,
-        headers: list.clone().into_iter().collect(),
-        body: vec![],
-    };
+    let answer = Response::new(200, list.clone(), vec![]);
     let redacted = SECRET_HEADERS.len() * 3;
     let mut secrets = values.clone();
     secrets.push(query.clone());

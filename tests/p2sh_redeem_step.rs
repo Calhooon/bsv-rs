@@ -158,16 +158,9 @@ fn accepted_by_the_node() -> Vec<(&'static str, Transaction)> {
     ]
 }
 
-// `genesis_height` is mainnet's (a field deprecated on the 0.9.0 line).
-#[allow(deprecated)]
+// The tip is mainnet's: the default doors judge by mainnet's heights (#843).
 fn tracker(tx: &Transaction) -> MockChainTracker {
-    let tip = ChainTip {
-        height: NEXT_BLOCK - 1,
-        median_time_past: 1_700_000_000,
-        genesis_height: 620_538,
-        csv_height: 419_328,
-        next_block_time: None,
-    };
+    let tip = ChainTip::new(NEXT_BLOCK - 1, 1_700_000_000);
     let mut tracker = MockChainTracker::new(NEXT_BLOCK - 1).with_mining_tip(Some(tip));
     let parent = tx.inputs()[0].source_transaction.as_ref().unwrap();
     let proof = parent.merkle_path.as_ref().unwrap();

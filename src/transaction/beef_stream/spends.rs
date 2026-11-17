@@ -202,16 +202,11 @@ impl<T: TxFields> InputCheck<'_, T> {
     }
 
     /// GHSA-h4m7-c6p8-725m: in the default mode a coin the BUMP of its parent
-    /// proves below the tip's Genesis height (mainnet's without a tip) is
-    /// judged again as one created before Genesis; chain parameters judge
-    /// the era themselves.
-    #[allow(deprecated)] // ChainTip's copy serves the default path until the api-break.
+    /// proves below mainnet's Genesis height is judged again as one created
+    /// before Genesis (the tip names no Genesis height since #843, as #451
+    /// promised); chain parameters judge the era themselves.
     fn before_genesis(&self, coin_height: Option<u64>) -> bool {
-        let genesis = self
-            .tip
-            .map_or(crate::block::ChainParams::mainnet().genesis_height, |t| {
-                t.genesis_height
-            });
+        let genesis = crate::block::ChainParams::mainnet().genesis_height;
         self.evaluation.chain.is_none()
             && coin_height.is_some_and(|height| height < u64::from(genesis))
     }

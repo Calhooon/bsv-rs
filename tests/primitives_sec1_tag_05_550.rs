@@ -18,7 +18,7 @@
 use bsv_rs::auth::{validate_requested_certificate_set, Certificate, RequestedCertificateSet};
 use bsv_rs::compat::ecies;
 use bsv_rs::kvstore::{KVStoreContext, KVStoreInterpreter};
-use bsv_rs::primitives::{from_hex, PrivateKey, PublicKey};
+use bsv_rs::primitives::{from_hex, to_hex, PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
@@ -126,7 +126,9 @@ fn a_kvstore_token_whose_controller_field_is_tag_05_reads_no_value_550() {
     tx.add_input(TransactionInput::new("11".repeat(32), 0))
         .unwrap();
     tx.add_output(TransactionOutput::new(1, script)).unwrap();
-    let ctx = KVStoreContext::new("alpha", "kvstore");
+    // The context names the token's own controller field (`05 || x`), so the
+    // context is never the reason no value is read.
+    let ctx = KVStoreContext::new("alpha", "kvstore", read.controller_hex());
     assert!(KVStoreInterpreter::interpret(&tx, 0, Some(&ctx)).is_none());
 }
 
@@ -135,11 +137,15 @@ fn the_reference_kvstore_token_with_a_tag_05_key_reads_no_value_550() {
     for name in ["kvstore_lock_key", "kvstore_controller"] {
         assert_eq!(case(name)["words"], "Unknown point format", "{name}");
         let script = LockingScript::from_binary(&input(name)).unwrap();
+        // The token's own controller field (the lock, `OP_CHECKSIG`, then the
+        // protocol, the key, the value and the controller), so the context
+        // is never the reason no value is read.
+        let controller = to_hex(script.chunks()[5].data.as_deref().unwrap());
         let mut tx = Transaction::new();
         tx.add_input(TransactionInput::new("11".repeat(32), 0))
             .unwrap();
         tx.add_output(TransactionOutput::new(1, script)).unwrap();
-        let ctx = KVStoreContext::new("alpha", "kvstore");
+        let ctx = KVStoreContext::new("alpha", "kvstore", controller);
         assert!(
             KVStoreInterpreter::interpret(&tx, 0, Some(&ctx)).is_none(),
             "{name}"

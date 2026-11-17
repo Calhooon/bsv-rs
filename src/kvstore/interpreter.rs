@@ -47,29 +47,66 @@ fn parse_tags(bytes: &[u8]) -> Option<Vec<String>> {
     validate_tags(&serde_json::from_slice::<serde_json::Value>(bytes).ok()?).ok()
 }
 
-/// Context for KVStore interpreter operations.
+/// Context for KVStore interpreter operations: the reference's `KVContext`
+/// (`kvStoreInterpreter.ts:6-10` at `ts-stack@edf6e03` and at its head
+/// `11faa7d16`): the key, the protocol and the controller a token must match.
 ///
-/// Contains the key and protocol ID to match against when traversing history.
+/// A context block that grows, so it is `#[non_exhaustive]` (#843): build it
+/// with [`KVStoreContext::new`]; the fields stay readable, and a pattern over
+/// it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::kvstore::KVStoreContext) -> bsv_rs::kvstore::KVStoreContext {
+///     bsv_rs::kvstore::KVStoreContext { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::kvstore::KVStoreContext) -> bsv_rs::kvstore::KVStoreContext {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct KVStoreContext {
     /// The key to match.
     pub key: String,
     /// The protocol ID to match.
     pub protocol_id: String,
+    /// The controller to match: the hex of the token's controller key,
+    /// compared without regard to case, as the reference compares it
+    /// (`kvStoreInterpreter.ts:43`).
+    pub controller: String,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(KVStoreContext, bsv_rs::kvstore::KVStoreContext);
+
 impl KVStoreContext {
-    /// Creates a new context.
-    pub fn new(key: impl Into<String>, protocol_id: impl Into<String>) -> Self {
+    /// Creates a new context: the key, the protocol and the controller's key
+    /// in hex.
+    #[must_use]
+    pub fn new(
+        key: impl Into<String>,
+        protocol_id: impl Into<String>,
+        controller: impl Into<String>,
+    ) -> Self {
         Self {
             key: key.into(),
             protocol_id: protocol_id.into(),
+            controller: controller.into(),
         }
     }
 
-    /// Creates a cache key for history lookups.
+    /// Creates a cache key for history lookups: the protocol, the key and the
+    /// controller in lower case, every member the interpreter matches on.
+    #[must_use]
     pub fn cache_key(&self) -> String {
-        format!("{}:{}", self.protocol_id, self.key)
+        format!(
+            "{}:{}:{}",
+            self.protocol_id,
+            self.key,
+            self.controller.to_ascii_lowercase()
+        )
     }
 }
 
@@ -88,7 +125,10 @@ impl KVStoreInterpreter {
     ///
     /// * `tx` - The transaction containing the output
     /// * `output_index` - The index of the output to interpret
-    /// * `ctx` - Optional context for filtering (key and protocol_id to match)
+    /// * `ctx` - Optional context for filtering (the key, the protocol and
+    ///   the controller to match, as the reference's interpreter matches all
+    ///   three, `kvStoreInterpreter.ts:39-46`); `None` reads any token (this
+    ///   crate's own: the reference answers nothing without a context)
     ///
     /// # Returns
     ///
@@ -125,7 +165,8 @@ impl KVStoreInterpreter {
                 || serde_json::from_str::<(u8, String)>(&token.protocol_id_text).is_ok_and(
                     |(level, name)| level == SecurityLevel::App.as_u8() && name == ctx.protocol_id,
                 );
-            if ctx.key != token.key || !protocol_matches {
+            let controller_matches = token.controller.eq_ignore_ascii_case(&ctx.controller);
+            if ctx.key != token.key || !protocol_matches || !controller_matches {
                 return None;
             }
         }
@@ -346,7 +387,7 @@ impl KVStoreFields {
 // =============================================================================
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::script::templates::PushDrop;
@@ -386,7 +427,7 @@ mod tests {
     /// controller's signature over them for `anyone`, locked with its key
     /// for `anyone` (`GlobalKVStore.ts`'s `PushDrop.lock(.., 'anyone', true,
     /// true)`).
-    fn create_test_token(
+    pub(crate) fn create_test_token(
         protocol_id: &str,
         key: &str,
         value: &str,
@@ -466,9 +507,17 @@ mod tests {
 
         let script = create_test_token("kvstore", "my_key", "my_value", &privkey, None);
 
-        let ctx = KVStoreContext::new("my_key", "kvstore");
+        let controller = privkey.public_key().to_hex();
+        let ctx = KVStoreContext::new("my_key", "kvstore", &controller);
         let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
         assert!(entry.is_some());
+        // The controller is compared without regard to case, and another
+        // controller's context reads no value (`kvStoreInterpreter.ts:43`).
+        let upper = KVStoreContext::new("my_key", "kvstore", controller.to_uppercase());
+        assert!(KVStoreInterpreter::interpret_script(&script, Some(&upper)).is_some());
+        let other = PrivateKey::random().public_key().to_hex();
+        let ctx = KVStoreContext::new("my_key", "kvstore", other);
+        assert!(KVStoreInterpreter::interpret_script(&script, Some(&ctx)).is_none());
     }
 
     #[test]
@@ -477,7 +526,7 @@ mod tests {
 
         let script = create_test_token("kvstore", "my_key", "my_value", &privkey, None);
 
-        let ctx = KVStoreContext::new("other_key", "kvstore");
+        let ctx = KVStoreContext::new("other_key", "kvstore", privkey.public_key().to_hex());
         let entry = KVStoreInterpreter::interpret_script(&script, Some(&ctx));
         assert!(entry.is_none());
     }
@@ -541,10 +590,11 @@ mod tests {
 
     #[test]
     fn test_kvstore_context() {
-        let ctx = KVStoreContext::new("test_key", "kvstore");
+        let ctx = KVStoreContext::new("test_key", "kvstore", "02AB");
         assert_eq!(ctx.key, "test_key");
         assert_eq!(ctx.protocol_id, "kvstore");
-        assert_eq!(ctx.cache_key(), "kvstore:test_key");
+        assert_eq!(ctx.controller, "02AB");
+        assert_eq!(ctx.cache_key(), "kvstore:test_key:02ab");
     }
 
     #[test]

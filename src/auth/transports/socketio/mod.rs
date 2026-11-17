@@ -80,7 +80,7 @@ mod app_event;
 pub mod codec;
 mod packet_rules;
 
-pub use app_event::AppEventReceiver;
+pub use app_event::{AppEvent, AppEventReceiver};
 
 use std::sync::{Arc, Mutex as StdMutex};
 
@@ -90,7 +90,6 @@ use serde_json::Value;
 
 use crate::auth::transports::{Transport, TransportCallback};
 use crate::auth::types::AuthMessage;
-use crate::primitives::PublicKey;
 use crate::Result;
 
 use codec::{EngineIoPacket, SocketIoPacket};
@@ -349,27 +348,6 @@ pub async fn run_dispatch<F, S>(
 // ============================================================================
 // Application-event envelope layer
 // ============================================================================
-
-/// One application-level event decoded from a post-BRC-103-handshake
-/// [`MessageType::General`](crate::auth::MessageType::General) payload.
-///
-/// The payload shape is the canonical `{eventName, data}` JSON envelope
-/// used by `@bsv/authsocket-client`'s `encodeEventPayload` — byte-identical
-/// between the TS canonical and this Rust client.
-#[derive(Debug, Clone, PartialEq)]
-pub struct AppEvent {
-    /// The signing identity from the inbound General's `identity_key`
-    /// field — typically the server's identity key, but typed as
-    /// [`PublicKey`] so the same shape generalizes to peer-to-peer events.
-    pub sender: PublicKey,
-    /// The `eventName` field from the payload JSON. Empty string when the
-    /// payload was missing the field (still surfaced so callers can
-    /// observe malformed traffic instead of silently dropping it).
-    pub event_name: String,
-    /// The `data` field from the payload JSON. Type varies by event;
-    /// left as [`Value`] so callers parse the per-event shape themselves.
-    pub data: Value,
-}
 
 /// Install an inbound listener that decodes every post-BRC-103 General
 /// message payload as the canonical `{eventName, data}` envelope and

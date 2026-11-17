@@ -139,12 +139,7 @@ fn outputs(beef: &[u8], indexes: &[u32]) -> LookupAnswer {
     LookupAnswer::OutputList {
         outputs: indexes
             .iter()
-            .map(|&output_index| OutputListItem {
-                beef: beef.to_vec(),
-                output_index,
-                context: None,
-                txid: None,
-            })
+            .map(|&output_index| OutputListItem::new(beef.to_vec(), output_index))
             .collect(),
     }
 }

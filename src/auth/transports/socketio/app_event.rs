@@ -1,6 +1,59 @@
 //! The queue `install_app_event_listener` hands back (#843d23).
 
-use super::AppEvent;
+use crate::primitives::PublicKey;
+use serde_json::Value;
+
+/// One application-level event decoded from a post-BRC-103-handshake
+/// [`MessageType::General`](crate::auth::MessageType::General) payload.
+///
+/// The payload shape is the canonical `{eventName, data}` JSON envelope
+/// used by `@bsv/authsocket-client`'s `encodeEventPayload`, byte-identical
+/// between the TS canonical and this Rust client.
+///
+/// A record this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one (a test's) with
+/// [`AppEvent::new`].
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::auth::AppEvent) -> bsv_rs::auth::AppEvent {
+///     bsv_rs::auth::AppEvent { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::auth::AppEvent) -> bsv_rs::auth::AppEvent {
+///     value
+/// }
+/// ```
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct AppEvent {
+    /// The signing identity from the inbound General's `identity_key`
+    /// field, typically the server's identity key, but typed as
+    /// [`PublicKey`] so the same shape generalizes to peer-to-peer events.
+    pub sender: PublicKey,
+    /// The `eventName` field from the payload JSON. Empty string when the
+    /// payload was missing the field (still surfaced so callers can
+    /// observe malformed traffic instead of silently dropping it).
+    pub event_name: String,
+    /// The `data` field from the payload JSON. Type varies by event;
+    /// left as [`Value`] so callers parse the per-event shape themselves.
+    pub data: Value,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(AppEvent, bsv_rs::auth::AppEvent);
+
+impl AppEvent {
+    /// The event `event_name` carrying `data`, signed by `sender`.
+    #[must_use]
+    pub fn new(sender: PublicKey, event_name: impl Into<String>, data: Value) -> Self {
+        Self {
+            sender,
+            event_name: event_name.into(),
+            data,
+        }
+    }
+}
 
 /// The queue [`install_app_event_listener`](super::install_app_event_listener) hands back: this crate's type
 /// (#843d23), so no public signature names another crate's channel and a

@@ -68,12 +68,7 @@ impl OverlayLookupFacilitator for Answering {
 
 /// A client whose `ls_identity` lookups answer `beef` at output 0.
 fn client(beef: Vec<u8>) -> IdentityClient<ProtoWallet> {
-    let output = OutputListItem {
-        beef,
-        output_index: 0,
-        context: None,
-        txid: None,
-    };
+    let output = OutputListItem::new(beef, 0);
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         facilitator: Some(Arc::new(Answering(output))),
         slap_trackers: Some(vec![]),

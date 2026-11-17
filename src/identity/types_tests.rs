@@ -213,13 +213,6 @@ fn test_contacts_manager_config_default() {
 }
 
 #[test]
-fn test_certifier_info_default() {
-    let info = CertifierInfo::default();
-    assert_eq!(info.name, "Unknown Certifier");
-    assert_eq!(info.trust, 0);
-}
-
-#[test]
 fn test_contact_from_identity() {
     let identity = DisplayableIdentity::from_key("02abc123");
     let contact = Contact::from_identity(identity.clone());

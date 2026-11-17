@@ -208,8 +208,8 @@ const TOTALS: &[(&str, usize)] = &[
     ("p256", 0),
     ("tokio", 0),
     ("reqwest", 4),
-    ("serde_json", 26),
-    ("indexmap", 36),
+    ("serde_json", 27),
+    ("indexmap", 33),
 ];
 
 /// (file, item, crate, reason): one row per site.
@@ -353,8 +353,14 @@ const ALLOWED: &[(&str, &str, &str, &str)] = &[
         "text as received: the event argument's text as received (#280): a RawValue keeps its bytes",
     ),
     (
-        "src/auth/transports/socketio/mod.rs",
+        "src/auth/transports/socketio/app_event.rs",
         "AppEvent.data",
+        "serde_json",
+        "untyped member: a JSON document of the caller's or the wire's, carried as given (the reference's `unknown`, `LookupResolver.ts:43`)",
+    ),
+    (
+        "src/auth/transports/socketio/app_event.rs",
+        "fn AppEvent::new",
         "serde_json",
         "untyped member: a JSON document of the caller's or the wire's, carried as given (the reference's `unknown`, `LookupResolver.ts:43`)",
     ),
@@ -429,18 +435,6 @@ const ALLOWED: &[(&str, &str, &str, &str)] = &[
         "fn IdentityQuery::by_attributes",
         "indexmap",
         "ordered record: the attributes in insertion order, the reference's `Record` (`IdentityClient.ts:667`, #394), the order the lookup body is written in",
-    ),
-    (
-        "src/identity/types.rs",
-        "IdentityCertificate.publicly_revealed_keyring",
-        "indexmap",
-        "ordered record: a certificate's fields or keyring in insertion order, the reference's `Record` (`Certificate.ts:179`, #385, #394), the order its bounds are checked in",
-    ),
-    (
-        "src/identity/types.rs",
-        "IdentityCertificate.decrypted_fields",
-        "indexmap",
-        "ordered record: a certificate's fields or keyring in insertion order, the reference's `Record` (`Certificate.ts:179`, #385, #394), the order its bounds are checked in",
     ),
     (
         "src/overlay/facilitators.rs",
@@ -531,12 +525,6 @@ const ALLOWED: &[(&str, &str, &str, &str)] = &[
         "fn HttpWalletWire::with_client",
         "reqwest",
         "caller's instance: the reference's `httpClient` parameter (`HTTPWalletWire.ts:15`, #320), the caller's own HTTP client; under `http` reqwest's next breaking release is this crate's",
-    ),
-    (
-        "src/wallet/types.rs",
-        "Certificate.fields",
-        "indexmap",
-        "ordered record: a certificate's fields or keyring in insertion order, the reference's `Record` (`Certificate.ts:179`, #385, #394), the order its bounds are checked in",
     ),
     (
         "src/wallet/types.rs",
@@ -1525,7 +1513,7 @@ fn the_scan_reads_indexmap_and_an_alias_of_this_crates_own_843dforeign() {
     // Every `indexmap` site the scan finds, counted: the pinned figure
     assert_eq!(
         sites.iter().filter(|site| site.krate == "indexmap").count(),
-        36
+        33
     );
     assert_eq!(sites.iter().filter(|site| site.krate == "tokio").count(), 0);
 }
@@ -1544,11 +1532,11 @@ fn every_row_opens_with_a_class_its_crate_may_carry_843dforeign() {
             .filter(|row| row.2 == krate && row.3.starts_with(class))
             .count()
     };
-    assert_eq!(count("serde_json", "untyped member: "), 21);
+    assert_eq!(count("serde_json", "untyped member: "), 22);
     assert_eq!(count("serde_json", "text as received: "), 5);
-    assert_eq!(count("indexmap", "ordered record: "), 36);
+    assert_eq!(count("indexmap", "ordered record: "), 33);
     assert_eq!(count("reqwest", "caller's instance: "), 4);
-    assert_eq!(ALLOWED.len(), 21 + 5 + 36 + 4);
+    assert_eq!(ALLOWED.len(), 22 + 5 + 33 + 4);
     // A `caller's instance` row says whose break the crate's next one is
     for row in ALLOWED
         .iter()

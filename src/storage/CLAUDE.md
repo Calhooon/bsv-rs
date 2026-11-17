@@ -453,3 +453,7 @@ Internal dependencies:
 - `../overlay/CLAUDE.md` - Overlay module (lookup resolution)
 - `../primitives/CLAUDE.md` - Hash functions and encoding
 - `../CLAUDE.md` - Root SDK documentation
+
+## Open structs (#843's structs lane)
+
+`UploadMetadata` is `#[non_exhaustive]` since #843's structs lane (a record this crate produces from a storage server's list answer, which the reference types nowhere; `UploadMetadata::new(uhrp_url, expiry_time)`), pinned by its `compile_fail` doc test and `assert_no_drop!`; its JSON is unchanged. The module's other records mirror reference records and stay rows of the census's `Record` class.

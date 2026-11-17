@@ -28,17 +28,22 @@
 //! ```
 
 use crate::error::{Error, Result};
-use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
+use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TrustSelf, TxId, MAX_SATOSHIS};
 pub(crate) mod client;
 mod create_action_input;
 pub(crate) mod crypto;
 mod internalize;
 mod originator;
+mod raw;
 pub(crate) use internalize::remittance_error;
 pub use internalize::validate_internalize_action_args;
 #[cfg(feature = "http")]
 pub(crate) use originator::trim_js;
 pub use originator::validate_originator;
+pub use raw::{
+    CreateActionArgsRaw, CreateActionInputRaw, CreateActionOptionsRaw, CreateActionOutputRaw,
+    SignActionSpendRaw,
+};
 pub use {create_action_input::validate_create_action_input, crypto::validate_public_key};
 
 // Basic validation functions.
@@ -557,6 +562,8 @@ pub struct ValidCreateActionOptions {
     pub sign_and_process: bool,
     /// Whether to accept delayed broadcast.
     pub accept_delayed_broadcast: bool,
+    /// `trustSelf`, absent or `known` (`validationHelpers.ts:668-674`; #843).
+    pub trust_self: Option<TrustSelf>,
     /// Known transaction IDs.
     pub known_txids: Vec<TxId>,
     /// Whether to return only the txid.
@@ -576,6 +583,7 @@ impl Default for ValidCreateActionOptions {
         Self {
             sign_and_process: true,
             accept_delayed_broadcast: true,
+            trust_self: None,
             known_txids: Vec::new(),
             return_txid_only: false,
             no_send: false,
@@ -619,80 +627,6 @@ pub struct ValidCreateActionArgs {
     pub is_sign_action: bool,
 }
 
-/// Raw create action input for validation.
-#[derive(Debug, Clone)]
-pub struct CreateActionInputRaw {
-    /// The outpoint string "txid.vout".
-    pub outpoint: String,
-    /// Description of this input.
-    pub input_description: String,
-    /// Optional unlocking script (hex).
-    pub unlocking_script: Option<String>,
-    /// Optional unlocking script length.
-    pub unlocking_script_length: Option<u32>,
-    /// Optional sequence number.
-    pub sequence_number: Option<u32>,
-}
-
-/// Raw create action output for validation.
-#[derive(Debug, Clone)]
-pub struct CreateActionOutputRaw {
-    /// The locking script (hex).
-    pub locking_script: String,
-    /// The satoshi value.
-    pub satoshis: u64,
-    /// Description of this output.
-    pub output_description: String,
-    /// Optional basket name.
-    pub basket: Option<String>,
-    /// Optional custom instructions.
-    pub custom_instructions: Option<String>,
-    /// Tags for this output.
-    pub tags: Vec<String>,
-}
-
-/// Raw create action options for validation.
-#[derive(Debug, Clone, Default)]
-pub struct CreateActionOptionsRaw {
-    /// Whether to sign and process immediately.
-    pub sign_and_process: Option<bool>,
-    /// Whether to accept delayed broadcast.
-    pub accept_delayed_broadcast: Option<bool>,
-    /// Known transaction IDs (hex).
-    pub known_txids: Vec<String>,
-    /// Whether to return only the txid.
-    pub return_txid_only: Option<bool>,
-    /// Whether to skip sending the transaction.
-    pub no_send: Option<bool>,
-    /// Change outpoints from prior noSend actions.
-    pub no_send_change: Vec<String>,
-    /// TXIDs to send with this transaction (hex).
-    pub send_with: Vec<String>,
-    /// Whether to randomize output order.
-    pub randomize_outputs: Option<bool>,
-}
-
-/// Raw create action arguments for validation.
-#[derive(Debug, Clone)]
-pub struct CreateActionArgsRaw {
-    /// Description of this action.
-    pub description: String,
-    /// Optional input BEEF data.
-    pub input_beef: Option<Vec<u8>>,
-    /// Raw inputs.
-    pub inputs: Vec<CreateActionInputRaw>,
-    /// Raw outputs.
-    pub outputs: Vec<CreateActionOutputRaw>,
-    /// Optional lock time.
-    pub lock_time: Option<u32>,
-    /// Optional version.
-    pub version: Option<u32>,
-    /// Labels for this action.
-    pub labels: Vec<String>,
-    /// Raw options.
-    pub options: Option<CreateActionOptionsRaw>,
-}
-
 /// Validates a create action output.
 pub fn validate_create_action_output(
     output: &CreateActionOutputRaw,
@@ -730,6 +664,7 @@ pub fn validate_create_action_options(
     Ok(ValidCreateActionOptions {
         sign_and_process: options.sign_and_process.unwrap_or(true),
         accept_delayed_broadcast: options.accept_delayed_broadcast.unwrap_or(true),
+        trust_self: raw::trust_self(options.trust_self.as_deref())?,
         known_txids: options
             .known_txids
             .iter()
@@ -816,15 +751,6 @@ pub fn validate_create_action_args(args: &CreateActionArgsRaw) -> Result<ValidCr
 // =============================================================================
 // Sign Action Validation
 // =============================================================================
-
-/// Raw sign action spend for validation.
-#[derive(Debug, Clone)]
-pub struct SignActionSpendRaw {
-    /// The unlocking script (hex).
-    pub unlocking_script: String,
-    /// Optional sequence number.
-    pub sequence_number: Option<u32>,
-}
 
 /// Validated sign action spend.
 #[derive(Debug, Clone)]

@@ -19,13 +19,10 @@ impl Headers for Context {
 #[test]
 fn mining_tip_defaults_and_reference_forwarding() {
     assert_eq!(OldHeaders.mining_tip(), None);
-    #[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
-    let headers = Context(ChainTip {
-        height: 800_000,
-        median_time_past: 1_700_000_000,
-        genesis_height: 620_538,
-        csv_height: 419_328,
-        next_block_time: None,
-    });
+    let headers = Context(ChainTip::new(800_000, 1_700_000_000));
+    assert_eq!(
+        (headers.0.csv_height, headers.0.next_block_time),
+        (419_328, None)
+    );
     assert_eq!(Headers::mining_tip(&&headers), Some(headers.0));
 }

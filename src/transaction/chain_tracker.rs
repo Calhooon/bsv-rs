@@ -32,7 +32,6 @@ use thiserror::Error;
 
 use super::beef_stream::{display_hex, ChainTip, Hash32, Headers};
 use crate::error::TransportFault;
-use crate::script::ProtocolEra;
 
 crate::util::non_exhaustive::non_exhaustive_enum! {
     path = bsv_rs::transaction::ChainTrackerError;
@@ -226,8 +225,6 @@ pub struct MockChainTracker {
 
 /// The synthetic tip's median time past (2023-11-14T22:13:20Z).
 const MOCK_MEDIAN_TIME_PAST: u32 = 1_700_000_000;
-/// Mainnet's CSV activation height (bitcoin-sv@879fc8b `src/chainparams.cpp:1046`).
-const MAINNET_CSV_HEIGHT: u32 = 419_328;
 
 impl MockChainTracker {
     /// Creates a new mock chain tracker with the given current height.
@@ -247,15 +244,9 @@ impl MockChainTracker {
     }
 
     /// The tip set, or the synthetic mainnet tip at `height`.
-    #[allow(deprecated)] // Populate the retained ChainTip field for source compatibility (#451).
     fn tip(&self) -> Option<ChainTip> {
-        self.tip.unwrap_or(Some(ChainTip {
-            height: self.height,
-            median_time_past: MOCK_MEDIAN_TIME_PAST,
-            genesis_height: ProtocolEra::MAINNET_GENESIS_HEIGHT,
-            csv_height: MAINNET_CSV_HEIGHT,
-            next_block_time: None,
-        }))
+        self.tip
+            .unwrap_or(Some(ChainTip::new(self.height, MOCK_MEDIAN_TIME_PAST)))
     }
 
     /// Adds a known valid merkle root for a specific height.
@@ -306,11 +297,32 @@ impl Headers for MockChainTracker {
 /// A chain tracker that always returns true for any merkle root.
 ///
 /// For tests that skip the root check; its `height` still decides the depth of an offset-0 proof in `Transaction::verify` (100 blocks, #734).
+///
+/// A configured double, so it is `#[non_exhaustive]` (#843): build it with
+/// [`AlwaysValidChainTracker::new`]; `height` stays readable and assignable.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::AlwaysValidChainTracker) -> bsv_rs::transaction::AlwaysValidChainTracker {
+///     bsv_rs::transaction::AlwaysValidChainTracker { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::AlwaysValidChainTracker) -> bsv_rs::transaction::AlwaysValidChainTracker {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct AlwaysValidChainTracker {
     /// The current block height to report.
     pub height: u32,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(
+    AlwaysValidChainTracker,
+    bsv_rs::transaction::AlwaysValidChainTracker
+);
 
 impl AlwaysValidChainTracker {
     /// Creates a new always-valid tracker with the given height.
@@ -361,15 +373,11 @@ mod tests {
     #[tokio::test]
     async fn the_mock_answers_a_synthetic_mainnet_tip_at_its_height() {
         let mut tracker = MockChainTracker::new(1000);
-        #[allow(deprecated)]
-        // Populate the retained ChainTip field for source compatibility (#451).
-        let expected = ChainTip {
-            height: 1000,
-            median_time_past: 1_700_000_000,
-            genesis_height: ProtocolEra::MAINNET_GENESIS_HEIGHT,
-            csv_height: 419_328,
-            next_block_time: None,
-        };
+        let expected = ChainTip::new(1000, 1_700_000_000);
+        assert_eq!(
+            (expected.csv_height, expected.next_block_time),
+            (419_328, None)
+        );
         assert_eq!(ChainTracker::mining_tip(&tracker).await, Ok(Some(expected)));
         assert_eq!(Headers::mining_tip(&tracker), Some(expected));
         tracker.height = 1001;
@@ -383,15 +391,9 @@ mod tests {
         let none = MockChainTracker::new(1000).with_mining_tip(None);
         assert_eq!(ChainTracker::mining_tip(&none).await, Ok(None));
         assert_eq!(Headers::mining_tip(&none), None);
-        #[allow(deprecated)]
-        // Populate the retained ChainTip field for source compatibility (#451).
-        let tip = ChainTip {
-            height: 7,
-            median_time_past: 1,
-            genesis_height: 10_000,
-            csv_height: 0,
-            next_block_time: Some(2),
-        };
+        let tip = ChainTip::new(7, 1)
+            .with_csv_height(0)
+            .with_next_block_time(2);
         let set = MockChainTracker::new(1000).with_mining_tip(Some(tip));
         assert_eq!(ChainTracker::mining_tip(&set).await, Ok(Some(tip)));
         assert_eq!(Headers::mining_tip(&set), Some(tip));

@@ -189,16 +189,12 @@ pub(super) async fn verify(
         } else {
             None
         },
-        genesis_height: 0,
+        genesis_height: u64::from(ChainParams::mainnet().genesis_height),
         memory_limit,
         work,
         fee_model,
     };
     let by_txid = root.reachable_by_txid();
-    let evaluation = Evaluation {
-        genesis_height: genesis_height(chain, tracker, &by_txid).await,
-        ..evaluation
-    };
     let mut verified = HashSet::new();
     let mut queue = vec![root.id()];
     while let Some(txid) = queue.pop() {
@@ -217,26 +213,6 @@ pub(super) async fn verify(
         }
     }
     Ok(true)
-}
-
-/// The chain's Genesis height for the default mode (GHSA-h4m7-c6p8-725m):
-/// the tracker's tip's when its `mining_tip` names one, mainnet's otherwise
-/// (also when it fails). Asked once, and only when no chain parameters are
-/// given and a reachable transaction carries a merkle path.
-#[allow(deprecated)] // ChainTip's copy serves the default path until the api-break.
-async fn genesis_height(
-    chain: Option<&ChainParams>,
-    tracker: &dyn ChainTracker,
-    reachable: &HashMap<String, &Transaction>,
-) -> u64 {
-    let mainnet = u64::from(ChainParams::mainnet().genesis_height);
-    if chain.is_some() || !reachable.values().any(|tx| tx.merkle_path.is_some()) {
-        return mainnet;
-    }
-    match tracker.mining_tip().await {
-        Ok(Some(tip)) => u64::from(tip.genesis_height),
-        _ => mainnet,
-    }
 }
 
 async fn proven(tx: &Transaction, txid: &str, tracker: &dyn ChainTracker) -> Result<bool> {

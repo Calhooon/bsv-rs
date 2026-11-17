@@ -1632,27 +1632,36 @@ fn test_wallet_certificate_conversion_roundtrip() {
         cert.serial_number_base64(),
         "Serial number should be preserved"
     );
+    // The wallet's record holds text (#843: `WalletCertificate`, where the
+    // removed `wallet::Certificate` held keys and bytes): the keys in
+    // compressed hex, the signature in hex, the outpoint as `txid.vout`.
     assert_eq!(
-        wallet_cert.subject, cert.subject,
+        wallet_cert.subject,
+        cert.subject.to_hex(),
         "Subject should be preserved"
     );
     assert_eq!(
-        wallet_cert.certifier, cert.certifier,
+        wallet_cert.certifier,
+        cert.certifier.to_hex(),
         "Certifier should be preserved"
     );
     assert!(
-        wallet_cert.signature.is_some(),
+        !wallet_cert.signature.is_empty(),
         "Signature should be preserved"
     );
     assert_eq!(
-        wallet_cert.signature.as_ref().unwrap(),
-        cert.signature.as_ref().unwrap(),
+        wallet_cert.signature,
+        bsv_rs::primitives::to_hex(cert.signature.as_ref().unwrap()),
         "Signature bytes should match"
     );
 
     // Verify revocation outpoint is preserved
-    assert!(wallet_cert.revocation_outpoint.is_some());
-    let outpoint = wallet_cert.revocation_outpoint.as_ref().unwrap();
+    assert_eq!(
+        wallet_cert.revocation_outpoint,
+        format!("{}.7", "cc".repeat(32))
+    );
+    let outpoint =
+        bsv_rs::wallet::types::Outpoint::from_string(&wallet_cert.revocation_outpoint).unwrap();
     assert_eq!(outpoint.txid, [0xCC; 32]);
     assert_eq!(outpoint.vout, 7);
 
@@ -1680,7 +1689,7 @@ fn test_wallet_certificate_conversion_without_signature() {
     let wallet_cert = cert.to_wallet_certificate();
 
     assert!(
-        wallet_cert.signature.is_none(),
+        wallet_cert.signature.is_empty(),
         "Unsigned cert should have no signature in wallet format"
     );
     assert_eq!(wallet_cert.fields.len(), 1);
@@ -1701,8 +1710,8 @@ fn test_wallet_certificate_conversion_no_revocation() {
     let wallet_cert = cert.to_wallet_certificate();
 
     assert!(
-        wallet_cert.revocation_outpoint.is_none(),
-        "Certificate without revocation outpoint should preserve None"
+        wallet_cert.revocation_outpoint.is_empty(),
+        "Certificate without revocation outpoint should write the empty text"
     );
 }
 

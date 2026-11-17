@@ -402,12 +402,7 @@ fn published(json: &str) -> OutputListItem {
     let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
     beef.merge_raw_tx(tx.to_binary(), Some(index))
         .expect("the bytes are one transaction");
-    OutputListItem {
-        beef: beef.to_binary().expect("the BEEF is writable"),
-        output_index: 0,
-        context: None,
-        txid: None,
-    }
+    OutputListItem::new(beef.to_binary().expect("the BEEF is writable"), 0)
 }
 
 #[tokio::test]

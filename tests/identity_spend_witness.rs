@@ -436,12 +436,7 @@ impl OverlayLookupFacilitator for TokenLookup {
         _timeout_ms: Option<u64>,
     ) -> Result<LookupAnswer> {
         Ok(LookupAnswer::OutputList {
-            outputs: vec![OutputListItem {
-                beef: self.beef.clone(),
-                output_index: 0,
-                context: None,
-                txid: None,
-            }],
+            outputs: vec![OutputListItem::new(self.beef.clone(), 0)],
         })
     }
 }

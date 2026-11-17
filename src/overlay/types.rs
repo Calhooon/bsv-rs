@@ -12,6 +12,12 @@ use std::fmt;
 ///
 /// SHIP is used for broadcasting transactions to overlay topics.
 /// SLAP is used for discovering and querying lookup services.
+///
+/// Declared beside `wallet::Protocol` on purpose (#843): this is the
+/// reference's `OverlayDiscoveryProtocol`, `'SHIP' | 'SLAP'`
+/// (`OverlayAdminTokenTemplate.ts:21`), that one its `WalletProtocol`, a
+/// `[level, name]` pair; go-sdk keeps the same two apart by package
+/// (`overlay/overlay.go:15`, `wallet/wallet.go:26` at `2ca481c`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Protocol {
     /// Submit Hierarchical Information Protocol - for broadcasting transactions.
@@ -124,7 +130,25 @@ pub enum LookupAnswerType {
 }
 
 /// Single output in a lookup answer.
+///
+/// A record that grows (it gained `txid` with #735), so it is
+/// `#[non_exhaustive]` (#843): build it with [`OutputListItem::new`] and the
+/// `with_` setters (a custom lookup facilitator returns it); the fields stay
+/// readable, and a pattern over it ends in `..`.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::OutputListItem) -> bsv_rs::overlay::OutputListItem {
+///     bsv_rs::overlay::OutputListItem { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::OutputListItem) -> bsv_rs::overlay::OutputListItem {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct OutputListItem {
     /// BEEF-encoded transaction.
     pub beef: Vec<u8>,
@@ -143,6 +167,36 @@ pub struct OutputListItem {
     /// (`IdentityClient::txid_hint_contradictions`), reading the subject.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub txid: Option<String>,
+}
+
+crate::util::non_exhaustive::assert_no_drop!(OutputListItem, bsv_rs::overlay::OutputListItem);
+
+impl OutputListItem {
+    /// The output at `output_index` of the transaction `beef` carries; no
+    /// context and no txid hint.
+    #[must_use]
+    pub fn new(beef: Vec<u8>, output_index: u32) -> Self {
+        Self {
+            beef,
+            output_index,
+            context: None,
+            txid: None,
+        }
+    }
+
+    /// Sets the context data.
+    #[must_use]
+    pub fn with_context(mut self, context: Vec<u8>) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// Sets the host's txid hint (#735).
+    #[must_use]
+    pub fn with_txid(mut self, txid: impl Into<String>) -> Self {
+        self.txid = Some(txid.into());
+        self
+    }
 }
 
 /// Formula for computed lookups.
@@ -268,7 +322,25 @@ impl AdmittanceInstructions {
 pub type Steak = HashMap<String, AdmittanceInstructions>;
 
 /// Response from a single host during broadcast.
+///
+/// A record this crate produces, so it is `#[non_exhaustive]` (#843): read
+/// the fields, end a pattern over it in `..`, and build one with
+/// [`HostResponse::success`] or [`HostResponse::failure`], the two answers a
+/// host gives.
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::HostResponse) -> bsv_rs::overlay::HostResponse {
+///     bsv_rs::overlay::HostResponse { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::HostResponse) -> bsv_rs::overlay::HostResponse {
+///     value
+/// }
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct HostResponse {
     /// Host URL.
     pub host: String,
@@ -279,6 +351,8 @@ pub struct HostResponse {
     /// Error message (if failed).
     pub error: Option<String>,
 }
+
+crate::util::non_exhaustive::assert_no_drop!(HostResponse, bsv_rs::overlay::HostResponse);
 
 impl HostResponse {
     /// Create a successful response.
