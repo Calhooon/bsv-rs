@@ -659,11 +659,9 @@ async fn test_teranode_broadcast_timeout() {
         .mount(&mock_server)
         .await;
 
-    let config = TeranodeConfig {
-        url: mock_server.uri(),
-        api_key: None,
-        timeout_ms: 100, // Very short timeout
-    };
+    let config = TeranodeConfig::new(mock_server.uri())
+        .with_api_key(None)
+        .with_timeout_ms(100); // Very short timeout
     let broadcaster = TeranodeBroadcaster::with_config(config);
     let tx = ef_capable_transaction();
     let result = broadcaster.broadcast(&tx).await;

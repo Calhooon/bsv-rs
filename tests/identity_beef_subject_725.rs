@@ -175,15 +175,15 @@ async fn read(beef: Vec<u8>, subject: &str) -> (usize, usize) {
         context: None,
         txid: None,
     };
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Answering(output))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec!["https://ls_identity.invalid".to_string()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Answering(output))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec!["https://ls_identity.invalid".to_string()],
+            )]))),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
     let attributes = IndexMap::from([("email".to_string(), "alice@example.com".to_string())]);

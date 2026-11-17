@@ -301,13 +301,13 @@ fn mock_resolver(
         service.to_string(),
         vec!["http://mock-749-host:8080".to_string()],
     );
-    LookupResolver::new(LookupResolverConfig {
-        network_preset: preset,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    })
+    LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(preset)
+            .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    )
 }
 
 fn output_list_of(beef: Vec<u8>) -> LookupAnswer {
@@ -337,12 +337,12 @@ async fn the_resolver_slap_door_links_nothing_behaviourally() {
     let mock = Arc::new(MockLookupFacilitator::new());
     mock.add_response("http://slap-749-tracker:8080", output_list_of(beef))
         .await;
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Mainnet,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec!["http://slap-749-tracker:8080".to_string()]),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Mainnet)
+            .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec!["http://slap-749-tracker:8080".to_string()])),
+    );
 
     let hosts = resolver.find_competent_hosts(service).await.unwrap();
     assert!(
@@ -366,14 +366,13 @@ async fn the_topic_discovery_door_links_nothing_behaviourally() {
     let resolver = Arc::new(mock_resolver(NetworkPreset::Mainnet, "ls_ship", mock));
     let broadcaster = TopicBroadcaster::new(
         vec![topic.to_string()],
-        TopicBroadcasterConfig {
-            network_preset: NetworkPreset::Mainnet,
-            facilitator: None,
-            resolver: Some(resolver),
-            require_ack_from_all_hosts: RequireAck::None,
-            require_ack_from_any_host: RequireAck::None,
-            require_ack_from_specific_hosts: HashMap::new(),
-        },
+        TopicBroadcasterConfig::default()
+            .with_network_preset(NetworkPreset::Mainnet)
+            .with_facilitator(None)
+            .with_resolver(Some(resolver))
+            .with_require_ack_from_all_hosts(RequireAck::None)
+            .with_require_ack_from_any_host(RequireAck::None)
+            .with_require_ack_from_specific_hosts(HashMap::new()),
     )
     .unwrap();
 
@@ -457,11 +456,9 @@ async fn the_kvstore_query_door_links_nothing_behaviourally() {
     mock.add_response("http://mock-749-host:8080", output_list_of(beef))
         .await;
     let resolver = mock_resolver(NetworkPreset::Local, service, mock);
-    let config = bsv_rs::kvstore::KVStoreConfig {
-        service_name: service.to_string(),
-        protocol_id: protocol_id.to_string(),
-        ..Default::default()
-    };
+    let config = bsv_rs::kvstore::KVStoreConfig::new()
+        .with_service_name(service)
+        .with_protocol_id(protocol_id);
     let store = bsv_rs::kvstore::GlobalKVStore::with_resolver(
         ProtoWallet::new(None),
         config,
@@ -526,12 +523,12 @@ async fn the_storage_downloader_door_links_nothing_behaviourally() {
     mock.add_response("http://mock-749-host:8080", output_list_of(beef))
         .await;
     let resolver = Arc::new(mock_resolver(NetworkPreset::Local, "ls_uhrp", mock));
-    let downloader =
-        bsv_rs::storage::StorageDownloader::new(bsv_rs::storage::StorageDownloaderConfig {
-            network_preset: NetworkPreset::Local,
-            resolver: Some(resolver),
-            timeout_ms: Some(5_000),
-        });
+    let downloader = bsv_rs::storage::StorageDownloader::new(
+        bsv_rs::storage::StorageDownloaderConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_resolver(Some(resolver))
+            .with_timeout_ms(Some(5_000)),
+    );
 
     let hosts = downloader.resolve(&uhrp_url).await.unwrap();
     assert!(

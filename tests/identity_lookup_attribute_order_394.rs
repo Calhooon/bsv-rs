@@ -51,15 +51,15 @@ async fn bodies(server: &MockServer) -> Vec<String> {
 
 /// `resolve_by_attributes` against `server` as the one `ls_identity` host.
 async fn resolve(server: &MockServer, attributes: IndexMap<String, String>) {
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec![server.uri()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec![server.uri()],
+            )]))),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
     let found = client
@@ -94,15 +94,15 @@ async fn resolve_by_attributes_sends_its_attributes_in_insertion_order() {
 #[tokio::test]
 async fn query_sends_its_attributes_in_insertion_order_751() {
     let server = lookup_host().await;
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec![server.uri()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(HttpsOverlayLookupFacilitator::new(true))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec![server.uri()],
+            )]))),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
     let attributes = IndexMap::from([
@@ -181,15 +181,15 @@ impl OverlayLookupFacilitator for Recording {
 #[tokio::test]
 async fn a_facilitator_with_the_default_is_asked_through_lookup() {
     let recording = Arc::new(Recording::default());
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(recording.clone()),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec!["https://identity-lookup.invalid".to_string()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(recording.clone()))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec!["https://identity-lookup.invalid".to_string()],
+            )]))),
+    ));
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
     let attributes = IndexMap::from([

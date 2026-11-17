@@ -55,19 +55,18 @@ impl Service {
                 api_key: None,
                 timeout_ms,
             })),
-            Service::Teranode => Box::new(TeranodeBroadcaster::with_config(TeranodeConfig {
-                url,
-                api_key: None,
-                timeout_ms,
-            })),
-            Service::WhatsOnChain => {
-                Box::new(WhatsOnChainBroadcaster::with_config(WocBroadcastConfig {
-                    network: WocBroadcastNetwork::Mainnet,
-                    api_key: None,
-                    timeout_ms,
-                    base_url: Some(url),
-                }))
-            }
+            Service::Teranode => Box::new(TeranodeBroadcaster::with_config(
+                TeranodeConfig::new(url)
+                    .with_api_key(None)
+                    .with_timeout_ms(timeout_ms),
+            )),
+            Service::WhatsOnChain => Box::new(WhatsOnChainBroadcaster::with_config(
+                WocBroadcastConfig::default()
+                    .with_network(WocBroadcastNetwork::Mainnet)
+                    .with_api_key(None)
+                    .with_timeout_ms(timeout_ms)
+                    .with_base_url(Some(url)),
+            )),
         }
     }
 }

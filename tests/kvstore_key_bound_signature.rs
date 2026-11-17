@@ -219,16 +219,16 @@ impl OverlayLookupFacilitator for TokenLookup {
 async fn read_by_the_store(token: &PushDrop, key_text: &str, host: &str) -> Option<String> {
     let config = KVStoreConfig::default();
     let source = signaction_reference_326::source_of(&script(token).to_binary(), 1);
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some(std::collections::HashMap::from([(
-            config.service_name.clone(),
-            vec![format!("https://{host}.invalid")],
-        )])),
-        slap_trackers: Some(Vec::new()),
-        facilitator: Some(Arc::new(TokenLookup(source.to_beef(true).unwrap()))),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some(std::collections::HashMap::from([(
+                config.service_name.clone(),
+                vec![format!("https://{host}.invalid")],
+            )])))
+            .with_slap_trackers(Some(Vec::new()))
+            .with_facilitator(Some(Arc::new(TokenLookup(source.to_beef(true).unwrap())))),
+    );
     let store = GlobalKVStore::with_resolver(
         identity_reveal_wallet::Counting::of_scalar(9),
         config,
@@ -278,22 +278,20 @@ async fn set_refuses_tags_its_reader_refuses_before_the_wallet_is_asked() {
     ] {
         let wallet = identity_reveal_wallet::Counting::of_scalar(9);
         let config = KVStoreConfig::default();
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            host_overrides: Some(std::collections::HashMap::from([(
-                config.service_name.clone(),
-                vec![format!("https://kv-tags-4mcm-{}.invalid", tags.len())],
-            )])),
-            slap_trackers: Some(Vec::new()),
-            facilitator: Some(Arc::new(TokenLookup(Vec::new()))),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_host_overrides(Some(std::collections::HashMap::from([(
+                    config.service_name.clone(),
+                    vec![format!("https://kv-tags-4mcm-{}.invalid", tags.len())],
+                )])))
+                .with_slap_trackers(Some(Vec::new()))
+                .with_facilitator(Some(Arc::new(TokenLookup(Vec::new())))),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
-        let options = bsv_rs::kvstore::KVStoreSetOptions {
-            tags: Some(tags.iter().map(|t| t.to_string()).collect()),
-            ..Default::default()
-        };
+        let options = bsv_rs::kvstore::KVStoreSetOptions::new()
+            .with_tags(tags.iter().map(|t| t.to_string()).collect());
         let result = store.set("k1", "v", Some(options)).await;
         assert_eq!(result, Err(bsv_rs::Error::KvStoreError(words.into())));
         assert!(wallet.calls().is_empty(), "{:?}", wallet.calls());
@@ -394,18 +392,18 @@ async fn set_refuses_one_byte_past_the_readers_key_and_value_bounds() {
     ] {
         let wallet = identity_reveal_wallet::Counting::of_scalar(9);
         let config = KVStoreConfig::default();
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            host_overrides: Some(std::collections::HashMap::from([(
-                config.service_name.clone(),
-                vec![format!(
-                    "https://kv-bounds-4mcm-{key_len}-{value_len}.invalid"
-                )],
-            )])),
-            slap_trackers: Some(Vec::new()),
-            facilitator: Some(Arc::new(TokenLookup(Vec::new()))),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_host_overrides(Some(std::collections::HashMap::from([(
+                    config.service_name.clone(),
+                    vec![format!(
+                        "https://kv-bounds-4mcm-{key_len}-{value_len}.invalid"
+                    )],
+                )])))
+                .with_slap_trackers(Some(Vec::new()))
+                .with_facilitator(Some(Arc::new(TokenLookup(Vec::new())))),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
         let result = store

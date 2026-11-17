@@ -38,7 +38,40 @@ pub enum RequireAck {
 }
 
 /// Configuration for the topic broadcaster.
+///
+/// A record that grows (the reference's has six optional members,
+/// `SHIPBroadcaster.ts:62-85` at `ts-stack@edf6e03`, and its constructor
+/// takes `config = {}`), so it is `#[non_exhaustive]` (#843d8b): build it
+/// with [`Default`] and the `with_` setters, naming only what differs; the
+/// fields stay public, so assignment on a `default()` compiles too, and a
+/// pattern over it ends in `..`.
+///
+/// ```
+/// use bsv_rs::overlay::{NetworkPreset, RequireAck, TopicBroadcasterConfig};
+///
+/// let config = TopicBroadcasterConfig::default()
+///     .with_network_preset(NetworkPreset::Local)
+///     .with_require_ack_from_any_host(RequireAck::Any);
+/// assert_eq!(config.network_preset, NetworkPreset::Local);
+/// assert!(config.resolver.is_none());
+/// ```
+///
+/// No struct expression builds one outside the crate, a functional update
+/// that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::TopicBroadcasterConfig) -> bsv_rs::overlay::TopicBroadcasterConfig {
+///     bsv_rs::overlay::TopicBroadcasterConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::TopicBroadcasterConfig) -> bsv_rs::overlay::TopicBroadcasterConfig {
+///     value
+/// }
+/// ```
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct TopicBroadcasterConfig {
     /// Network preset.
     pub network_preset: NetworkPreset,
@@ -78,6 +111,11 @@ pub struct TopicBroadcasterConfig {
     pub require_ack_from_specific_hosts: HashMap<String, RequireAck>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    TopicBroadcasterConfig,
+    bsv_rs::overlay::TopicBroadcasterConfig
+);
+
 impl Default for TopicBroadcasterConfig {
     fn default() -> Self {
         Self {
@@ -88,6 +126,53 @@ impl Default for TopicBroadcasterConfig {
             require_ack_from_any_host: RequireAck::All,
             require_ack_from_specific_hosts: HashMap::new(),
         }
+    }
+}
+
+impl TopicBroadcasterConfig {
+    /// Sets the network preset.
+    #[must_use]
+    pub fn with_network_preset(mut self, value: NetworkPreset) -> Self {
+        self.network_preset = value;
+        self
+    }
+
+    /// Sets the custom broadcast facilitator.
+    #[must_use]
+    pub fn with_facilitator(mut self, value: Option<Arc<dyn OverlayBroadcastFacilitator>>) -> Self {
+        self.facilitator = value;
+        self
+    }
+
+    /// Sets the custom lookup resolver.
+    #[must_use]
+    pub fn with_resolver(mut self, value: Option<Arc<LookupResolver>>) -> Self {
+        self.resolver = value;
+        self
+    }
+
+    /// Sets the acknowledgment required from all hosts.
+    #[must_use]
+    pub fn with_require_ack_from_all_hosts(mut self, value: RequireAck) -> Self {
+        self.require_ack_from_all_hosts = value;
+        self
+    }
+
+    /// Sets the acknowledgment required from any host.
+    #[must_use]
+    pub fn with_require_ack_from_any_host(mut self, value: RequireAck) -> Self {
+        self.require_ack_from_any_host = value;
+        self
+    }
+
+    /// Sets the acknowledgment required from specific hosts.
+    #[must_use]
+    pub fn with_require_ack_from_specific_hosts(
+        mut self,
+        value: HashMap<String, RequireAck>,
+    ) -> Self {
+        self.require_ack_from_specific_hosts = value;
+        self
     }
 }
 

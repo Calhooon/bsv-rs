@@ -92,15 +92,15 @@ fn client_over<W: bsv_rs::wallet::WalletInterface + Clone>(
     outputs: Vec<OutputListItem>,
 ) -> (IdentityClient<W>, Asked) {
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Recording(asked.clone(), outputs))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_identity".to_string(),
-            vec!["https://ls_identity.invalid".to_string()],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Recording(asked.clone(), outputs))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_identity".to_string(),
+                vec!["https://ls_identity.invalid".to_string()],
+            )]))),
+    ));
     (
         IdentityClient::with_resolver(wallet, Default::default(), resolver),
         asked,

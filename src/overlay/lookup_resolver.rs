@@ -24,7 +24,43 @@ mod discovery; // `find_competent_hosts`, in the trackers' order within the limi
 mod query; // `query` and the ordered lookup (#394)
 
 /// Configuration for the lookup resolver.
+///
+/// A record that grows (the reference's has nine optional members,
+/// `LookupResolver.ts:658-690` at `ts-stack@edf6e03`, and its constructor
+/// takes `config = {}`), so it is `#[non_exhaustive]` (#843d8b): build it
+/// with [`Default`] and the `with_` setters, naming only what differs; the
+/// fields stay public, so assignment on a `default()` compiles too, and a
+/// pattern over it ends in `..`.
+///
+/// ```
+/// use bsv_rs::overlay::{LookupResolverConfig, NetworkPreset};
+/// use std::collections::HashMap;
+///
+/// let mut hosts = HashMap::new();
+/// hosts.insert("ls_example".to_string(), vec!["https://overlay.example".to_string()]);
+/// let config = LookupResolverConfig::default()
+///     .with_network_preset(NetworkPreset::Testnet)
+///     .with_host_overrides(Some(hosts));
+/// assert_eq!(config.network_preset, NetworkPreset::Testnet);
+/// assert!(config.slap_trackers.is_none());
+/// ```
+///
+/// No struct expression builds one outside the crate, a functional update
+/// that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::overlay::LookupResolverConfig) -> bsv_rs::overlay::LookupResolverConfig {
+///     bsv_rs::overlay::LookupResolverConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::overlay::LookupResolverConfig) -> bsv_rs::overlay::LookupResolverConfig {
+///     value
+/// }
+/// ```
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct LookupResolverConfig {
     /// Network preset (mainnet, testnet, local).
     pub network_preset: NetworkPreset,
@@ -49,6 +85,11 @@ pub struct LookupResolverConfig {
     pub limits: LookupLimits,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    LookupResolverConfig,
+    bsv_rs::overlay::LookupResolverConfig
+);
+
 impl Default for LookupResolverConfig {
     fn default() -> Self {
         Self {
@@ -63,6 +104,78 @@ impl Default for LookupResolverConfig {
             tx_memo_max_entries: DEFAULT_TX_MEMO_MAX_ENTRIES,
             limits: LookupLimits::default(),
         }
+    }
+}
+
+impl LookupResolverConfig {
+    /// Sets the network preset.
+    #[must_use]
+    pub fn with_network_preset(mut self, value: NetworkPreset) -> Self {
+        self.network_preset = value;
+        self
+    }
+
+    /// Sets the custom lookup facilitator.
+    #[must_use]
+    pub fn with_facilitator(mut self, value: Option<Arc<dyn OverlayLookupFacilitator>>) -> Self {
+        self.facilitator = value;
+        self
+    }
+
+    /// Sets the custom SLAP tracker URLs.
+    #[must_use]
+    pub fn with_slap_trackers(mut self, value: Option<Vec<String>>) -> Self {
+        self.slap_trackers = value;
+        self
+    }
+
+    /// Sets the manual host overrides per service.
+    #[must_use]
+    pub fn with_host_overrides(mut self, value: Option<HashMap<String, Vec<String>>>) -> Self {
+        self.host_overrides = value;
+        self
+    }
+
+    /// Sets the additional hosts to query per service.
+    #[must_use]
+    pub fn with_additional_hosts(mut self, value: Option<HashMap<String, Vec<String>>>) -> Self {
+        self.additional_hosts = value;
+        self
+    }
+
+    /// Sets the hosts cache TTL in milliseconds.
+    #[must_use]
+    pub fn with_hosts_cache_ttl_ms(mut self, value: u64) -> Self {
+        self.hosts_cache_ttl_ms = value;
+        self
+    }
+
+    /// Sets the maximum entries in the hosts cache.
+    #[must_use]
+    pub fn with_hosts_cache_max_entries(mut self, value: usize) -> Self {
+        self.hosts_cache_max_entries = value;
+        self
+    }
+
+    /// Sets the TX memoization cache TTL in milliseconds.
+    #[must_use]
+    pub fn with_tx_memo_ttl_ms(mut self, value: u64) -> Self {
+        self.tx_memo_ttl_ms = value;
+        self
+    }
+
+    /// Sets the maximum entries in the TX memoization cache.
+    #[must_use]
+    pub fn with_tx_memo_max_entries(mut self, value: usize) -> Self {
+        self.tx_memo_max_entries = value;
+        self
+    }
+
+    /// Sets the lookup client's limits.
+    #[must_use]
+    pub fn with_limits(mut self, value: LookupLimits) -> Self {
+        self.limits = value;
+        self
     }
 }
 

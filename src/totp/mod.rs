@@ -23,11 +23,9 @@
 //! assert!(Totp::validate(secret, &code, None));
 //!
 //! // Use SHA-256 algorithm with 8 digits
-//! let options = TotpOptions {
-//!     algorithm: Algorithm::Sha256,
-//!     digits: 8,
-//!     ..Default::default()
-//! };
+//! let options = TotpOptions::default()
+//!     .with_algorithm(Algorithm::Sha256)
+//!     .with_digits(8);
 //! let code_sha256 = Totp::generate(secret, Some(options));
 //! ```
 //!
@@ -38,5 +36,7 @@
 //! - RFC 4226: HOTP (HMAC-Based One-Time Password Algorithm)
 
 mod core;
+mod options;
 
-pub use core::{Algorithm, Totp, TotpOptions, TotpValidateOptions};
+pub use core::{Algorithm, Totp};
+pub use options::{TotpOptions, TotpValidateOptions};

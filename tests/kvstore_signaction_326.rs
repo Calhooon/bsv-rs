@@ -120,13 +120,13 @@ fn global_store(wallet: &Counting, token: Arc<Mutex<Option<Vec<u8>>>>) -> Global
             NEXT_LOOKUP.fetch_add(1, Ordering::Relaxed)
         )],
     );
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(TokenLookup(token))),
-        slap_trackers: Some(Vec::new()),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(Arc::new(TokenLookup(token))))
+            .with_slap_trackers(Some(Vec::new()))
+            .with_host_overrides(Some(host_overrides)),
+    );
     GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver)
 }
 

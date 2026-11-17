@@ -107,6 +107,7 @@ pub mod global;
 pub mod interpreter;
 mod legacy_signature;
 pub mod local;
+mod options;
 mod token_derivation;
 mod token_spends;
 mod token_validation;

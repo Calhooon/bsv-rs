@@ -39,7 +39,7 @@
 //!
 //! // Create client
 //! let wallet = ProtoWallet::new(None);
-//! let config = IdentityClientConfig::with_originator("myapp.com");
+//! let config = IdentityClientConfig::default().with_originator("myapp.com");
 //! let client = IdentityClient::new(wallet, config);
 //!
 //! // Resolve an identity: every admitted one, in the answer's order at the parser's one trust (#737)

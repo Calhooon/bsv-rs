@@ -265,7 +265,8 @@ let wallet = ProtoWallet::new(Some(private_key));
 let client = IdentityClient::new(wallet.clone(), IdentityClientConfig::default());
 
 // Create client with custom config
-let config = IdentityClientConfig::with_originator("myapp.example.com")
+let config = IdentityClientConfig::default()
+    .with_originator("myapp.example.com")
     .with_network(NetworkPreset::Mainnet)
     .with_token_amount(5);
 let client = IdentityClient::new(wallet, config);
@@ -375,7 +376,7 @@ Direct contact management with encrypted storage, search, and caching:
 ```rust
 use bsv_rs::identity::{ContactsManager, ContactsManagerConfig, Contact};
 
-let config = ContactsManagerConfig::with_originator("myapp.example.com");
+let config = ContactsManagerConfig::default().with_originator("myapp.example.com");
 let manager = ContactsManager::new(wallet, config);
 
 // CRUD operations
@@ -418,8 +419,12 @@ pub struct IdentityClientConfig {
     pub originator: Option<String>,     // Application originator; None: none to the wallet (#318, #329)
 }
 
-// Builder methods
-let config = IdentityClientConfig::with_originator("myapp.com")
+// Builder methods: every field's setter takes `self` and returns `Self`;
+// `with_originator` too since #843's ruling 10 (an associated constructor
+// before; `IdentityClientConfig::with_originator(o)` is now
+// `IdentityClientConfig::default().with_originator(o)`)
+let config = IdentityClientConfig::default()
+    .with_originator("myapp.com")
     .with_network(NetworkPreset::Testnet)
     .with_token_amount(100);
 ```
@@ -433,7 +438,9 @@ pub struct ContactsManagerConfig {
     pub originator: Option<String>, // Application originator; None: none to the wallet (#329)
 }
 
-let config = ContactsManagerConfig::with_originator("myapp.com");
+// `with_protocol_id`, `with_basket`, `with_originator`: each takes `self`
+// (`with_originator` an associated constructor until #843's ruling 10)
+let config = ContactsManagerConfig::default().with_originator("myapp.com");
 ```
 
 ## Broadcast Result Types

@@ -281,18 +281,17 @@ async fn test_lookup_resolver_with_mock() {
         vec!["http://mock-host:8080".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 
@@ -326,18 +325,17 @@ async fn test_lookup_resolver_empty_result() {
         vec!["http://mock-host:8080".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 
@@ -370,18 +368,17 @@ async fn test_lookup_resolver_find_competent_hosts_cached() {
         vec!["http://mock-a:8080".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 
@@ -423,28 +420,26 @@ async fn test_topic_broadcaster_with_mock_local() {
 
     // Create a mock lookup resolver that won't be used (local preset skips SHIP lookup)
     let lookup_mock = Arc::new(MockLookupFacilitator::new());
-    let resolver_config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(lookup_mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: None,
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let resolver_config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(lookup_mock as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(None)
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
     let resolver = Arc::new(LookupResolver::new(resolver_config));
 
-    let config = TopicBroadcasterConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayBroadcastFacilitator>),
-        resolver: Some(resolver),
-        require_ack_from_all_hosts: RequireAck::None,
-        require_ack_from_any_host: RequireAck::None,
-        require_ack_from_specific_hosts: HashMap::new(),
-    };
+    let config = TopicBroadcasterConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayBroadcastFacilitator>))
+        .with_resolver(Some(resolver))
+        .with_require_ack_from_all_hosts(RequireAck::None)
+        .with_require_ack_from_any_host(RequireAck::None)
+        .with_require_ack_from_specific_hosts(HashMap::new());
 
     let broadcaster = TopicBroadcaster::new(vec!["tm_test_topic".to_string()], config).unwrap();
 
@@ -482,28 +477,26 @@ async fn test_topic_broadcaster_all_reject() {
     let mock = Arc::new(MockBroadcastFacilitator::with_failure());
 
     let lookup_mock = Arc::new(MockLookupFacilitator::new());
-    let resolver_config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(lookup_mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: None,
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let resolver_config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(lookup_mock as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(None)
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
     let resolver = Arc::new(LookupResolver::new(resolver_config));
 
-    let config = TopicBroadcasterConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayBroadcastFacilitator>),
-        resolver: Some(resolver),
-        require_ack_from_all_hosts: RequireAck::None,
-        require_ack_from_any_host: RequireAck::None,
-        require_ack_from_specific_hosts: HashMap::new(),
-    };
+    let config = TopicBroadcasterConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayBroadcastFacilitator>))
+        .with_resolver(Some(resolver))
+        .with_require_ack_from_all_hosts(RequireAck::None)
+        .with_require_ack_from_any_host(RequireAck::None)
+        .with_require_ack_from_specific_hosts(HashMap::new());
 
     let broadcaster = TopicBroadcaster::new(vec!["tm_test_topic".to_string()], config).unwrap();
 
@@ -544,18 +537,17 @@ async fn test_request_coalescing() {
     };
     mock.add_response("http://localhost:8080", answer).await;
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: None,
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(None)
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 
@@ -610,18 +602,17 @@ async fn test_lookup_resolver_multiple_hosts() {
         ],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock.clone() as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
     let q = LookupQuestion::new("ls_multi_host", serde_json::json!({}));
@@ -661,18 +652,17 @@ async fn test_lookup_resolver_records_reputation() {
         vec!["http://rep-host:8080".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 
@@ -701,18 +691,17 @@ async fn test_lookup_resolver_all_hosts_fail() {
         vec!["http://fail-host:8080".to_string()],
     );
 
-    let config = LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(mock as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        additional_hosts: None,
-        hosts_cache_ttl_ms: 60_000,
-        hosts_cache_max_entries: 128,
-        tx_memo_ttl_ms: 60_000,
-        tx_memo_max_entries: 100,
-        limits: Default::default(),
-    };
+    let config = LookupResolverConfig::default()
+        .with_network_preset(NetworkPreset::Local)
+        .with_facilitator(Some(mock as Arc<dyn OverlayLookupFacilitator>))
+        .with_slap_trackers(Some(vec![]))
+        .with_host_overrides(Some(host_overrides))
+        .with_additional_hosts(None)
+        .with_hosts_cache_ttl_ms(60_000)
+        .with_hosts_cache_max_entries(128)
+        .with_tx_memo_ttl_ms(60_000)
+        .with_tx_memo_max_entries(100)
+        .with_limits(Default::default());
 
     let resolver = LookupResolver::new(config);
 

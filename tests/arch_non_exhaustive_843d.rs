@@ -11,8 +11,20 @@
 //! `Pending` and `Unruled` classes take no new row (their lengths are pinned
 //! and only lowered). Each `pub` field of an attributed struct has a
 //! `with_<field>` method in an inherent `impl` of its name, or is a
-//! parameter of its `new`, else the struct is a row of [`ASSIGNED`] with its
-//! reason.
+//! parameter of its `new`, or a setter [`NAMED_SETTERS`] names for it (the
+//! four that existed under another name before #843d8c), else the struct is a
+//! row of [`ASSIGNED`] with its reason. A setter is read by its signature
+//! (the captain's ruling 10 on #843, 2026-11-17): its receiver is `self` or
+//! `mut self` and it returns `Self`, or its receiver is `&mut self` and it
+//! returns `&mut Self`. A function of a setter's name that takes no `self`
+//! is a constructor: as a field's only setter it is refused by name and
+//! place (after `Config::default().with_other(..)` that field could not be
+//! set in the chain), whatever [`ASSIGNED`] says. An associated constructor
+//! of a type the rule does not cover (not an attributed struct of `pub`
+//! fields: `with_capacity`, `with_config`, `with_client`, `with_resolver`)
+//! is Rust's ordinary constructor name and is not read; nor is one on an
+//! attributed struct whose field has a chainable setter too, since the
+//! field can then be set in a chain.
 //!
 //! The scan is lexical (`arch_support`): comments and string literals supply
 //! nothing, `#[cfg(test)]` items and files named `tests.rs` or `*_tests.rs`
@@ -274,10 +286,84 @@ fn scan(path: &str, tokens: &[Token<'_>]) -> (Vec<Found>, Vec<String>) {
     (found, refused)
 }
 
-/// The inherent impls' methods of one file: type name to `(fn names, new's
-/// parameter names)`.
-fn methods(tokens: &[Token<'_>]) -> BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> {
-    let mut out: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
+/// One type's inherent methods, over every file that has an impl of its name.
+#[derive(Debug, Default)]
+struct Methods {
+    /// Every method's name.
+    fns: BTreeSet<String>,
+    /// `new`'s parameter names.
+    params: BTreeSet<String>,
+    /// The chainable setters: a method whose receiver is `self` or `mut
+    /// self` and which returns `Self`, or whose receiver is `&mut self` and
+    /// which returns `&mut Self` (the captain's ruling 10 on #843).
+    setters: BTreeSet<String>,
+    /// Where each method is declared, `path:line`.
+    at: BTreeMap<String, String>,
+}
+
+/// The impls of a scan: type name to its methods.
+type Impls = BTreeMap<String, Methods>;
+
+/// Whether the method whose `fn` keyword is at `j` is a chainable setter:
+/// its receiver is `self` or `mut self` and it returns `Self`, or its
+/// receiver is `&mut self` (a lifetime allowed) and it returns `&mut Self`.
+fn chainable(tokens: &[Token<'_>], j: usize) -> bool {
+    let mut open = j + 2;
+    if tokens.get(open).is_some_and(|t| t.text == "<") {
+        open = after(tokens, open);
+    }
+    if tokens.get(open).is_none_or(|t| t.text != "(") {
+        return false;
+    }
+    let close = after(tokens, open) - 1;
+    // The lexer reads a lifetime as `'` and its name.
+    let skip_lifetime = |k: usize| {
+        if tokens.get(k).is_some_and(|t| t.text == "'") {
+            k + 2
+        } else {
+            k
+        }
+    };
+    let text = |k: usize| tokens.get(k).map_or("", |t| t.text);
+    let mut k = open + 1;
+    let by_ref = text(k) == "&";
+    if by_ref {
+        k = skip_lifetime(k + 1);
+        if text(k) != "mut" {
+            return false;
+        }
+        k += 1;
+    } else if text(k) == "mut" {
+        k += 1;
+    }
+    if text(k) != "self" || !(text(k + 1) == "," || k + 1 == close) {
+        return false;
+    }
+    let mut r = close + 1;
+    if text(r) != "-" || text(r + 1) != ">" {
+        return false;
+    }
+    r += 2;
+    let mut ret = Vec::new();
+    while r < tokens.len() && text(r) != "{" && text(r) != "where" && text(r) != ";" {
+        if text(r) == "'" {
+            r += 2;
+            continue;
+        }
+        ret.push(text(r));
+        r += 1;
+    }
+    if by_ref {
+        ret == ["&", "mut", "Self"]
+    } else {
+        ret == ["Self"]
+    }
+}
+
+/// The inherent impls' methods of one file, each method's place under
+/// `path`.
+fn methods(path: &str, tokens: &[Token<'_>]) -> Impls {
+    let mut out: Impls = BTreeMap::new();
     let mut at = 0;
     while at < tokens.len() {
         if tokens[at].text != "impl" || tokens[at].literal {
@@ -325,6 +411,13 @@ fn methods(tokens: &[Token<'_>]) -> BTreeMap<String, (BTreeSet<String>, BTreeSet
                 while j < end - 1 {
                     if tokens[j].text == "fn" {
                         let f = tokens[j + 1].text.to_string();
+                        if chainable(tokens, j) {
+                            entry.setters.insert(f.clone());
+                        }
+                        entry
+                            .at
+                            .entry(f.clone())
+                            .or_insert_with(|| format!("{path}:{}", tokens[j].line));
                         if f == "new" {
                             let open = (j..end).find(|&k| tokens[k].text == "(").expect("params");
                             let close = after(tokens, open) - 1;
@@ -334,13 +427,13 @@ fn methods(tokens: &[Token<'_>]) -> BTreeMap<String, (BTreeSet<String>, BTreeSet
                                     "(" | "[" | "{" | "<" => depth += 1,
                                     ")" | "]" | "}" | ">" => depth -= 1,
                                     ":" if depth == 0 => {
-                                        entry.1.insert(tokens[k - 1].text.to_string());
+                                        entry.params.insert(tokens[k - 1].text.to_string());
                                     }
                                     _ => {}
                                 }
                             }
                         }
-                        entry.0.insert(f);
+                        entry.fns.insert(f);
                     }
                     j = match tokens[j].text {
                         "{" => after(tokens, j),
@@ -359,15 +452,10 @@ fn is_test_file(path: &str) -> bool {
 }
 
 /// Every `pub struct` under `src/`, the refusals, and the impls' methods.
-#[allow(clippy::type_complexity)]
-fn crate_scan() -> (
-    Vec<Found>,
-    Vec<String>,
-    BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)>,
-) {
+fn crate_scan() -> (Vec<Found>, Vec<String>, Impls) {
     let mut found = Vec::new();
     let mut refused = Vec::new();
-    let mut impls: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
+    let mut impls: Impls = BTreeMap::new();
     for source in arch_support::sources() {
         if is_test_file(&source.path) {
             continue;
@@ -376,10 +464,14 @@ fn crate_scan() -> (
         let (f, r) = scan(&source.path, &tokens);
         found.extend(f);
         refused.extend(r);
-        for (name, (fns, params)) in methods(&tokens) {
+        for (name, m) in methods(&source.path, &tokens) {
             let entry = impls.entry(name).or_default();
-            entry.0.extend(fns);
-            entry.1.extend(params);
+            entry.fns.extend(m.fns);
+            entry.params.extend(m.params);
+            entry.setters.extend(m.setters);
+            for (f, at) in m.at {
+                entry.at.entry(f).or_insert(at);
+            }
         }
     }
     (found, refused, impls)
@@ -400,7 +492,8 @@ enum Class {
     /// Deprecated, or a deprecated door's alone.
     Deprecated,
     /// The freeze plan's row 8b or 8c: opened by a later part. Takes no new
-    /// row; [`PENDING_LEN`] only lowers.
+    /// row; [`PENDING_LEN`] only lowers. Empty since #843d8c.
+    #[allow(dead_code)]
     Pending,
     /// No class holds it and no ruling names it. Takes no new row;
     /// [`UNRULED_LEN`] only lowers.
@@ -408,7 +501,7 @@ enum Class {
 }
 
 /// The rows of `Pending`: only lowered, as each struct is opened.
-const PENDING_LEN: usize = 20;
+const PENDING_LEN: usize = 0;
 /// The rows of `Unruled`: only lowered, as each struct takes a class or the
 /// attribute.
 const UNRULED_LEN: usize = 57;
@@ -546,26 +639,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/script/spend/mod.rs:TxSpendParams", Class::ParameterBlock, "every field a caller's choice of the input judged and its budgets"),
     ("src/transaction/beef.rs:BeefLimits", Class::Deprecated, "the hints of the deprecated `Beef::from_binary_with_limits` door alone (0.4.0)"),
     ("src/transaction/broadcasters/arc.rs:ArcConfig", Class::Deprecated, "deprecated since 0.9.0 with ARC (#350, the owner's word of 2026-10-27): ARCade is the standard"),
-    ("src/identity/types.rs:IdentityClientConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/identity/types.rs:ContactsManagerConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreGetOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreSetOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/kvstore/types.rs:KVStoreRemoveOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/historian.rs:HistorianConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/host_reputation_tracker.rs:ReputationConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/overlay/lookup_resolver.rs:LookupResolverConfig", Class::Pending, "the freeze plan's row 8b"),
-    ("src/overlay/topic_broadcaster.rs:TopicBroadcasterConfig", Class::Pending, "the freeze plan's row 8b"),
-    ("src/registry/client.rs:RegistryClientConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/storage/downloader.rs:StorageDownloaderConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/storage/uploader.rs:StorageUploaderConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/totp/core.rs:TotpOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/totp/core.rs:TotpValidateOptions", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/broadcasters/teranode.rs:TeranodeConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/broadcasters/whatsonchain.rs:WocBroadcastConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/chain_trackers/block_headers_service.rs:BlockHeadersServiceConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/transaction/fee_models/live_policy.rs:LivePolicyConfig", Class::Pending, "the freeze plan's row 8c"),
-    ("src/wallet/cached_key_deriver.rs:CacheConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/auth/clients/response.rs:Response", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/auth/transports/http.rs:HttpRequest", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/auth/transports/http.rs:HttpResponse", Class::Unruled, "no class holds it and no ruling names it"),
@@ -701,6 +774,40 @@ const ASSIGNED: &[(&str, &str)] = &[
     ),
 ];
 
+/// `file:Name`, the field, the setter: a field of an attributed struct whose
+/// setter was named otherwise before the rule (#843d8c). A row whose setter is
+/// gone, or whose field has a `with_<field>` too, fails.
+const NAMED_SETTERS: &[(&str, &str, &str)] = &[
+    (
+        "src/identity/types.rs:IdentityClientConfig",
+        "network_preset",
+        "with_network",
+    ),
+    (
+        "src/registry/client.rs:RegistryClientConfig",
+        "network_preset",
+        "with_network",
+    ),
+    (
+        "src/registry/client.rs:RegistryClientConfig",
+        "accept_delayed_broadcast",
+        "with_delayed_broadcast",
+    ),
+    (
+        "src/storage/uploader.rs:StorageUploaderConfig",
+        "default_retention_minutes",
+        "with_retention_minutes",
+    ),
+];
+
+/// The setter [`NAMED_SETTERS`] names for a field, when it names one.
+fn named_setter(row: &str, field: &str) -> Option<&'static str> {
+    NAMED_SETTERS
+        .iter()
+        .find(|(r, f, _)| *r == row && *f == field)
+        .map(|(_, _, setter)| *setter)
+}
+
 /// The structs the scan reads by name: the generic ones, the tuple one and
 /// the ones a `key_args!` invocation declares.
 const GENERIC: &[&str] = &[
@@ -722,21 +829,48 @@ const KEY_ARGS: &[&str] = &[
     "src/wallet/key_args.rs:VerifySignatureArgs",
 ];
 
-/// The fields of an attributed struct that have no setter and are no
-/// parameter of its `new`.
-fn unset_fields(
-    found: &Found,
-    impls: &BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)>,
-) -> Vec<String> {
+/// The fields of an attributed struct that have no chainable setter (a
+/// `with_<field>`, or the one [`NAMED_SETTERS`] names, that takes `self`) and
+/// are no parameter of its `new`.
+fn unset_fields(found: &Found, impls: &Impls) -> Vec<String> {
     found
         .fields
         .iter()
         .filter(|(_, vis)| vis.as_deref() == Some("pub"))
         .map(|(name, _)| name.clone())
         .filter(|name| {
-            impls.get(&found.name).is_none_or(|(fns, params)| {
-                !fns.contains(&format!("with_{name}")) && !params.contains(name)
+            impls.get(&found.name).is_none_or(|m| {
+                !m.setters.contains(&format!("with_{name}"))
+                    && !m.params.contains(name)
+                    && !named_setter(&found.row(), name).is_some_and(|s| m.setters.contains(s))
             })
+        })
+        .collect()
+}
+
+/// The fields of an attributed struct whose only setter is an associated
+/// function (ruling 10 on #843): `(field, function, path:line)`, a function
+/// named `with_<field>` (or the one [`NAMED_SETTERS`] names) that takes no
+/// `self` or returns no `Self`, the field having no chainable setter and
+/// being no parameter of `new`. Such a function is a constructor: after
+/// `Type::default().with_other(..)` the field cannot be set in the chain.
+fn constructor_only_fields(found: &Found, impls: &Impls) -> Vec<(String, String, String)> {
+    let Some(m) = impls.get(&found.name) else {
+        return Vec::new();
+    };
+    unset_fields(found, impls)
+        .into_iter()
+        .filter_map(|field| {
+            let named = format!("with_{field}");
+            let function = if m.fns.contains(&named) {
+                named
+            } else {
+                named_setter(&found.row(), &field)
+                    .filter(|s| m.fns.contains(*s))?
+                    .to_string()
+            };
+            let at = m.at.get(&function).cloned().unwrap_or_default();
+            Some((field, function, at))
         })
         .collect()
 }
@@ -745,7 +879,7 @@ fn unset_fields(
 fn errors(
     found: &[Found],
     refused: &[String],
-    impls: &BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)>,
+    impls: &Impls,
     rows: &[(&str, Class, &str)],
     assigned: &[(&str, &str)],
 ) -> Vec<String> {
@@ -772,7 +906,21 @@ fn errors(
             _ => {}
         }
         if f.attributed {
-            let unset = unset_fields(f, impls);
+            for (field, function, at) in constructor_only_fields(f, impls) {
+                out.push(format!(
+                    "{row}: `{function}` ({at}) is the only setter of `{field}` and takes no \
+                     `self`: a field's setter is a chainable `self` method returning `Self` \
+                     (ruling 10 on #843)"
+                ));
+            }
+            let unset: Vec<String> = unset_fields(f, impls)
+                .into_iter()
+                .filter(|field| {
+                    !constructor_only_fields(f, impls)
+                        .iter()
+                        .any(|(c, _, _)| c == field)
+                })
+                .collect();
             let is_assigned = assigned.iter().any(|(r, _)| *r == row);
             if !unset.is_empty() && !is_assigned {
                 out.push(format!(
@@ -780,7 +928,7 @@ fn errors(
                      parameter of `new`: add the setters, or list it in ASSIGNED with its reason"
                 ));
             }
-            if unset.is_empty() && is_assigned {
+            if unset_fields(f, impls).is_empty() && is_assigned {
                 out.push(format!(
                     "{row}: every field has a setter: remove its ASSIGNED row"
                 ));
@@ -900,10 +1048,42 @@ fn the_scan_reads_every_form_by_name_843d8a() {
     assert_eq!(public.len(), 220, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
-        13,
+        33,
         "attributed"
     );
-    assert_eq!(ROWS.len() + 13, public.len(), "every other one a row");
+    assert_eq!(ROWS.len() + 33, public.len(), "every other one a row");
+}
+
+/// Each row of [`NAMED_SETTERS`] names an attributed struct, a `pub` field of
+/// it with no `with_<field>`, and a method its inherent impl has (#843d8c).
+#[test]
+fn every_named_setter_names_a_field_and_its_method_843d8c() {
+    let (found, _, impls) = crate_scan();
+    for (row, field, setter) in NAMED_SETTERS {
+        let f = found
+            .iter()
+            .find(|f| f.row() == *row && f.attributed)
+            .unwrap_or_else(|| panic!("{row}: no attributed struct"));
+        assert!(
+            f.fields.iter().any(|(name, _)| name == field),
+            "{row}: no field `{field}`"
+        );
+        let m = impls
+            .get(&f.name)
+            .unwrap_or_else(|| panic!("{row}: no impl"));
+        assert!(
+            m.setters.contains(*setter),
+            "{row}: no chainable `self` method `{setter}`"
+        );
+        assert!(
+            !m.fns.contains(&format!("with_{field}")),
+            "{row}: `with_{field}` exists, so its NAMED_SETTERS row goes"
+        );
+    }
+    let probe: Vec<&str> = NAMED_SETTERS.iter().map(|(r, _, _)| *r).collect();
+    assert!(named_setter(probe[0], "network_preset").is_some());
+    assert!(named_setter(probe[0], "key_id").is_none());
+    assert!(named_setter("probe.rs:Half", "network_preset").is_none());
 }
 
 fn probe(text: &str) -> (Vec<Found>, Vec<String>) {
@@ -1006,7 +1186,7 @@ fn the_rule_refuses_each_case_on_a_probe_843d8a() {
     "#;
     let tokens = arch_support::scan_tokens_with_attributes(text);
     let (found, refused) = scan("probe.rs", &tokens);
-    let impls = methods(&tokens);
+    let impls = methods("probe.rs", &tokens);
     let clean = errors(
         &found,
         &refused,
@@ -1077,4 +1257,46 @@ fn the_rule_refuses_each_case_on_a_probe_843d8a() {
         assert_eq!(got.len(), 1, "{words}: {got:?}");
         assert!(got[0].starts_with(words), "{words}: {got:?}");
     }
+}
+
+/// The receiver rule on sample texts (ruling 10 on #843): a `with_<field>`
+/// that takes no `self` is a constructor and refused as the field's only
+/// setter, by name and place; `self`, `mut self` returning `Self` and `&mut
+/// self` returning `&mut Self` are setters; `self` returning another type,
+/// a `&self` receiver and a named setter without `self` are not.
+#[test]
+fn a_setter_is_a_chainable_self_method_the_receiver_read_843() {
+    let text = r#"
+        #[non_exhaustive]
+        pub struct Cfg { pub a: u8, pub b: u8, pub c: u8, pub d: u8, pub e: u8, pub f: u8 }
+        impl Cfg {
+            pub fn with_a(a: u8) -> Self { Self { a, ..Default::default() } }
+            pub fn with_b(mut self, b: u8) -> Self { self.b = b; self }
+            pub fn with_c<'x>(&'x mut self, c: u8) -> &'x mut Self { self.c = c; self }
+            pub fn with_d(self, d: u8) -> Option<Self> { None }
+            pub fn with_e(&self, e: u8) -> Self { todo!() }
+            pub fn with_f(self) -> Self where Self: Sized { self }
+        }
+    "#;
+    let tokens = arch_support::scan_tokens_with_attributes(text);
+    let (found, refused) = scan("probe.rs", &tokens);
+    let impls = methods("probe.rs", &tokens);
+    let m = &impls["Cfg"];
+    assert_eq!(
+        m.setters.iter().map(String::as_str).collect::<Vec<_>>(),
+        ["with_b", "with_c", "with_f"],
+        "the chainable setters"
+    );
+    let got = errors(&found, &refused, &impls, &[], &[]);
+    assert_eq!(
+        got,
+        [
+            "probe.rs:Cfg: `with_a` (probe.rs:5) is the only setter of `a` and takes no `self`: \
+             a field's setter is a chainable `self` method returning `Self` (ruling 10 on #843)",
+            "probe.rs:Cfg: `with_d` (probe.rs:8) is the only setter of `d` and takes no `self`: \
+             a field's setter is a chainable `self` method returning `Self` (ruling 10 on #843)",
+            "probe.rs:Cfg: `with_e` (probe.rs:9) is the only setter of `e` and takes no `self`: \
+             a field's setter is a chainable `self` method returning `Self` (ruling 10 on #843)",
+        ],
+    );
 }

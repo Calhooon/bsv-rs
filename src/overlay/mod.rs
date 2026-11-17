@@ -59,6 +59,7 @@ pub mod lookup_limits;
 pub mod lookup_resolver;
 pub mod overlay_admin_token_template;
 mod rank_change_receiver;
+mod reputation_config;
 pub mod retry;
 pub mod topic_broadcaster;
 pub mod types;

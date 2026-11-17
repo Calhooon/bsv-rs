@@ -116,13 +116,13 @@ async fn the_global_store_pushes_the_wallet_key_as_returned_545() {
             config.service_name.clone(),
             vec!["https://kvstore-545.invalid".to_string()],
         );
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            facilitator: Some(Arc::new(NothingFound)),
-            slap_trackers: Some(Vec::new()),
-            host_overrides: Some(host_overrides),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_facilitator(Some(Arc::new(NothingFound)))
+                .with_slap_trackers(Some(Vec::new()))
+                .with_host_overrides(Some(host_overrides)),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
         let _ = store.set("alpha", "one", None).await;

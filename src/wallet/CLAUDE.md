@@ -290,6 +290,7 @@ The `validation` module (`validation.rs`) provides 40+ validation functions for 
 Validated structs (used after validation):
 - `ValidCreateActionInput`, `ValidCreateActionOutput`, `ValidCreateActionOptions`, `ValidCreateActionArgs`
 - `ValidSignActionSpend`, `ValidListOutputsArgs`, `ValidListActionsArgs`
+- The `Valid*` family stays literal records, each mirroring a reference record (`validationHelpers.ts` at `ts-stack@edf6e03`; rows of class `Record` in `tests/arch_non_exhaustive_843d.rs`): `ValidCreateActionOptions` among them by the captain's ruling of 2026-11-12 (`:676-689`, `ValidProcessActionOptions` and its extension; nine members there, eight here, no `trust_self`), no `#[non_exhaustive]` (#843d8c)
 - Raw counterparts (`CreateActionInputRaw`, `CreateActionOutputRaw`, `CreateActionOptionsRaw`, `CreateActionArgsRaw`, `SignActionSpendRaw`) for unvalidated input
 
 ### Hex Serialization Helpers (in `types.rs`)
@@ -357,7 +358,7 @@ The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWa
 - `derive_public_key()`, `derive_private_key()`, `derive_private_key_raw()`, `derive_symmetric_key()`
 - `reveal_specific_secret()`, `reveal_counterparty_secret() -> Result<SharedSecret>` (an implementor returns what `derive_shared_secret` gave it; no public constructor, #843d6)
 
-**CacheConfig** - Configuration for CachedKeyDeriver:
+**CacheConfig** - Configuration for CachedKeyDeriver (`#[non_exhaustive]` since #843d8c: `CacheConfig::default().with_max_size(n)`, or assign the public field on a `default()`; a struct literal outside the crate does not compile):
 - `max_size: usize` - Maximum entries per cache (default 1000)
 
 ## Usage Examples

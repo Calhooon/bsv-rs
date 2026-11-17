@@ -279,9 +279,10 @@ mod identity {
     async fn the_identity_client_passes_none_unless_an_originator_is_configured() {
         let default = identity_client(IdentityClientConfig::default()).await;
         assert_eq!(default, ("get_public_key", None));
-        let named = identity_client(IdentityClientConfig::with_originator("app.example")).await;
+        let named =
+            identity_client(IdentityClientConfig::default().with_originator("app.example")).await;
         assert_eq!(named.1.as_deref(), Some("app.example"));
-        let empty = identity_client(IdentityClientConfig::with_originator("")).await;
+        let empty = identity_client(IdentityClientConfig::default().with_originator("")).await;
         assert_eq!(empty.1.as_deref(), Some(""));
     }
 
@@ -296,7 +297,7 @@ mod identity {
     #[tokio::test]
     async fn the_contacts_manager_passes_none_unless_an_originator_is_configured() {
         assert_eq!(contacts(ContactsManagerConfig::default()).await, None);
-        let named = contacts(ContactsManagerConfig::with_originator("app.example")).await;
+        let named = contacts(ContactsManagerConfig::default().with_originator("app.example")).await;
         assert_eq!(named.as_deref(), Some("app.example"));
     }
 }
@@ -352,13 +353,13 @@ mod kvstore {
             "ls_kvstore".to_string(),
             vec!["https://overlay.invalid".to_string()],
         );
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            facilitator: Some(Arc::new(Failing)),
-            slap_trackers: Some(Vec::new()),
-            host_overrides: Some(host_overrides),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_network_preset(NetworkPreset::Local)
+                .with_facilitator(Some(Arc::new(Failing)))
+                .with_slap_trackers(Some(Vec::new()))
+                .with_host_overrides(Some(host_overrides)),
+        );
         let store =
             GlobalKVStore::with_resolver(wallet.clone(), config, NetworkPreset::Local, resolver);
         let _ = store.set("key", "value", None).await;

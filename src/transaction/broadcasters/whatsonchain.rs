@@ -72,7 +72,24 @@ impl WocBroadcastNetwork {
 }
 
 /// WhatsOnChain broadcaster configuration.
-#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::WocBroadcastConfig) -> bsv_rs::transaction::WocBroadcastConfig {
+///     bsv_rs::transaction::WocBroadcastConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::WocBroadcastConfig) -> bsv_rs::transaction::WocBroadcastConfig {
+///     value
+/// }
+/// ```
+// Debug redacts the key (credential_debug.rs)
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct WocBroadcastConfig {
     /// Network to broadcast to
     pub network: WocBroadcastNetwork,
@@ -85,6 +102,11 @@ pub struct WocBroadcastConfig {
     pub base_url: Option<String>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    WocBroadcastConfig,
+    bsv_rs::transaction::WocBroadcastConfig
+);
+
 impl Default for WocBroadcastConfig {
     fn default() -> Self {
         Self {
@@ -93,6 +115,36 @@ impl Default for WocBroadcastConfig {
             timeout_ms: 30_000,
             base_url: None,
         }
+    }
+}
+
+impl WocBroadcastConfig {
+    /// Sets `network`.
+    #[must_use]
+    pub fn with_network(mut self, network: WocBroadcastNetwork) -> Self {
+        self.network = network;
+        self
+    }
+
+    /// Sets `api_key`.
+    #[must_use]
+    pub fn with_api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
+        self
+    }
+
+    /// Sets `timeout_ms`.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
+    }
+
+    /// Sets `base_url`.
+    #[must_use]
+    pub fn with_base_url(mut self, base_url: Option<String>) -> Self {
+        self.base_url = base_url;
+        self
     }
 }
 

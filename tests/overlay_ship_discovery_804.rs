@@ -118,16 +118,16 @@ fn resolver(answer: LookupAnswer) -> Arc<LookupResolver> {
 fn resolver_under(answer: LookupAnswer, limits: LookupLimits) -> Arc<LookupResolver> {
     static N: AtomicUsize = AtomicUsize::new(0);
     let n = N.fetch_add(1, Ordering::Relaxed);
-    Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Scripted(answer))),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_ship".to_string(),
-            vec![format!("https://ls-ship-{n}.ship-discovery-804-rs.invalid")],
-        )])),
-        limits,
-        ..Default::default()
-    }))
+    Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(Arc::new(Scripted(answer))))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_ship".to_string(),
+                vec![format!("https://ls-ship-{n}.ship-discovery-804-rs.invalid")],
+            )])))
+            .with_limits(limits),
+    ))
 }
 
 fn broadcaster(
@@ -136,13 +136,11 @@ fn broadcaster(
 ) -> bsv_rs::Result<TopicBroadcaster> {
     TopicBroadcaster::new(
         vec![TOPIC.to_string()],
-        TopicBroadcasterConfig {
-            resolver: Some(resolver(answer)),
-            facilitator: Some(Arc::new(Acknowledging)),
-            require_ack_from_any_host: RequireAck::Any,
-            require_ack_from_specific_hosts: specific,
-            ..Default::default()
-        },
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver(answer)))
+            .with_facilitator(Some(Arc::new(Acknowledging)))
+            .with_require_ack_from_any_host(RequireAck::Any)
+            .with_require_ack_from_specific_hosts(specific),
     )
 }
 
@@ -378,20 +376,18 @@ async fn a_freeform_ls_ship_host_beside_an_advertising_one_admits_the_advertised
         } else {
             vec![list, free]
         };
-        let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-            facilitator: Some(Arc::new(ByHost(answers))),
-            slap_trackers: Some(vec![]),
-            host_overrides: Some(HashMap::from([("ls_ship".to_string(), hosts)])),
-            limits: raised_limits(),
-            ..Default::default()
-        }));
+        let resolver = Arc::new(LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_facilitator(Some(Arc::new(ByHost(answers))))
+                .with_slap_trackers(Some(vec![]))
+                .with_host_overrides(Some(HashMap::from([("ls_ship".to_string(), hosts)])))
+                .with_limits(raised_limits()),
+        ));
         let b = TopicBroadcaster::new(
             vec![TOPIC.to_string()],
-            TopicBroadcasterConfig {
-                resolver: Some(resolver),
-                facilitator: Some(Arc::new(Acknowledging)),
-                ..Default::default()
-            },
+            TopicBroadcasterConfig::default()
+                .with_resolver(Some(resolver))
+                .with_facilitator(Some(Arc::new(Acknowledging))),
         )
         .unwrap();
         let admitted: Vec<String> = b
@@ -429,14 +425,12 @@ async fn the_resolvers_default_limits_take_an_answer_past_32_mib_first_775_804()
     outputs.extend(sixteen.iter().cloned());
     let b = TopicBroadcaster::new(
         vec![TOPIC.to_string()],
-        TopicBroadcasterConfig {
-            resolver: Some(resolver_under(
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver_under(
                 LookupAnswer::OutputList { outputs },
                 LookupLimits::default(),
-            )),
-            facilitator: Some(Arc::new(Acknowledging)),
-            ..Default::default()
-        },
+            )))
+            .with_facilitator(Some(Arc::new(Acknowledging))),
     )
     .unwrap();
     assert_eq!(b.find_interested_hosts().await.map(|h| h.len()), Ok(0));

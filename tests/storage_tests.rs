@@ -509,29 +509,22 @@ fn test_storage_downloader_config_default() {
 
 #[test]
 fn test_storage_downloader_config_custom_timeout() {
-    let config = StorageDownloaderConfig {
-        timeout_ms: Some(60000),
-        ..Default::default()
-    };
+    let config = StorageDownloaderConfig::default().with_timeout_ms(Some(60000));
     assert_eq!(config.timeout_ms, Some(60000));
 }
 
 #[test]
 fn test_storage_downloader_config_no_timeout() {
-    let config = StorageDownloaderConfig {
-        timeout_ms: None,
-        ..Default::default()
-    };
+    let config = StorageDownloaderConfig::default().with_timeout_ms(None);
     assert!(config.timeout_ms.is_none());
 }
 
 #[test]
 fn test_storage_downloader_config_testnet() {
-    let config = StorageDownloaderConfig {
-        network_preset: bsv_rs::overlay::NetworkPreset::Testnet,
-        resolver: None,
-        timeout_ms: Some(30000),
-    };
+    let config = StorageDownloaderConfig::default()
+        .with_network_preset(bsv_rs::overlay::NetworkPreset::Testnet)
+        .with_resolver(None)
+        .with_timeout_ms(Some(30000));
     assert_eq!(
         config.network_preset,
         bsv_rs::overlay::NetworkPreset::Testnet
@@ -540,11 +533,10 @@ fn test_storage_downloader_config_testnet() {
 
 #[test]
 fn test_storage_downloader_config_local() {
-    let config = StorageDownloaderConfig {
-        network_preset: bsv_rs::overlay::NetworkPreset::Local,
-        resolver: None,
-        timeout_ms: Some(5000),
-    };
+    let config = StorageDownloaderConfig::default()
+        .with_network_preset(bsv_rs::overlay::NetworkPreset::Local)
+        .with_resolver(None)
+        .with_timeout_ms(Some(5000));
     assert_eq!(config.network_preset, bsv_rs::overlay::NetworkPreset::Local);
 }
 
@@ -557,11 +549,10 @@ fn test_storage_downloader_creation() {
 
 #[test]
 fn test_storage_downloader_creation_with_config() {
-    let config = StorageDownloaderConfig {
-        network_preset: bsv_rs::overlay::NetworkPreset::Testnet,
-        resolver: None,
-        timeout_ms: Some(15000),
-    };
+    let config = StorageDownloaderConfig::default()
+        .with_network_preset(bsv_rs::overlay::NetworkPreset::Testnet)
+        .with_resolver(None)
+        .with_timeout_ms(Some(15000));
     let downloader = StorageDownloader::new(config);
     // Just verify it was created successfully
     assert!(std::mem::size_of_val(&downloader) > 0);

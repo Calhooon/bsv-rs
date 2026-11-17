@@ -146,17 +146,17 @@ fn resolver_counting(outputs: Vec<OutputListItem>) -> (Arc<LookupResolver>, Arc<
         LookupAnswer::OutputList { outputs },
         AtomicUsize::new(0),
     ));
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(lookup.clone()),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(HashMap::from([(
-            "ls_ship".to_string(),
-            vec![format!(
-                "https://ls-ship-{n}.ship-requirements-tb-acks-rs.invalid"
-            )],
-        )])),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_facilitator(Some(lookup.clone()))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(HashMap::from([(
+                "ls_ship".to_string(),
+                vec![format!(
+                    "https://ls-ship-{n}.ship-requirements-tb-acks-rs.invalid"
+                )],
+            )]))),
+    ));
     (resolver, lookup)
 }
 
@@ -178,11 +178,9 @@ fn require_ack(v: &Value) -> RequireAck {
 /// this crate's default (`None` for all hosts, the reference's `[]`; `All`
 /// for any host, the reference's `'all'`).
 fn config(requirement: &Value, facilitator: Arc<Behaving>) -> TopicBroadcasterConfig {
-    let mut config = TopicBroadcasterConfig {
-        resolver: Some(resolver()),
-        facilitator: Some(facilitator),
-        ..Default::default()
-    };
+    let mut config = TopicBroadcasterConfig::default()
+        .with_resolver(Some(resolver()))
+        .with_facilitator(Some(facilitator));
     if let Some(all) = requirement.get("all") {
         config.require_ack_from_all_hosts = require_ack(all);
     }
@@ -466,12 +464,10 @@ async fn a_failed_broadcast_carries_the_txid_the_reference_leaves_out_stated_815
         let (resolver, lookup) = resolver_counting(vec![]);
         let b = TopicBroadcaster::new(
             topics(),
-            TopicBroadcasterConfig {
-                network_preset: preset,
-                resolver: Some(resolver),
-                facilitator: Some(facilitator.clone()),
-                ..Default::default()
-            },
+            TopicBroadcasterConfig::default()
+                .with_network_preset(preset)
+                .with_resolver(Some(resolver))
+                .with_facilitator(Some(facilitator.clone())),
         )
         .unwrap();
         let failure = b.broadcast_tx(&subject).await.unwrap_err();
@@ -500,11 +496,9 @@ async fn a_failed_broadcast_carries_the_txid_the_reference_leaves_out_stated_815
     let (resolver, lookup) = resolver_counting(vec![]);
     let b = TopicBroadcaster::new(
         topics(),
-        TopicBroadcasterConfig {
-            resolver: Some(resolver),
-            facilitator: Some(facilitator.clone()),
-            ..Default::default()
-        },
+        TopicBroadcasterConfig::default()
+            .with_resolver(Some(resolver))
+            .with_facilitator(Some(facilitator.clone())),
     )
     .unwrap();
     let failure = b.broadcast_tx(&unwritable).await.unwrap_err();

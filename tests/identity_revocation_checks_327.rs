@@ -181,13 +181,15 @@ async fn revoke_across(
     let by_host: HashMap<String, LookupAnswer> = hosts.iter().cloned().zip(lookups).collect();
     let mut host_overrides = HashMap::new();
     host_overrides.insert("ls_identity".to_string(), hosts);
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(Lookup(by_host)) as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(
+                Arc::new(Lookup(by_host)) as Arc<dyn OverlayLookupFacilitator>
+            ))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    ));
     let ship = Ship::default();
     let config = IdentityClientConfig::default().with_network(NetworkPreset::Local);
     let client = IdentityClient::with_resolver(wallet.clone(), config, resolver)

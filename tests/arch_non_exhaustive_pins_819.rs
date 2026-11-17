@@ -744,7 +744,7 @@ fn macro_file_refusals(text: &str) -> Vec<String> {
 /// is the pins found under `src/` (the test below holds it so), and each
 /// entry must have exactly one `compile fail ... ok` line and at least one
 /// plain `... ok` line in the doc suite's log.
-const DOC_PINS: [&str; 25] = [
+const DOC_PINS: [&str; 45] = [
     "src/auth/certificates/certificate.rs - auth::certificates::certificate::Certificate",
     "src/auth/clients/auth_fetch.rs - auth::clients::auth_fetch::AuthFetchOptions",
     "src/auth/peer.rs - auth::peer::PeerOptions",
@@ -760,14 +760,34 @@ const DOC_PINS: [&str; 25] = [
     "src/error/wallet_fault.rs - error::wallet_fault::WalletFaultFamily",
     "src/error/wallet_refusal.rs - error::wallet_refusal::WalletRefusalClass",
     "src/identity/types.rs - identity::types::Contact",
+    "src/identity/types.rs - identity::types::ContactsManagerConfig",
+    "src/identity/types.rs - identity::types::IdentityClientConfig",
+    "src/kvstore/options.rs - kvstore::options::KVStoreGetOptions",
+    "src/kvstore/options.rs - kvstore::options::KVStoreRemoveOptions",
+    "src/kvstore/options.rs - kvstore::options::KVStoreSetOptions",
+    "src/kvstore/types.rs - kvstore::types::KVStoreConfig",
+    "src/overlay/historian.rs - overlay::historian::HistorianConfig",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupLimits",
     "src/overlay/lookup_limits.rs - overlay::lookup_limits::LookupRequestOptions",
+    "src/overlay/lookup_resolver.rs - overlay::lookup_resolver::LookupResolverConfig",
+    "src/overlay/reputation_config.rs - overlay::reputation_config::ReputationConfig",
+    "src/overlay/topic_broadcaster.rs - overlay::topic_broadcaster::TopicBroadcasterConfig",
+    "src/registry/client.rs - registry::client::RegistryClientConfig",
     "src/script/not_judged.rs - script::not_judged::NotJudgedCause",
+    "src/storage/downloader.rs - storage::downloader::StorageDownloaderConfig",
+    "src/storage/uploader.rs - storage::uploader::StorageUploaderConfig",
+    "src/totp/options.rs - totp::options::TotpOptions",
+    "src/totp/options.rs - totp::options::TotpValidateOptions",
     "src/transaction/beef/link.rs - transaction::beef::link::BeefLinkLimits",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Kind",
     "src/transaction/beef_stream/reason.rs - transaction::beef_stream::reason::Reason",
+    "src/transaction/broadcasters/teranode.rs - transaction::broadcasters::teranode::TeranodeConfig",
+    "src/transaction/broadcasters/whatsonchain.rs - transaction::broadcasters::whatsonchain::WocBroadcastConfig",
     "src/transaction/chain_tracker.rs - transaction::chain_tracker::ChainTrackerError",
+    "src/transaction/chain_trackers/block_headers_service.rs - transaction::chain_trackers::block_headers_service::BlockHeadersServiceConfig",
+    "src/transaction/fee_models/live_policy.rs - transaction::fee_models::live_policy::LivePolicyConfig",
     "src/transaction/work_budget.rs - transaction::work_budget::WorkBudget",
+    "src/wallet/cached_key_deriver.rs - wallet::cached_key_deriver::CacheConfig",
     "src/wallet/hmac_tag.rs - wallet::hmac_tag::HmacKeyEncoding",
     "src/wallet/hmac_tag.rs - wallet::hmac_tag::HmacVerifyPolicy",
 ];

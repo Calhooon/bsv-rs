@@ -66,7 +66,24 @@ pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
 pub const DEFAULT_FALLBACK_RATE: u64 = 100;
 
 /// Live policy fee model configuration.
-#[derive(Clone)] // Debug redacts the key (credential_debug.rs)
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::transaction::LivePolicyConfig) -> bsv_rs::transaction::LivePolicyConfig {
+///     bsv_rs::transaction::LivePolicyConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::transaction::LivePolicyConfig) -> bsv_rs::transaction::LivePolicyConfig {
+///     value
+/// }
+/// ```
+// Debug redacts the key (credential_debug.rs)
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct LivePolicyConfig {
     /// URL of the policy endpoint (ARC's schema); empty in the `Default`,
     /// which `refresh` refuses
@@ -81,6 +98,11 @@ pub struct LivePolicyConfig {
     pub timeout_ms: u64,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    LivePolicyConfig,
+    bsv_rs::transaction::LivePolicyConfig
+);
+
 impl Default for LivePolicyConfig {
     fn default() -> Self {
         Self {
@@ -90,6 +112,43 @@ impl Default for LivePolicyConfig {
             fallback_rate: DEFAULT_FALLBACK_RATE,
             timeout_ms: 10_000,
         }
+    }
+}
+
+impl LivePolicyConfig {
+    /// Sets `policy_url`.
+    #[must_use]
+    pub fn with_policy_url(mut self, policy_url: String) -> Self {
+        self.policy_url = policy_url;
+        self
+    }
+
+    /// Sets `api_key`.
+    #[must_use]
+    pub fn with_api_key(mut self, api_key: Option<String>) -> Self {
+        self.api_key = api_key;
+        self
+    }
+
+    /// Sets `cache_ttl`.
+    #[must_use]
+    pub fn with_cache_ttl(mut self, cache_ttl: Duration) -> Self {
+        self.cache_ttl = cache_ttl;
+        self
+    }
+
+    /// Sets `fallback_rate`.
+    #[must_use]
+    pub fn with_fallback_rate(mut self, fallback_rate: u64) -> Self {
+        self.fallback_rate = fallback_rate;
+        self
+    }
+
+    /// Sets `timeout_ms`.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
     }
 }
 

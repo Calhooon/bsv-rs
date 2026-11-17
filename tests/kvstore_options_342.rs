@@ -23,14 +23,13 @@ async fn enabled_store_options_reach_both_calls_as_recorded_342() {
 #[tokio::test]
 async fn exhaustive_config_literals_keep_the_recorded_defaults_342() {
     for global in [false, true] {
-        let config = KVStoreConfig {
-            protocol_id: "kvstore".into(),
-            service_name: "ls_kvstore".into(),
-            token_amount: 1,
-            topics: vec!["tm_kvstore".into()],
-            originator: None,
-            encrypt: true,
-        };
+        let mut config = KVStoreConfig::default()
+            .with_token_amount(1)
+            .with_topics(vec!["tm_kvstore".into()])
+            .with_encrypt(true);
+        config.protocol_id = "kvstore".into();
+        config.service_name = "ls_kvstore".into();
+        config.originator = None;
         let (_, wallet) = support::setup(global, config).await;
         support::assert_options(&wallet, global, "set_new", "defaults");
     }

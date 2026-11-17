@@ -170,25 +170,25 @@ fn make_store(
     if !global {
         return Store::Local(LocalKVStore::new(wallet.clone(), config).unwrap());
     }
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        host_overrides: Some(
-            [(
-                config.service_name.clone(),
-                vec![format!(
-                    "https://kvstore-343-{}.invalid",
-                    NEXT.fetch_add(1, Ordering::Relaxed)
-                )],
-            )]
-            .into(),
-        ),
-        slap_trackers: Some(vec![]),
-        facilitator: Some(Arc::new(Lookup {
-            outputs: lookup,
-            questions,
-        })),
-        ..Default::default()
-    });
+    let resolver = LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_host_overrides(Some(
+                [(
+                    config.service_name.clone(),
+                    vec![format!(
+                        "https://kvstore-343-{}.invalid",
+                        NEXT.fetch_add(1, Ordering::Relaxed)
+                    )],
+                )]
+                .into(),
+            ))
+            .with_slap_trackers(Some(vec![]))
+            .with_facilitator(Some(Arc::new(Lookup {
+                outputs: lookup,
+                questions,
+            }))),
+    );
     Store::Global(GlobalKVStore::with_resolver(
         wallet.clone(),
         config,

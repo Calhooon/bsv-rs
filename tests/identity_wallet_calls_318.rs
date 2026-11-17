@@ -113,7 +113,7 @@ fn vector() -> Vector {
 
 fn config(w: &Witness) -> IdentityClientConfig {
     match &w.configured_originator {
-        Some(o) => IdentityClientConfig::with_originator(o.clone()),
+        Some(o) => IdentityClientConfig::default().with_originator(o.clone()),
         None => IdentityClientConfig::default(),
     }
 }
@@ -163,15 +163,15 @@ async fn revoked(v: &Vector, w: &Witness) -> Counting {
         "ls_identity".to_string(),
         vec!["http://identity-lookup.invalid".to_string()],
     );
-    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
-        network_preset: NetworkPreset::Local,
-        facilitator: Some(Arc::new(Lookup {
-            beef: v.revocation.lookup_beef.clone(),
-        }) as Arc<dyn OverlayLookupFacilitator>),
-        slap_trackers: Some(vec![]),
-        host_overrides: Some(host_overrides),
-        ..Default::default()
-    }));
+    let resolver = Arc::new(LookupResolver::new(
+        LookupResolverConfig::default()
+            .with_network_preset(NetworkPreset::Local)
+            .with_facilitator(Some(Arc::new(Lookup {
+                beef: v.revocation.lookup_beef.clone(),
+            }) as Arc<dyn OverlayLookupFacilitator>))
+            .with_slap_trackers(Some(vec![]))
+            .with_host_overrides(Some(host_overrides)),
+    ));
     let client = IdentityClient::with_resolver(wallet.clone(), config(w), resolver);
     let stopped = client
         .revoke_certificate_revelation(&v.certificate.serial_number)

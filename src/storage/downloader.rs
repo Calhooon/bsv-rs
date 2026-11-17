@@ -17,7 +17,23 @@ use super::utils::is_valid_url;
 use super::utils::get_hash_from_url;
 
 /// Configuration for StorageDownloader.
+///
+/// `#[non_exhaustive]` (#843d8c): no struct expression builds one outside the
+/// crate, a functional update that names no field included:
+///
+/// ```compile_fail,E0639
+/// fn rebuilt(value: bsv_rs::storage::StorageDownloaderConfig) -> bsv_rs::storage::StorageDownloaderConfig {
+///     bsv_rs::storage::StorageDownloaderConfig { ..value }
+/// }
+/// ```
+///
+/// ```
+/// fn kept(value: bsv_rs::storage::StorageDownloaderConfig) -> bsv_rs::storage::StorageDownloaderConfig {
+///     value
+/// }
+/// ```
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct StorageDownloaderConfig {
     /// Network preset (mainnet, testnet, local).
     pub network_preset: NetworkPreset,
@@ -27,6 +43,11 @@ pub struct StorageDownloaderConfig {
     pub timeout_ms: Option<u64>,
 }
 
+crate::util::non_exhaustive::assert_no_drop!(
+    StorageDownloaderConfig,
+    bsv_rs::storage::StorageDownloaderConfig
+);
+
 impl Default for StorageDownloaderConfig {
     fn default() -> Self {
         Self {
@@ -34,6 +55,29 @@ impl Default for StorageDownloaderConfig {
             resolver: None,
             timeout_ms: Some(30000),
         }
+    }
+}
+
+impl StorageDownloaderConfig {
+    /// Sets `network_preset`.
+    #[must_use]
+    pub fn with_network_preset(mut self, network_preset: NetworkPreset) -> Self {
+        self.network_preset = network_preset;
+        self
+    }
+
+    /// Sets `resolver`.
+    #[must_use]
+    pub fn with_resolver(mut self, resolver: Option<Arc<LookupResolver>>) -> Self {
+        self.resolver = resolver;
+        self
+    }
+
+    /// Sets `timeout_ms`.
+    #[must_use]
+    pub fn with_timeout_ms(mut self, timeout_ms: Option<u64>) -> Self {
+        self.timeout_ms = timeout_ms;
+        self
     }
 }
 

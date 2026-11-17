@@ -74,25 +74,22 @@ fn resolver_with_waits(
 ) -> (LookupResolver, Asked, Waits) {
     let asked = Asked::default();
     let waits = Waits::default();
-    let resolver = LookupResolver::new(LookupResolverConfig {
-        facilitator: Some(Arc::new(Scripted {
+    let resolver = LookupResolver::new(
+        config.with_facilitator(Some(Arc::new(Scripted {
             asked: asked.clone(),
             waits: waits.clone(),
             script: script
                 .into_iter()
                 .map(|(url, answer)| (url.to_string(), answer))
                 .collect(),
-        })),
-        ..config
-    });
+        }))),
+    );
     (resolver, asked, waits)
 }
 
 fn trackers(urls: &[&str]) -> LookupResolverConfig {
-    LookupResolverConfig {
-        slap_trackers: Some(urls.iter().map(|url| url.to_string()).collect()),
-        ..Default::default()
-    }
+    LookupResolverConfig::default()
+        .with_slap_trackers(Some(urls.iter().map(|url| url.to_string()).collect()))
 }
 
 /// A tracker's answer naming each host for `service`, SLAP advertisements
@@ -191,10 +188,7 @@ async fn find_competent_hosts_on_the_local_preset_asks_its_tracker() {
     const LOCAL: &str = "http://localhost:8080";
     assert_eq!(NetworkPreset::Local.slap_trackers(), [LOCAL]);
     let (resolver, asked) = resolver(
-        LookupResolverConfig {
-            network_preset: NetworkPreset::Local,
-            ..Default::default()
-        },
+        LookupResolverConfig::default().with_network_preset(NetworkPreset::Local),
         vec![(
             LOCAL,
             advertising("ls_test", &["https://found.discovery-779.invalid"]),
@@ -213,13 +207,10 @@ async fn find_competent_hosts_does_not_apply_a_host_override() {
     const TRACKER: &str = "https://override.discovery-779.invalid";
     const SERVICE: &str = "ls_override_test";
     let (resolver, asked) = resolver(
-        LookupResolverConfig {
-            host_overrides: Some(HashMap::from([(
-                SERVICE.to_string(),
-                vec!["https://override.host".to_string()],
-            )])),
-            ..trackers(&[TRACKER])
-        },
+        trackers(&[TRACKER]).with_host_overrides(Some(HashMap::from([(
+            SERVICE.to_string(),
+            vec!["https://override.host".to_string()],
+        )]))),
         vec![
             (TRACKER, advertising(SERVICE, &["https://discovered.host"])),
             (
@@ -374,10 +365,7 @@ async fn a_trackers_share_is_counted_after_admission_815() {
     let mut limits = bsv_rs::overlay::LookupLimits::default();
     limits.max_hosts_per_tracker = 2;
     let (resolver, asked) = resolver(
-        LookupResolverConfig {
-            limits,
-            ..trackers(&[TRACKER])
-        },
+        trackers(&[TRACKER]).with_limits(limits),
         vec![(TRACKER, Ok(LookupAnswer::OutputList { outputs }))],
     );
     let hosts = resolver.find_competent_hosts(SERVICE).await.unwrap();

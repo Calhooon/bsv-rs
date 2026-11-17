@@ -118,11 +118,13 @@ async fn the_slap_discovery_reads_only_an_authenticated_advertisement_544() {
         ("slap_wrong_signer", vec![]),
         ("slap_wrong_lock_key", vec![]),
     ] {
-        let resolver = LookupResolver::new(LookupResolverConfig {
-            facilitator: Some(Arc::new(Answering(script(case(&v, name)).to_binary()))),
-            slap_trackers: Some(vec![format!("https://{name}.tracker.invalid")]),
-            ..Default::default()
-        });
+        let resolver = LookupResolver::new(
+            LookupResolverConfig::default()
+                .with_facilitator(Some(Arc::new(Answering(
+                    script(case(&v, name)).to_binary(),
+                ))))
+                .with_slap_trackers(Some(vec![format!("https://{name}.tracker.invalid")])),
+        );
         assert_eq!(
             resolver.find_competent_hosts("ls_test").await.unwrap(),
             hosts,
@@ -142,10 +144,7 @@ async fn the_ship_discovery_reads_only_an_authenticated_advertisement_544() {
         let resolver = lock_position::answering("ls_ship", script(case(&v, name)));
         let broadcaster = TopicBroadcaster::new(
             vec!["tm_test".to_string()],
-            TopicBroadcasterConfig {
-                resolver: Some(resolver),
-                ..Default::default()
-            },
+            TopicBroadcasterConfig::default().with_resolver(Some(resolver)),
         )
         .unwrap();
         let hosts = broadcaster.find_interested_hosts().await.unwrap();
