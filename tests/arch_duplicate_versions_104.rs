@@ -72,7 +72,7 @@ const LINES: usize = 22;
 const RUN_TESTS: &str =
     "          python3 -B -m unittest discover -s .github/scripts -p 'test_duplicate_versions.py' || result=1\n";
 const RUN_SCRIPT: &str = "          python3 -B .github/scripts/duplicate_versions.py || result=1\n";
-const WASM32_DENY: &str = "          cargo-deny --locked --no-default-features --features \"auth,wallet,transaction,overlay,socketio,wasm\" --target wasm32-unknown-unknown check || result=1\n";
+const WASM32_DENY: &str = "          cargo-deny --locked --no-default-features --features \"auth,wallet,transaction,overlay,socketio,wasm\" --target wasm32-unknown-unknown check bans licenses sources || result=1\n";
 
 /// A line's order, the script's `line_key`: numeric by part, a part that is no number after
 /// every number.
@@ -472,7 +472,7 @@ fn the_deny_step_runs_the_duplicate_check_and_its_tests_104() {
         "does not end with `exit \"$result\"`",
     );
     one(
-        ci.replace("--features \"auth,wallet,transaction,overlay,socketio,wasm\" --target wasm32-unknown-unknown check", "--features \"auth,wasm\" --target wasm32-unknown-unknown check"),
+        ci.replace("--features \"auth,wallet,transaction,overlay,socketio,wasm\" --target wasm32-unknown-unknown check bans", "--features \"auth,wasm\" --target wasm32-unknown-unknown check bans"),
         "cargo-deny on the wasm32 slice the check reads",
     );
     // moved out of the gate: the lines in another step leave the `deny` step without them

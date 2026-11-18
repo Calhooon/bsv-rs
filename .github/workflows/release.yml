@@ -190,6 +190,50 @@ jobs:
     permissions:
       contents: read
 
+  # The fourth check of cargo-deny (#1034): a pull request's `deny` step reads bans, licenses and
+  # sources, and the RustSec database is read once a day for each line by advisories.yml, which
+  # keeps an issue `advisories: <line>` while a line has a finding. A tag reads all four checks
+  # here, on the three graphs of that step and a lockfile resolved in this job (the library
+  # commits none), and the publish waits for it: nothing is released with an advisory nobody has
+  # looked at. A red job here spends the tag as any red job before the publish does, so the
+  # line's issue is read, and the daily workflow dispatched, before the tag is made (RELEASING.md
+  # step 2; tests/arch_advisories_1034.rs).
+  advisories:
+    name: Advisories
+    needs: version
+    runs-on: ubuntu-latest
+    # the daily run's shape and figure (advisories.yml: two jobs of about a minute, each
+    # bounded at 15): a fetch of the database or the index that hangs ends the job, and the tag,
+    # in 15 minutes, never at the runner's 6 hours (#1034's second fold)
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-deny 0.20.2
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
+        with:
+          tool: cargo-deny@0.20.2
+
+      - name: Resolve the lockfile
+        run: cargo generate-lockfile
+
+      - name: deny, all four checks
+        run: |
+          result=0
+          cargo-deny --locked --all-features check advisories bans licenses sources || result=1
+          cargo-deny --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check advisories bans licenses sources || result=1
+          cargo-deny --locked check advisories bans licenses sources || result=1
+          exit "$result"
+
   bench:
     name: Bench
     needs: version
@@ -201,7 +245,7 @@ jobs:
 
   publish:
     name: Publish to crates.io
-    needs: [version, ci, docs, msrv, features, machete]
+    needs: [version, ci, docs, msrv, features, machete, advisories]
     runs-on: ubuntu-latest
     permissions:
       contents: read

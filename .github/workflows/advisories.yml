@@ -1,0 +1,168 @@
+name: advisories
+
+# The advisories run (#1034; the stack's ruling of 2026-11-17, bsv-stack-lean
+# docs/DECISIONS-2026-10-19.md 27.5, its template/advisories.yml the shape). The RustSec
+# database is an outside clock: a new advisory against a dependency is no change of any pull
+# request, so a pull request's `deny` step reads bans, licenses and sources (ci.yml) and the
+# advisories are read here, once a day for each line, and by release.yml's `advisories` job on
+# a tag before it publishes.
+#
+# A scheduled workflow runs from the default branch's file alone, so this one file reads both
+# lines: a job for `main` and a job for `beta`, each on a checkout of its line, a lockfile
+# resolved in the job (the library commits none: the graph a new consumer resolves that day)
+# and the three graphs of ci.yml's `deny` step (all features, the Cloudflare slice on wasm32,
+# default features). It reads nothing until it is on `main`.
+#
+# A finding opens one issue for its line, titled `advisories: <line>`, or rewrites the one
+# that is open; a run that finds nothing closes it. The run stays green on a finding: the
+# issue is the signal, and the tag is the gate. The run is red only when cargo-deny could not
+# judge a graph (it failed with no advisory's finding, or with a fault of its own: a config it
+# could not read, the database not fetched, the graph not resolved), and then the line's issue
+# is left as it stands.
+#
+# Triage of an issue: a dependency change by its own pull request. deny.toml's ignore list
+# stays empty (RELEASING.md step 2; tests/arch_advisories_1034.rs pins this file's shape).
+#
+# This is the one workflow of the repository on a schedule (the nightly and the front pages
+# are dispatched by hand, the owner's words of 2026-10-27 and 2026-11-10), by the ruling
+# above. Its load: one run a day, two jobs of about a minute, each one checkout, one prebuilt
+# cargo-deny, one fetch of the advisory database and at most three calls to this repository's
+# own issues. Its token reads the contents and writes issues; it holds no secret.
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# one run at a time, never cancelled: two runs close together could each open the line's issue
+concurrency:
+  group: advisories
+  cancel-in-progress: false
+
+jobs:
+  advisories:
+    name: advisories (${{ matrix.line }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [main, beta]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ matrix.line }}
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      # the same pinned release binary as ci.yml's `deny` step and release.yml's job
+      - name: Install cargo-deny 0.20.2
+        uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
+        with:
+          tool: cargo-deny@0.20.2
+
+      - name: Resolve the lockfile
+        run: cargo generate-lockfile
+
+      # Each graph to a log and an exit code of its own; the step itself never fails on a
+      # finding. No colour, so the next step reads `error[...]` at a line's start.
+      - name: advisories
+        run: |
+          set +e
+          cargo-deny --color never --locked --all-features check advisories > "$RUNNER_TEMP/advisories-all.log" 2>&1
+          echo "$?" > "$RUNNER_TEMP/advisories-all.code"
+          cargo-deny --color never --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check advisories > "$RUNNER_TEMP/advisories-wasm32.log" 2>&1
+          echo "$?" > "$RUNNER_TEMP/advisories-wasm32.code"
+          cargo-deny --color never --locked check advisories > "$RUNNER_TEMP/advisories-default.log" 2>&1
+          echo "$?" > "$RUNNER_TEMP/advisories-default.code"
+          for graph in all wasm32 default; do
+            echo "::group::$graph (exit $(cat "$RUNNER_TEMP/advisories-$graph.code"))"
+            tail -n 200 "$RUNNER_TEMP/advisories-$graph.log"
+            echo "::endgroup::"
+          done
+          exit 0
+
+      - name: Open, rewrite or close the line's issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINE: ${{ matrix.line }}
+        run: |
+          set -euo pipefail
+          title="advisories: $LINE"
+          sha=$(git rev-parse --short=8 HEAD)
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          # A finding is an `error[...]` of an advisory's kind (a vulnerability, a notice, an
+          # unmaintained or unsound crate, a yanked version). A graph that failed otherwise is
+          # the run's own fault, never a finding: a log line of cargo-deny's `[ERROR]` (a config
+          # it could not read, a database it could not fetch, a graph it could not resolve), a
+          # diagnostic of another kind (a config's `unexpected-keys`, a registry's
+          # `index-failure`), or none; a code that cannot be read is the same. Each answer was
+          # shown by a run of cargo-deny 0.20.2 (tests/arch_advisories_answers_1034.rs).
+          findings=""
+          unjudged=""
+          advisory='^error\[(vulnerability|notice|unmaintained|unsound|yanked)\]'
+          for graph in all wasm32 default; do
+            log="$RUNNER_TEMP/advisories-$graph.log"
+            code=$(cat "$RUNNER_TEMP/advisories-$graph.code")
+            if [[ "$code" == "0" ]]; then
+              continue
+            fi
+            fault=$(grep -E '^error(\[[a-z-]+\])?: |^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9:]{8} \[ERROR\] ' "$log" | grep -v -E "$advisory" || true)
+            kinds=$(grep -o -E "$advisory" "$log" | sort | uniq -c | sed -E 's/^ *([0-9]+) error\[([a-z-]+)\]/\2: \1/' | paste -sd ',' - | sed 's/,/, /g' || true)
+            if [[ -n "$fault" || -z "$kinds" ]]; then
+              unjudged="$unjudged $graph"
+              continue
+            fi
+            ids=$(grep -o -E 'ID: RUSTSEC-[0-9]{4}-[0-9]{4}' "$log" | cut -d' ' -f2 | sort -u | paste -sd ' ' - || true)
+            findings="${findings}- \`$graph\`: $kinds; advisory ids: ${ids:-none named (a yanked crate carries no id)}"$'\n'
+          done
+          if [[ -n "$unjudged" ]]; then
+            echo "::error::cargo-deny could not judge:$unjudged (it failed with no advisory's finding, or with a fault of its own). This run could not judge \`$LINE\`; its issue is left as it stands"
+            exit 1
+          fi
+
+          # Every page of the open issues, so an old issue is found again and never opened
+          # twice; pull requests share the listing and are skipped.
+          nums=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" \
+            --jq ".[] | select(.pull_request == null and .title == \"$title\") | .number")
+          num=$(printf '%s\n' "$nums" | head -n 1)
+
+          if [[ -z "$findings" ]]; then
+            # every open issue of this title, should two ever have been opened
+            for n in $nums; do
+              gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$n/comments" --silent \
+                -f body="The advisories check is clean on \`$LINE\` at \`$sha\`, on the three graphs ($run_url). Closing."
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$n" --silent -f state=closed
+              echo "clean: closed issue $n"
+            done
+            [[ -n "$num" ]] || echo "clean: no issue open"
+            exit 0
+          fi
+
+          body=$(printf '%s\n' \
+            "The advisories check of cargo-deny fails on \`$LINE\` at \`$sha\`, on a lockfile resolved by the run (the library commits none). By graph (\`all\`: all features; \`wasm32\`: the Cloudflare slice; \`default\`: default features), the findings by kind:" \
+            "" \
+            "${findings%$'\n'}" \
+            "" \
+            "The run, with cargo-deny's full text: $run_url" \
+            "" \
+            "No pull request is blocked by this: a pull request's \`deny\` reads bans, licenses and sources. A release tag reads advisories too (\`release.yml\`'s \`advisories\` job, before \`publish\`), so this issue is closed before the next tag of \`$LINE\`, by a dependency change in a pull request of its own. Never by an entry in \`deny.toml\`'s ignore list, which stays empty (\`RELEASING.md\` step 2)." \
+            "" \
+            "This issue is rewritten by each daily run while the check fails and closed by the next clean run.")
+
+          if [[ -n "$num" ]]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$num" --silent -f body="$body"
+            echo "finding: rewrote issue $num"
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues" --silent -f title="$title" -f body="$body"
+            echo "finding: opened an issue"
+          fi
+          printf '%s' "$findings"

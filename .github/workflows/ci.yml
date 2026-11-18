@@ -634,7 +634,10 @@ jobs:
             echo "::endgroup::"
           done
 
-      # all features, the Cloudflare slice and default features; every graph must pass. cargo-deny
+      # all features, the Cloudflare slice and default features; every graph must pass. The three
+      # checks named are functions of the tree; the fourth, the RustSec database's, follows an
+      # outside clock and is read by its own daily workflow for each line and by release.yml on a
+      # tag before it publishes, never here (#1034; tests/arch_advisories_1034.rs). cargo-deny
       # warns on a crate held in two versions and passes, so the last two lines refuse one that
       # docs/duplicate-versions.txt does not hold, in those three graphs and `full,http,websocket`
       # (#104; tests/arch_duplicate_versions_104.rs pins the list's totals and these lines)
@@ -644,9 +647,9 @@ jobs:
         run: |
           trap 'if [ $? -eq 0 ]; then echo "PASS deny"; else echo "FAIL deny"; fi' EXIT
           result=0
-          cargo-deny --locked --all-features check || result=1
-          cargo-deny --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check || result=1
-          cargo-deny --locked check || result=1
+          cargo-deny --locked --all-features check bans licenses sources || result=1
+          cargo-deny --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check bans licenses sources || result=1
+          cargo-deny --locked check bans licenses sources || result=1
           python3 -B -m unittest discover -s .github/scripts -p 'test_duplicate_versions.py' || result=1
           python3 -B .github/scripts/duplicate_versions.py || result=1
           exit "$result"
