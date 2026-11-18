@@ -161,10 +161,14 @@ recorded baseline is compared against the PR base so a raised limit cannot hide
 code, and a mutation floor in the record's `mutation_floors` member (#602) can
 be raised but never lowered or removed. [RATCHETS.md](RATCHETS.md).
 
-**Deny.** `cargo deny check` on all features, the Cloudflare wasm32 slice and
-the defaults, `--locked` against one audit lockfile: RustSec findings and
-yanked crates fail, the ignore list stays empty, licenses are allowlisted,
-sources are crates.io only. [RELEASING.md](../RELEASING.md) step 2.
+**Deny.** `cargo deny check bans licenses sources` on all features, the
+Cloudflare wasm32 slice and the defaults, `--locked` against one audit
+lockfile: licenses are allowlisted, sources are crates.io only. Advisories
+(RustSec findings and yanked crates) are not read on a pull request (#1034):
+`advisories.yml` reads them once a day for `main` and for `beta` on the same
+three graphs and keeps one issue a line, and `release.yml`'s `advisories` job
+reads all four checks on a tag before the publish; the ignore list stays
+empty (`tests/arch_advisories_1034.rs`). [RELEASING.md](../RELEASING.md) step 2.
 Duplicate versions warn and are never skipped (`deny.toml`, `[bans]`
 `multiple-versions = "warn"`, no `skip` or `skip-tree`); #104 tracks them.
 A new one is refused beside cargo-deny, in the same step:
