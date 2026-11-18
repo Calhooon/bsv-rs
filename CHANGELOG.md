@@ -5545,6 +5545,16 @@ No SDK has a twin of the baseline. No source line, wire byte, verdict or error t
 - Pinned by: the law by the test's own assertions, red under a copy that drops the lock time (`merge_transaction, entry 1: the id for signing`) and green restored; the budget by the two runs' closing assertions.
 - Migration. none: a test-only change.
 
+## [0.8.13] - 2026-11-18
+
+### Security: GlobalKVStore selector queries enforce the query's controller, protocol and tags against the overlay resolver's answer
+
+- **What was reachable.** `GlobalKVStore::query`, `get_by_controller` and `get_by_tags` sent the caller's selector (a controller, a protocol or tags) to the overlay lookup resolver and returned its answer without re-checking the selector on the client side. A token's fields are controller-signed (the token-authentication fixes), so a lookup host cannot forge a token, but it can answer a selector query with any real, validly-signed token of any controller or tags; a caller that trusted `get_by_controller(X)` to return only `X`'s entries was served another controller's token, honestly self-labelled with its true controller. Reachable from an untrusted lookup host on the default read path (no feature flag). The existing-token lookup that `set` and `remove` run reads the same path and did not re-check the controller of each returned entry either, so a host's wrong-controller token could be taken as the caller's existing token; spending such a token still needs the caller's own key, so the caller-facing loss is on the three read doors.
+- **What changed.** `query_overlay` (`src/kvstore/global.rs`), the one path every read door and the existing-token lookup share, now drops a decoded entry that does not satisfy the query's key, controller (case-insensitive), protocol or tags before it is returned, through `KVStoreInterpreter::entry_matches_query` (`src/kvstore/interpreter.rs`). No API or type change.
+- **Pinned by.** `tests/kvstore_global_selector_filter.rs`: a host-injected other-controller token is dropped by `get_by_controller`, a token missing a queried tag by `get_by_tags` (`all` and `any` modes), and a token of another protocol by `query`; an honest matching token is kept, a key-only `get` is unchanged (equally lenient on both sides), and an existing-token lookup (`remove`) does not adopt a wrong-controller token. RED on a scratch copy of the tip before the fix. The `entry_matches_query` unit tests in `src/kvstore/interpreter.rs` pin each guard directly — the key, the case-insensitive controller, the bare-name and `[1, name]` App-level protocol match, and the `all`/`any` tag mode — because the integration door cannot reach a `pub(crate)` function and the real path leaves four of the guards unexercised.
+- **Migration.** None. An honest caller talking to an honest host sees the same entries, values and errors; only a host-injected non-matching entry is now dropped.
+- **Notes: cross-SDK parity.** This conforms to the reference at the pin (`ts-stack@edf6e03` `packages/sdk/src/kvstore/GlobalKVStore.ts:601`, `:663-685`), whose `#entryMatchesQuery` already drops such an entry; this crate was lenient. No row of the divergence list moves.
+
 ## [0.8.12] - 2026-11-17
 
 ### Fixed: a second, heap bound on linking, beside the wire bound, closes the heap-held sibling of GHSA-gvmh-f5gf-5vjj (bsv-rs #749 fold-c)
