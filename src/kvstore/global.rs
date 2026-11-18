@@ -640,7 +640,6 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                         Err(_) => continue,
                     };
 
-                    // Get the output's locking script
                     let locking_script = match tx.outputs.get(output.output_index as usize) {
                         Some(out) => &out.locking_script,
                         None => continue,
@@ -662,7 +661,6 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                         continue;
                     }
 
-                    // Interpret the output
                     let ctx = query.key.as_ref().map(|k| {
                         KVStoreContext::new(
                             k,
@@ -676,6 +674,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                     if let Some(mut entry) =
                         KVStoreInterpreter::interpret(&tx, output.output_index, ctx.as_ref())
                     {
+                        if !KVStoreInterpreter::entry_matches_query(&entry, query) {
+                            continue;
+                        }
                         // Add token data if requested
                         if options.include_token {
                             let txid = tx.id();

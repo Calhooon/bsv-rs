@@ -11,7 +11,7 @@ use crate::transaction::Transaction;
 use crate::wallet::{Counterparty, ProtoWallet, SecurityLevel, VerifySignatureArgs};
 use std::sync::OnceLock;
 
-use super::types::{KVStoreEntry, KvProtocolFields};
+use super::types::{KVStoreEntry, KVStoreQuery, KvProtocolFields};
 
 /// Cached "anyone" wallet for signature verification.
 static ANYONE_WALLET: OnceLock<ProtoWallet> = OnceLock::new();
@@ -299,6 +299,52 @@ impl KVStoreInterpreter {
                 .cloned(),
             locking_public_key: pushdrop.locking_public_key,
         })
+    }
+
+    /// The reference's `#entryMatchesQuery` (`ts-stack@edf6e03`
+    /// `packages/sdk/src/kvstore/GlobalKVStore.ts:663-685`): the query's key,
+    /// controller (case-insensitive), protocol and tags (all/any mode) must all
+    /// be satisfied by a decoded entry, else it is dropped. The overlay
+    /// resolver's answer is the untrusted host's, so a selector query is
+    /// re-checked here before an entry is returned.
+    pub(crate) fn entry_matches_query(entry: &KVStoreEntry, query: &KVStoreQuery) -> bool {
+        if let Some(key) = &query.key {
+            if &entry.key != key {
+                return false;
+            }
+        }
+        if let Some(controller) = &query.controller {
+            if !entry.controller.eq_ignore_ascii_case(controller) {
+                return false;
+            }
+        }
+        if let Some(protocol) = &query.protocol_id {
+            // The entry's protocol is the token's raw `[level, name]` text; the
+            // query names the App-namespace name (or the same raw text), as the
+            // context match above reads it.
+            let matches = &entry.protocol_id == protocol
+                || serde_json::from_str::<(u8, String)>(&entry.protocol_id).is_ok_and(
+                    |(level, name)| level == SecurityLevel::App.as_u8() && &name == protocol,
+                );
+            if !matches {
+                return false;
+            }
+        }
+        if let Some(tags) = &query.tags {
+            let present: std::collections::HashSet<&String> = entry.tags.iter().collect();
+            let all_mode = query.tag_query_mode.as_deref().unwrap_or("all") == "all";
+            // `all`: drop if any queried tag is absent; `any`: drop if all are
+            // absent (the reference's `some`/`every` over the presence flags).
+            let fails = if all_mode {
+                tags.iter().any(|tag| !present.contains(tag))
+            } else {
+                tags.iter().all(|tag| !present.contains(tag))
+            };
+            if fails {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -633,5 +679,119 @@ mod tests {
 
         // Should return false for invalid controller
         assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    }
+
+    // ── entry_matches_query: the selector re-check on an overlay host's answer ──
+    // `entry_matches_query` is `pub(crate)`, so the integration suite cannot call
+    // it directly. On the real query path a keyed query is pre-filtered by
+    // `interpret`'s context and the writer stores the bare protocol name, so four
+    // of its guards are never exercised through the door. These unit tests reach
+    // each guard directly so none is a line the suite cannot see fail.
+    fn q() -> KVStoreQuery {
+        KVStoreQuery::new()
+    }
+
+    fn kv(key: &str, controller: &str, protocol_id: &str, tags: &[&str]) -> KVStoreEntry {
+        KVStoreEntry::new(key, "v", controller, protocol_id)
+            .with_tags(tags.iter().map(|t| (*t).to_string()).collect())
+    }
+
+    #[test]
+    fn entry_matches_query_empty_query_keeps_every_entry() {
+        let e = kv("k", "02aa", "kvstore", &["x"]);
+        assert!(KVStoreInterpreter::entry_matches_query(&e, &q()));
+    }
+
+    #[test]
+    fn entry_matches_query_key_guard_drops_a_mismatched_key() {
+        // Reachable only here: on the real path `interpret`'s context already drops
+        // a wrong-key entry before this function is called, so the integration
+        // suite never exercises this guard (it mirrors the reference's key check).
+        let e = kv("k1", "02aa", "kvstore", &[]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_key("k1")
+        ));
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_key("k2")
+        ));
+    }
+
+    #[test]
+    fn entry_matches_query_controller_compare_is_case_insensitive() {
+        // Reference parity (`entry.controller.toLowerCase() !== query...toLowerCase()`):
+        // the same key in another case still matches; a different key does not.
+        let e = kv("k", "02abcdef", "kvstore", &[]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_controller("02ABCDEF")
+        ));
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_controller("03abcdef")
+        ));
+    }
+
+    #[test]
+    fn entry_matches_query_protocol_matches_the_writers_bare_name() {
+        // `set_internal` writes field 0 as the bare protocol name; the exact-string
+        // disjunct keeps such a token under a matching protocol selector (removing
+        // it would wrongly drop this crate's own written tokens).
+        let e = kv("k", "02aa", "kvstore", &[]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_protocol_id("kvstore")
+        ));
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_protocol_id("otherproto")
+        ));
+    }
+
+    #[test]
+    fn entry_matches_query_protocol_matches_the_app_level_tuple() {
+        // A token whose field 0 is the reference's `[level, name]` JSON matches the
+        // bare-name selector only at the App security level (level 1).
+        let app = kv("k", "02aa", "[1,\"kvstore\"]", &[]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &app,
+            &q().with_protocol_id("kvstore")
+        ));
+        let non_app = kv("k", "02aa", "[2,\"kvstore\"]", &[]);
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &non_app,
+            &q().with_protocol_id("kvstore")
+        ));
+    }
+
+    #[test]
+    fn entry_matches_query_tag_mode_defaults_to_all() {
+        // Reference parity (`query.tagQueryMode ?? 'all'`): with no mode set, every
+        // queried tag must be present, so a missing tag drops the entry.
+        let e = kv("k", "02aa", "kvstore", &["a"]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_tags(vec!["a".to_string()])
+        ));
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_tags(vec!["a".to_string(), "b".to_string()])
+        ));
+    }
+
+    #[test]
+    fn entry_matches_query_tag_any_mode_keeps_on_one_present_tag() {
+        let e = kv("k", "02aa", "kvstore", &["a"]);
+        assert!(KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_tags(vec!["a".to_string(), "b".to_string()])
+                .with_tag_query_mode("any")
+        ));
+        assert!(!KVStoreInterpreter::entry_matches_query(
+            &e,
+            &q().with_tags(vec!["c".to_string()])
+                .with_tag_query_mode("any")
+        ));
     }
 }
