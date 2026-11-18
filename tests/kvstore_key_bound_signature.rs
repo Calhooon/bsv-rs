@@ -9,13 +9,13 @@
 //! the lock) signs the fields' bytes without the key: the same bytes divided
 //! into other fields kept the controller's signature. Every door that judges
 //! a token now refuses that form, an honest one included: the public
-//! signature check, the deprecated legacy verdict, the interpreter, the
+//! signature check, the interpreter, the
 //! store's read and its history walk. A door asked under a protocol refuses
 //! a token whose protocol field names another (the names compared as the
 //! derivation reads them). Every token here is built by this crate's own
 //! signer (`ProtoWallet`) and `PushDrop`, as each writer builds it.
 #![cfg(feature = "kvstore")]
-#![allow(deprecated, clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 #[path = "support/identity_reveal_wallet.rs"]
 mod identity_reveal_wallet;
@@ -29,7 +29,7 @@ use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OutputListItem, OverlayLookupFacilitator,
 };
-use bsv_rs::primitives::{sha256, PrivateKey};
+use bsv_rs::primitives::{sha256, PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
 use bsv_rs::wallet::{
@@ -110,14 +110,13 @@ fn script(token: &PushDrop) -> LockingScript {
     token.lock()
 }
 
-/// What each judging door answers for `token` against `controller`.
-fn doors(token: &PushDrop, controller: &PrivateKey, asked: &str) -> [bool; 3] {
+/// What each judging door answers for `token`.
+fn doors(token: &PushDrop, asked: &str) -> [bool; 2] {
     let script = script(token);
     let checked = KVStoreInterpreter::extract_fields(&script)
         .is_some_and(|fields| KVStoreInterpreter::verify_signature(&fields, asked));
-    let legacy = KVStoreInterpreter::verify_signature_legacy(token, &controller.public_key());
     let read = KVStoreInterpreter::interpret_script(&script, None).is_some();
-    [checked, legacy, read]
+    [checked, read]
 }
 
 #[test]
@@ -126,19 +125,11 @@ fn a_token_whose_signature_does_not_bind_its_key_authenticates_at_no_door() {
     for tags in [false, true] {
         let honest = token(&controller, true, "address_backup", "1value", tags);
         for asked in ["kvstore", " KVStore"] {
-            assert_eq!(
-                doors(&honest, &controller, asked),
-                [false; 3],
-                "{tags} {asked}"
-            );
+            assert_eq!(doors(&honest, asked), [false; 2], "{tags} {asked}");
         }
         for (at, shift) in [(1, 3), (1, -3), (0, 2), (0, -2)] {
             let moved = divided(&honest, at, shift).unwrap();
-            assert_eq!(
-                doors(&moved, &controller, "kvstore"),
-                [false; 3],
-                "{tags} {at} {shift}"
-            );
+            assert_eq!(doors(&moved, "kvstore"), [false; 2], "{tags} {at} {shift}");
         }
     }
 }
@@ -156,15 +147,11 @@ fn a_key_bound_token_is_read_at_every_door_and_no_division_of_it_is() {
             &format!("v{index}"),
             tags,
         );
-        assert_eq!(doors(&honest, &controller, "kvstore"), [true; 3], "{index}");
+        assert_eq!(doors(&honest, "kvstore"), [true; 2], "{index}");
         for at in 0..3 {
             for shift in [-2isize, -1, 1, 2] {
                 if let Some(moved) = divided(&honest, at, shift) {
-                    assert_eq!(
-                        doors(&moved, &controller, "kvstore"),
-                        [false; 3],
-                        "{index} {at} {shift}"
-                    );
+                    assert_eq!(doors(&moved, "kvstore"), [false; 2], "{index} {at} {shift}");
                 }
             }
         }
@@ -421,4 +408,183 @@ async fn set_refuses_one_byte_past_the_readers_key_and_value_bounds() {
             }
         }
     }
+}
+
+// The verdicts of the removed `verify_signature_legacy` (0.9.0, #843) on
+// the shared derivation (`src/kvstore/token_derivation.rs`), ported onto
+// the door that stays (#843's fold): the legacy door's tests were the only
+// pins on the canonical-JSON check and the derived lock at this door.
+
+/// `fields` signed by `controller` under `[1, "kvstore"]` and the key ID
+/// `fields[1]` names, the signature appended, locked by `lock` (the
+/// controller-derived key when `None`) and read back by the decoder.
+fn signed_fields(
+    controller: &PrivateKey,
+    mut fields: Vec<Vec<u8>>,
+    lock: Option<PublicKey>,
+) -> PushDrop {
+    let wallet = ProtoWallet::new(Some(controller.clone()));
+    let protocol = Protocol::new(SecurityLevel::App, "kvstore");
+    let key_id = String::from_utf8(fields[1].clone()).unwrap();
+    let signature = wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(fields.concat()),
+            protocol_id: protocol.clone(),
+            key_id: key_id.clone(),
+            counterparty: Some(Counterparty::Anyone),
+            ..Default::default()
+        })
+        .unwrap()
+        .signature;
+    fields.push(signature);
+    let lock = lock.unwrap_or_else(|| {
+        wallet
+            .key_deriver()
+            .derive_public_key(&protocol, &key_id, &Counterparty::Anyone, true)
+            .unwrap()
+    });
+    PushDrop::decode(&PushDrop::new(lock, fields).lock()).unwrap()
+}
+
+/// `verify_signature`'s answer for `token` under `kvstore`, `false` where
+/// `extract_fields` reads no fields.
+fn checked(token: &PushDrop) -> bool {
+    KVStoreInterpreter::extract_fields(&script(token))
+        .is_some_and(|fields| KVStoreInterpreter::verify_signature(&fields, "kvstore"))
+}
+
+/// A namespace token whose protocol field is not canonical JSON is refused,
+/// signed as such by the controller and locked by the controller-derived
+/// key; the canonical control is read (the reference refuses the same,
+/// `kvStoreTokenValidation.ts:97-98` at `ts-stack@edf6e03`).
+#[test]
+fn a_namespace_token_signed_in_noncanonical_json_is_refused() {
+    let controller = key("controller", 8);
+    let public = controller.public_key().to_compressed().to_vec();
+    for protocol in [
+        r#"[1, "kvstore"]"#,
+        r#"[ 1,"kvstore"]"#,
+        r#"[01,"kvstore"]"#,
+    ] {
+        for tags in [None, Some(br#"["t"]"#.to_vec())] {
+            let mut fields = vec![
+                protocol.as_bytes().to_vec(),
+                b"k".to_vec(),
+                b"v".to_vec(),
+                public.clone(),
+            ];
+            fields.extend(tags.clone());
+            let token = signed_fields(&controller, fields, None);
+            assert!(!checked(&token), "{protocol} {tags:?}");
+        }
+    }
+    let canonical = signed_fields(
+        &controller,
+        vec![
+            NAMESPACE.as_bytes().to_vec(),
+            b"k".to_vec(),
+            b"v".to_vec(),
+            public,
+        ],
+        None,
+    );
+    assert!(checked(&canonical), "the canonical control");
+}
+
+/// A signed key-bound token changed in one respect is refused: its value,
+/// its signature emptied, a field fewer or more, its lock the controller's
+/// own key or a stranger's (not the derived one).
+#[test]
+fn a_signed_token_changed_in_one_respect_is_refused() {
+    let controller = key("controller", 2);
+    let public = controller.public_key();
+    for tags in [false, true] {
+        let honest = token(&controller, false, "k", "v", tags);
+        assert!(checked(&honest), "{tags}");
+        let count = honest.fields.len();
+        let relock = |fields: Vec<Vec<u8>>, lock: PublicKey| {
+            PushDrop::decode(&PushDrop::new(lock, fields).lock()).unwrap()
+        };
+        let lock = honest.locking_public_key.clone();
+
+        let mut value = honest.fields.clone();
+        value[2] = b"w".to_vec();
+        assert!(!checked(&relock(value, lock.clone())), "value {tags}");
+
+        let mut unsigned = honest.fields.clone();
+        unsigned[count - 1].clear();
+        assert!(
+            !checked(&relock(unsigned, lock.clone())),
+            "empty signature {tags}"
+        );
+
+        let mut short = honest.fields.clone();
+        short.remove(2);
+        assert!(
+            !checked(&relock(short, lock.clone())),
+            "a field fewer {tags}"
+        );
+
+        let mut long = honest.fields.clone();
+        long.insert(4, b"x".to_vec());
+        assert!(!checked(&relock(long, lock)), "a field more {tags}");
+
+        for other in [public.clone(), key("stranger", 2).public_key()] {
+            let relocked = relock(honest.fields.clone(), other);
+            assert!(!checked(&relocked), "a lock not derived {tags}");
+        }
+    }
+}
+
+/// A token the controller signed whose controller field names another key
+/// is refused.
+#[test]
+fn a_signed_token_whose_controller_field_is_another_key_is_refused() {
+    let controller = key("controller", 9);
+    let stranger = key("stranger", 9).public_key();
+    for tags in [None, Some(br#"["t"]"#.to_vec())] {
+        let mut fields = vec![
+            NAMESPACE.as_bytes().to_vec(),
+            b"k".to_vec(),
+            b"v".to_vec(),
+            stranger.to_compressed().to_vec(),
+        ];
+        fields.extend(tags.clone());
+        assert!(
+            !checked(&signed_fields(&controller, fields, None)),
+            "{tags:?}"
+        );
+    }
+}
+
+/// The reference's kvstore tokens of `tests/vectors/token_envelope_544.json`
+/// (recorded by `tests/support/token_envelope_544.mjs`) at the check: its
+/// two signed tokens read and the signed fields in a loose push encoding
+/// read (the check judges the signature, the envelope is the interpreter's);
+/// the raw protocol, the unsigned, the unlinked lock and the bad signature
+/// refused.
+#[test]
+fn the_recorded_kvstore_tokens_take_the_checks_verdict() {
+    let vector: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/token_envelope_544.json")).unwrap();
+    let mut answers = Vec::new();
+    for case in vector["kvstore"]["cases"].as_array().unwrap() {
+        let script = LockingScript::from_hex(case["locking_script"].as_str().unwrap()).unwrap();
+        let answer = KVStoreInterpreter::extract_fields(&script)
+            .is_some_and(|fields| KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+        answers.push((case["name"].as_str().unwrap().to_owned(), answer));
+    }
+    let answers: Vec<(&str, bool)> = answers.iter().map(|(n, a)| (n.as_str(), *a)).collect();
+    assert_eq!(
+        answers,
+        [
+            ("reference", true),
+            ("reference_tags", true),
+            ("raw_protocol", false),
+            ("unsigned", false),
+            ("noncanonical_envelope", true),
+            ("wrong_lock_key", false),
+            ("bad_signature", false),
+        ]
+    );
 }

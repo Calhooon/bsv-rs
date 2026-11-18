@@ -68,8 +68,8 @@ pub use topic_broadcaster::{
 
 // Admin token functions
 pub use overlay_admin_token_template::{
-    decode_overlay_admin_token, decode_and_verify_overlay_admin_token,
-    create_overlay_admin_token, is_overlay_admin_token, is_ship_token, is_slap_token,
+    create_signed_overlay_admin_token, decode_overlay_admin_token,
+    decode_and_verify_overlay_admin_token, is_overlay_admin_token, is_ship_token, is_slap_token,
     OverlayAdminTokenData,
 };
 
@@ -282,10 +282,10 @@ Both return values in **chronological order** (oldest first) and prevent cycles 
 
 ## Admin Token Template
 
-Create and decode SHIP/SLAP advertisement tokens using PushDrop format: since #544 the reference's five fields (protocol, identity key, domain, topic/service, signature), the decode the reference's static decode (structure, not author) and `decode_and_verify_overlay_admin_token` its author check; the deprecated writer's legacy 4-field unsigned token is refused (`Unexpected PushDrop token field count`), as the reference refuses it.
+Create and decode SHIP/SLAP advertisement tokens using PushDrop format: since #544 the reference's five fields (protocol, identity key, domain, topic/service, signature), the decode the reference's static decode (structure, not author) and `decode_and_verify_overlay_admin_token` its author check; the legacy 4-field unsigned token is refused (`Unexpected PushDrop token field count`), as the reference refuses it, and its writer `create_overlay_admin_token`, deprecated since 0.3.7, is removed in 0.9.0 (#843).
 
 ```rust
-pub fn create_overlay_admin_token(protocol, identity_key, domain, topic_or_service) -> LockingScript
+pub fn create_signed_overlay_admin_token(private_key, protocol, domain, topic_or_service) -> LockingScript
 pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdminTokenData>
 pub fn decode_and_verify_overlay_admin_token(script, expected: Option<Protocol>) -> Result<OverlayAdminTokenData>
 pub fn is_overlay_admin_token(script) -> bool

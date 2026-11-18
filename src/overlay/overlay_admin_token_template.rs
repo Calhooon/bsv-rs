@@ -64,7 +64,7 @@ impl OverlayAdminTokenData {
 /// reference's, this decode checks the structure, not the author; a
 /// consumer that trusts the advertisement uses
 /// [`decode_and_verify_overlay_admin_token`]. The legacy 4-field unsigned
-/// token that the deprecated [`create_overlay_admin_token`] writes is
+/// token, the identity key as the locking key and no signature, is
 /// refused (`Unexpected PushDrop token field count`), as the reference
 /// refuses it (until #544 it was decoded here).
 ///
@@ -111,70 +111,6 @@ pub fn decode_and_verify_overlay_admin_token(
     expected: Option<Protocol>,
 ) -> Result<OverlayAdminTokenData> {
     super::admin_token_validation::decode_and_verify(script, expected)
-}
-
-/// Create an overlay admin token locking script.
-///
-/// This creates a PushDrop locking script that advertises a SHIP topic
-/// or SLAP service.
-///
-/// # Arguments
-///
-/// * `protocol` - SHIP or SLAP
-/// * `identity_key` - The public key of the service operator
-/// * `domain` - The domain where the service is hosted
-/// * `topic_or_service` - The topic name (for SHIP) or service name (for SLAP)
-///
-/// # Returns
-///
-/// A locking script containing the advertisement token.
-///
-/// # Example
-///
-/// ```rust,ignore
-/// use bsv_rs::overlay::{create_overlay_admin_token, Protocol};
-/// use bsv_rs::primitives::PrivateKey;
-///
-/// let private_key = PrivateKey::random();
-/// let public_key = private_key.public_key();
-///
-/// let script = create_overlay_admin_token(
-///     Protocol::Ship,
-///     &public_key,
-///     "https://example.com",
-///     "tm_mytopic",
-/// );
-/// ```
-#[deprecated(
-    since = "0.3.7",
-    note = "Produces a 4-field unsigned PushDrop with identity-key locking, which \
-            is rejected by current SHIP/SLAP validators (`@bsv/overlay-discovery-services` \
-            requires 5 fields with a BRC-42-derived locking key and trailing \
-            signature — see tm_ship.ts). Use `create_signed_overlay_admin_token` \
-            instead; it requires a `PrivateKey` (not just a `PublicKey`) because \
-            it has to SIGN the advert. Byte-equivalent to `@bsv/sdk 1.10.1`'s \
-            `pushdrop.lock(fields, [2, protocol_name], '1', 'anyone', true, true, \
-            'before')` path — verified via byte-exact fixtures in \
-            `overlay_admin_token_template_parity.rs`."
-)]
-pub fn create_overlay_admin_token(
-    protocol: Protocol,
-    identity_key: &PublicKey,
-    domain: &str,
-    topic_or_service: &str,
-) -> LockingScript {
-    // Build PushDrop fields
-    let fields = vec![
-        protocol.as_str().as_bytes().to_vec(),
-        identity_key.to_compressed().to_vec(),
-        domain.as_bytes().to_vec(),
-        topic_or_service.as_bytes().to_vec(),
-    ];
-
-    // Create PushDrop locking script
-    // The identity key is also used as the locking key
-    let pushdrop = PushDrop::new(identity_key.clone(), fields);
-    pushdrop.lock()
 }
 
 /// Create a TS-parity signed overlay admin token for SHIP/SLAP
@@ -321,7 +257,6 @@ mod tests {
     use crate::primitives::PrivateKey;
 
     #[test]
-    #[allow(deprecated)]
     fn test_create_and_decode_ship_token() {
         let private_key = PrivateKey::random();
         let public_key = private_key.public_key();
@@ -420,12 +355,11 @@ mod tests {
         assert_eq!(a.to_hex(), b.to_hex());
     }
 
-    /// The NEW signed variant produces DIFFERENT bytes than the
-    /// DEPRECATED unsigned variant for the same inputs. Catches any
-    /// accidental regression if someone re-routes create_signed to
-    /// the old code path.
+    /// The signed writer produces DIFFERENT bytes than the legacy
+    /// unsigned 4-field token for the same inputs (that token built here
+    /// with this crate's PushDrop writer). Catches any accidental
+    /// regression if someone re-routes create_signed to the old shape.
     #[test]
-    #[allow(deprecated)]
     fn test_signed_and_unsigned_tokens_produce_different_bytes() {
         let root = PrivateKey::from_hex(
             "0000000000000000000000000000000000000000000000000000000000000001",
@@ -437,12 +371,14 @@ mod tests {
             "https://overlay.example.com",
             "tm_uhrp",
         );
-        let unsigned = create_overlay_admin_token(
-            Protocol::Ship,
-            &root.public_key(),
-            "https://overlay.example.com",
-            "tm_uhrp",
-        );
+        let identity_key = root.public_key();
+        let fields = vec![
+            Protocol::Ship.as_str().as_bytes().to_vec(),
+            identity_key.to_compressed().to_vec(),
+            b"https://overlay.example.com".to_vec(),
+            b"tm_uhrp".to_vec(),
+        ];
+        let unsigned = PushDrop::new(identity_key.clone(), fields).lock();
         assert_ne!(
             signed.to_hex(),
             unsigned.to_hex(),
@@ -451,7 +387,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_create_and_decode_slap_token() {
         let private_key = PrivateKey::random();
 
@@ -470,7 +405,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_is_ship_token() {
         let private_key = PrivateKey::random();
 
@@ -493,7 +427,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_is_slap_token() {
         let private_key = PrivateKey::random();
 
@@ -516,7 +449,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_is_overlay_admin_token() {
         let private_key = PrivateKey::random();
 
@@ -536,7 +468,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_identity_key_hex() {
         let private_key = PrivateKey::random();
 

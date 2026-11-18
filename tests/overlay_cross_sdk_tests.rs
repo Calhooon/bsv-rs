@@ -3,28 +3,46 @@
 //! Tests admin token encoding/decoding and type serialization
 //! for compatibility with TypeScript and Go BSV SDKs.
 //!
-//! **Historical note:** this file was written against the legacy
-//! [`create_overlay_admin_token`] (4-field unsigned) which is now
-//! `#[deprecated]` in favor of [`create_signed_overlay_admin_token`]
-//! (5-field signed, matches @bsv/sdk 1.10.1). The legacy assertions
-//! remain here as regression coverage for the decode path, which still
-//! accepts both shapes. The TS-parity byte-exact assertions on the
-//! new signed helper live in
+//! **Historical note:** this file was written against the legacy 4-field
+//! unsigned token (the identity key as the locking key, no signature),
+//! which this crate's decode refuses since #544 as the reference's does;
+//! the 5-field signed [`create_signed_overlay_admin_token`] matches
+//! @bsv/sdk 1.10.1. The legacy token is built here with this crate's
+//! PushDrop writer and its refusal stays pinned. The TS-parity byte-exact
+//! assertions on the signed helper live in
 //! `tests/overlay_admin_token_ts_parity_tests.rs`.
 //!
-//! [`create_overlay_admin_token`]: bsv_rs::overlay::create_overlay_admin_token
 //! [`create_signed_overlay_admin_token`]: bsv_rs::overlay::create_signed_overlay_admin_token
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "overlay")]
-#![allow(deprecated)]
 
 use bsv_rs::overlay::{
-    create_overlay_admin_token, decode_overlay_admin_token, AdmittanceInstructions, LookupAnswer,
-    LookupQuestion, NetworkPreset, Protocol, TaggedBEEF,
+    create_signed_overlay_admin_token, decode_overlay_admin_token, AdmittanceInstructions,
+    LookupAnswer, LookupQuestion, NetworkPreset, Protocol, TaggedBEEF,
 };
-use bsv_rs::primitives::{from_hex, PublicKey};
+use bsv_rs::primitives::{from_hex, PrivateKey, PublicKey};
+use bsv_rs::script::templates::PushDrop;
+use bsv_rs::script::LockingScript;
 use serde::Deserialize;
 use std::fs;
+
+/// The legacy 4-field unsigned admin token (protocol, identity key, domain,
+/// topic or service), the identity key as the locking key, built with this
+/// crate's PushDrop writer.
+fn legacy_admin_token(
+    protocol: Protocol,
+    identity_key: &PublicKey,
+    domain: &str,
+    topic_or_service: &str,
+) -> LockingScript {
+    let fields = vec![
+        protocol.as_str().as_bytes().to_vec(),
+        identity_key.to_compressed().to_vec(),
+        domain.as_bytes().to_vec(),
+        topic_or_service.as_bytes().to_vec(),
+    ];
+    PushDrop::new(identity_key.clone(), fields).lock()
+}
 
 // =================
 // Test Vector Structures
@@ -125,7 +143,7 @@ fn load_overlay_types_vectors() -> OverlayTypesVectors {
 // Admin Token Tests
 // =================
 
-/// The deprecated writer's 4-field unsigned token for each vector is refused
+/// The legacy 4-field unsigned token for each vector is refused
 /// by the decode in the reference's words, as `OverlayAdminTokenTemplate.decode`
 /// refuses it (`ts-stack@edf6e03` `OverlayAdminTokenTemplate.ts:162-167`,
 /// `PushDropValidation.ts:61-63`; #544); the signed token over the vector's
@@ -135,7 +153,7 @@ fn load_overlay_types_vectors() -> OverlayTypesVectors {
 fn test_admin_token_creation_and_decoding() {
     let vectors = load_admin_token_vectors();
     assert!(!vectors.is_empty(), "No admin token vectors loaded");
-    let root = bsv_rs::primitives::PrivateKey::from_hex(&"07".repeat(32)).unwrap();
+    let root = PrivateKey::from_hex(&"07".repeat(32)).unwrap();
 
     for (i, v) in vectors.iter().enumerate() {
         // Parse protocol
@@ -147,8 +165,7 @@ fn test_admin_token_creation_and_decoding() {
             .unwrap_or_else(|e| panic!("Vector {}: invalid identity key: {}", i, e));
 
         // The legacy token is refused
-        let legacy =
-            create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+        let legacy = legacy_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
         assert_eq!(
             decode_overlay_admin_token(&legacy).unwrap_err(),
             bsv_rs::Error::OverlayError("Unexpected PushDrop token field count".into()),
@@ -157,12 +174,8 @@ fn test_admin_token_creation_and_decoding() {
         );
 
         // The signed token over the same fields
-        let script = bsv_rs::overlay::create_signed_overlay_admin_token(
-            &root,
-            protocol,
-            &v.domain,
-            &v.topic_or_service,
-        );
+        let script =
+            create_signed_overlay_admin_token(&root, protocol, &v.domain, &v.topic_or_service);
         let decoded = decode_overlay_admin_token(&script);
         if v.domain.starts_with("http://") {
             assert_eq!(
@@ -198,15 +211,14 @@ fn test_admin_token_creation_and_decoding() {
 #[test]
 fn test_admin_token_protocol_detection() {
     let vectors = load_admin_token_vectors();
-    let root = bsv_rs::primitives::PrivateKey::from_hex(&"07".repeat(32)).unwrap();
+    let root = PrivateKey::from_hex(&"07".repeat(32)).unwrap();
 
     for (i, v) in vectors.iter().enumerate() {
         let protocol = Protocol::parse(&v.protocol).unwrap();
         let identity_key = PublicKey::from_hex(&v.identity_key_hex).unwrap();
 
         // The legacy token is no admin token since #544
-        let legacy =
-            create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+        let legacy = legacy_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
         assert!(
             !bsv_rs::overlay::is_overlay_admin_token(&legacy),
             "Vector {}",
@@ -216,12 +228,8 @@ fn test_admin_token_protocol_detection() {
         if v.domain.starts_with("http://") {
             continue;
         }
-        let script = bsv_rs::overlay::create_signed_overlay_admin_token(
-            &root,
-            protocol,
-            &v.domain,
-            &v.topic_or_service,
-        );
+        let script =
+            create_signed_overlay_admin_token(&root, protocol, &v.domain, &v.topic_or_service);
 
         // Test protocol detection
         let is_ship = bsv_rs::overlay::is_ship_token(&script);
@@ -246,16 +254,16 @@ fn test_admin_token_protocol_detection() {
 #[test]
 fn test_admin_token_deterministic_encoding() {
     let vectors = load_admin_token_vectors();
+    let root = PrivateKey::from_hex(&"07".repeat(32)).unwrap();
 
     for (i, v) in vectors.iter().enumerate() {
         let protocol = Protocol::parse(&v.protocol).unwrap();
-        let identity_key = PublicKey::from_hex(&v.identity_key_hex).unwrap();
 
-        // Create token twice
+        // Create the signed token twice
         let script1 =
-            create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+            create_signed_overlay_admin_token(&root, protocol, &v.domain, &v.topic_or_service);
         let script2 =
-            create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
+            create_signed_overlay_admin_token(&root, protocol, &v.domain, &v.topic_or_service);
 
         // Should be identical
         assert_eq!(

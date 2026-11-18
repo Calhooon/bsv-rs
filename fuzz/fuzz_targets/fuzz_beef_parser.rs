@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use bsv_rs::transaction::{
-    verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, BeefTx, Element, Headers,
-    Kind, MerklePathLeaf, Transaction, Verdict,
+    verify_stream, verify_stream_structure, Beef, BeefStream, BeefTx, Element, Headers, Kind,
+    MerklePathLeaf, Transaction, Verdict,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -276,13 +276,6 @@ fn hand_states(beef: &Beef, data: &[u8]) -> Vec<Beef> {
 fuzz_target!(|data: &[u8]| {
     the_two_readers_agree(data);
 
-    // The hinted parse reads exactly what the parse reads.
-    let hints = BeefLimits {
-        max_txs: 64,
-        max_bumps: 8,
-    };
-    let hinted = Beef::from_binary_with_limits(data, &hints);
-
     // The streaming reader gives a verdict on any bytes and never panics;
     // with no header it accepts no BUMP.
     let headers: HashMap<u64, [u8; 32]> = HashMap::new();
@@ -294,14 +287,8 @@ fuzz_target!(|data: &[u8]| {
 
     // Fuzz the BEEF parse and every walk over it - none may panic
     let Ok(mut beef) = Beef::from_binary(data) else {
-        assert!(
-            hinted.is_err(),
-            "the hinted parse accepted what the parse refused"
-        );
         return;
     };
-    let hinted = hinted.expect("the hinted parse refused what the parse accepted");
-    assert_eq!(hinted.txs.len(), beef.txs.len());
 
     // #817: every BEEF the parse returns writes `Ok`, an `Ok` write reads
     // back to the same entries and BUMPs and is a fixed point, and so the

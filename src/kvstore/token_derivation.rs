@@ -1,7 +1,7 @@
 //! The one derivation a `GlobalKVStore` token's signature is judged under,
-//! for every door that judges one (`verify_signature`, the deprecated
-//! `verify_signature_legacy`, the store's reads and its history walk): the
-//! protocol field as canonical JSON `[level, name]`, the key field as the
+//! for every door that judges one (`verify_signature`, the store's reads
+//! and its history walk): the protocol field as canonical JSON
+//! `[level, name]`, the key field as the
 //! key ID, the locking key the controller's key linked to `anyone` under
 //! that protocol and key (BRC-35, as `@bsv/sdk` writes and reads it). A
 //! token in any other form authenticates nowhere: among them the form this

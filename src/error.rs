@@ -320,17 +320,6 @@ pub enum Error {
         detail: String,
     },
 
-    /// Former minimal-length-key refusal (#148), retained for source compatibility.
-    /// Never emitted since #379; strict verification returns [`Error::HmacLegacyKey`].
-    #[cfg(feature = "wallet")]
-    #[error(
-        "HMAC is not valid: the tag was made under a minimal-length key (the sender drops the {leading_zero_bytes} leading zero byte(s) of the 32-byte X coordinate; BRC-56)"
-    )]
-    HmacMinimalLengthKey {
-        /// Leading zero octets omitted by the sender.
-        leading_zero_bytes: usize,
-    },
-
     /// Strict refusal of a pre-amendment 32-byte-key tag (#379).
     #[cfg(feature = "wallet")]
     #[error("HMAC is not valid: legacy 32-byte key ({leading_zero_bytes} leading zero byte(s))")]

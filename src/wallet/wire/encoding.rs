@@ -4,11 +4,12 @@
 //! primitives Reader/Writer with signed varint support and convenience methods
 //! for the WalletWire protocol.
 
+use super::{counterparty_codes, status_codes};
 use crate::primitives::encoding::{Reader, Writer};
 use crate::primitives::{bounded_capacity, from_base64, from_hex, to_base64, to_hex, PublicKey};
 use crate::wallet::types::{
     ActionStatus, BasketInsertion, Counterparty, IdentityCertificate, IdentityCertifier,
-    InternalizeOutput, Outpoint, OutputInclude, Protocol, QueryMode, SecurityLevel, SendWithResult,
+    InternalizeOutput, Outpoint, Protocol, QueryMode, SecurityLevel, SendWithResult,
     SendWithResultStatus, SignActionSpend, WalletAction, WalletActionInput, WalletActionOutput,
     WalletCertificate, WalletOutput, WalletPayment,
 };
@@ -28,6 +29,9 @@ const NIL_SENTINEL: u64 = u64::MAX;
 /// Wraps the primitives [`Reader`] and adds methods for reading signed varints
 /// and other wire protocol types. Short reads return [`Error::WalletError`]
 /// with `ReaderUint8Array read exceeds available data`, the reference's words.
+///
+/// No part of the public contract: hidden from the documentation, it may
+/// change or vanish in any release (`wallet::wire`'s module docs).
 pub struct WireReader<'a> {
     inner: Reader<'a>,
 }
@@ -154,9 +158,9 @@ impl<'a> WireReader<'a> {
     pub fn read_counterparty(&mut self) -> Result<Option<Counterparty>, Error> {
         let flag = self.read_u8()?;
         match flag {
-            0 => Ok(None),
-            11 => Ok(Some(Counterparty::Self_)),
-            12 => Ok(Some(Counterparty::Anyone)),
+            counterparty_codes::UNDEFINED => Ok(None),
+            counterparty_codes::SELF => Ok(Some(Counterparty::Self_)),
+            counterparty_codes::ANYONE => Ok(Some(Counterparty::Anyone)),
             _ => {
                 // First byte is part of the 33-byte public key
                 let remaining = self.read_bytes(32)?;
@@ -212,7 +216,7 @@ impl<'a> WireReader<'a> {
     /// listActions' reader refuses it (#1002).
     pub fn read_action_status(&mut self) -> Result<Option<ActionStatus>, Error> {
         match self.read_i8()? {
-            -1 => Ok(None),
+            status_codes::UNKNOWN => Ok(None),
             code => super::flags::action_status(code).map(Some),
         }
     }
@@ -233,20 +237,6 @@ impl<'a> WireReader<'a> {
     // New type encoding methods
     // =========================================================================
 
-    /// Reads a query mode (0 = any, 1 = all): no method of the wire carries these bytes
-    /// (#1002; the mode `listActions` carries is [`Self::read_optional_query_mode`]).
-    pub fn read_query_mode(&mut self) -> Result<QueryMode, Error> {
-        let val = self.read_u8()?;
-        match val {
-            0 => Ok(QueryMode::Any),
-            1 => Ok(QueryMode::All),
-            _ => Err(Error::WalletError(format!(
-                "invalid query mode: expected 0 (any) or 1 (all), got {}",
-                val
-            ))),
-        }
-    }
-
     /// Reads listActions' `labelQueryMode` as the reference's processor
     /// reads it: -1 absent, 1 `any`, 2 `all`, another byte refused in its
     /// words (`WalletWireProcessor.ts:831-842` at `ts-stack@edf6e03`; #1002,
@@ -254,33 +244,6 @@ impl<'a> WireReader<'a> {
     /// reference assigns the other way round (1 `all`, 2 `any`, `:1206-1217`).
     pub fn read_optional_query_mode(&mut self) -> Result<Option<QueryMode>, Error> {
         self.read_label_query_mode()
-    }
-
-    /// Reads an output include mode (0, 1): no method's bytes; the `include` of `listOutputs` is 1 and 2 (#1002).
-    pub fn read_output_include(&mut self) -> Result<OutputInclude, Error> {
-        let val = self.read_u8()?;
-        match val {
-            0 => Ok(OutputInclude::LockingScripts),
-            1 => Ok(OutputInclude::EntireTransactions),
-            _ => Err(Error::WalletError(format!(
-                "invalid output include mode: expected 0 or 1, got {}",
-                val
-            ))),
-        }
-    }
-
-    /// Reads an optional output include mode (-1, 0, 1): no method's bytes, as above (#1002).
-    pub fn read_optional_output_include(&mut self) -> Result<Option<OutputInclude>, Error> {
-        let val = self.read_i8()?;
-        match val {
-            -1 => Ok(None),
-            0 => Ok(Some(OutputInclude::LockingScripts)),
-            1 => Ok(Some(OutputInclude::EntireTransactions)),
-            _ => Err(Error::WalletError(format!(
-                "invalid output include mode: expected -1, 0, or 1, got {}",
-                val
-            ))),
-        }
     }
 
     /// Reads a string to string map (Go-compatible: VarInt(MaxUint64) = empty).
@@ -672,6 +635,9 @@ impl<'a> WireReader<'a> {
 ///
 /// Wraps the primitives [`Writer`] and adds methods for writing signed varints
 /// and other wire protocol types.
+///
+/// No part of the public contract: hidden from the documentation, it may
+/// change or vanish in any release (`wallet::wire`'s module docs).
 pub struct WireWriter {
     inner: Writer,
 }
@@ -865,9 +831,9 @@ impl WireWriter {
     /// - Other(pubkey) = 33-byte compressed public key
     pub fn write_counterparty(&mut self, counterparty: Option<&Counterparty>) -> &mut Self {
         match counterparty {
-            None => self.write_u8(0),
-            Some(Counterparty::Self_) => self.write_u8(11),
-            Some(Counterparty::Anyone) => self.write_u8(12),
+            None => self.write_u8(counterparty_codes::UNDEFINED),
+            Some(Counterparty::Self_) => self.write_u8(counterparty_codes::SELF),
+            Some(Counterparty::Anyone) => self.write_u8(counterparty_codes::ANYONE),
             Some(Counterparty::Other(pubkey)) => self.write_bytes(&pubkey.to_compressed()),
         }
     }
@@ -894,15 +860,15 @@ impl WireWriter {
     /// Writes an action status code.
     pub fn write_action_status(&mut self, status: Option<ActionStatus>) -> &mut Self {
         let code = match status {
-            Some(ActionStatus::Completed) => 1,
-            Some(ActionStatus::Unprocessed) => 2,
-            Some(ActionStatus::Sending) => 3,
-            Some(ActionStatus::Unproven) => 4,
-            Some(ActionStatus::Unsigned) => 5,
-            Some(ActionStatus::NoSend) => 6,
-            Some(ActionStatus::NonFinal) => 7,
-            Some(ActionStatus::Failed) => 8,
-            None => -1,
+            Some(ActionStatus::Completed) => status_codes::COMPLETED,
+            Some(ActionStatus::Unprocessed) => status_codes::UNPROCESSED,
+            Some(ActionStatus::Sending) => status_codes::SENDING,
+            Some(ActionStatus::Unproven) => status_codes::UNPROVEN,
+            Some(ActionStatus::Unsigned) => status_codes::UNSIGNED,
+            Some(ActionStatus::NoSend) => status_codes::NOSEND,
+            Some(ActionStatus::NonFinal) => status_codes::NONFINAL,
+            Some(ActionStatus::Failed) => status_codes::FAILED,
+            None => status_codes::UNKNOWN,
         };
         self.write_i8(code)
     }
@@ -923,16 +889,6 @@ impl WireWriter {
     // New type encoding methods
     // =========================================================================
 
-    /// Writes a query mode (0 = any, 1 = all): no method of the wire carries these bytes
-    /// (#1002; the mode `listActions` carries is [`Self::write_optional_query_mode`]).
-    pub fn write_query_mode(&mut self, mode: QueryMode) -> &mut Self {
-        let val = match mode {
-            QueryMode::Any => 0,
-            QueryMode::All => 1,
-        };
-        self.write_u8(val)
-    }
-
     /// Writes listActions' `labelQueryMode` as the reference's transceiver
     /// writes it: -1 absent, 1 `any`, 2 `all` (`WalletWireTransceiver.ts:358-360`
     /// at `ts-stack@edf6e03`; #1002, 0 and 1 until then). Not listOutputs'
@@ -942,24 +898,6 @@ impl WireWriter {
             None => self.write_i8(-1),
             Some(QueryMode::Any) => self.write_i8(1),
             Some(QueryMode::All) => self.write_i8(2),
-        }
-    }
-
-    /// Writes an output include mode (0, 1): no method's bytes; the `include` of `listOutputs` is 1 and 2 (#1002).
-    pub fn write_output_include(&mut self, mode: OutputInclude) -> &mut Self {
-        let val = match mode {
-            OutputInclude::LockingScripts => 0,
-            OutputInclude::EntireTransactions => 1,
-        };
-        self.write_u8(val)
-    }
-
-    /// Writes an optional output include mode (-1, 0, 1): no method's bytes, as above (#1002).
-    pub fn write_optional_output_include(&mut self, mode: Option<OutputInclude>) -> &mut Self {
-        match mode {
-            None => self.write_i8(-1),
-            Some(OutputInclude::LockingScripts) => self.write_i8(0),
-            Some(OutputInclude::EntireTransactions) => self.write_i8(1),
         }
     }
 
@@ -1590,49 +1528,12 @@ mod tests {
     }
 
     #[test]
-    fn test_query_mode_roundtrip() {
-        for mode in [QueryMode::Any, QueryMode::All] {
-            let mut writer = WireWriter::new();
-            writer.write_query_mode(mode);
-            let mut reader = WireReader::new(writer.as_bytes());
-            assert_eq!(reader.read_query_mode().unwrap(), mode);
-        }
-    }
-
-    #[test]
     fn test_optional_query_mode_roundtrip() {
         for mode in [None, Some(QueryMode::Any), Some(QueryMode::All)] {
             let mut writer = WireWriter::new();
             writer.write_optional_query_mode(mode);
             let mut reader = WireReader::new(writer.as_bytes());
             assert_eq!(reader.read_optional_query_mode().unwrap(), mode);
-        }
-    }
-
-    #[test]
-    fn test_output_include_roundtrip() {
-        for mode in [
-            OutputInclude::LockingScripts,
-            OutputInclude::EntireTransactions,
-        ] {
-            let mut writer = WireWriter::new();
-            writer.write_output_include(mode);
-            let mut reader = WireReader::new(writer.as_bytes());
-            assert_eq!(reader.read_output_include().unwrap(), mode);
-        }
-    }
-
-    #[test]
-    fn test_optional_output_include_roundtrip() {
-        for mode in [
-            None,
-            Some(OutputInclude::LockingScripts),
-            Some(OutputInclude::EntireTransactions),
-        ] {
-            let mut writer = WireWriter::new();
-            writer.write_optional_output_include(mode);
-            let mut reader = WireReader::new(writer.as_bytes());
-            assert_eq!(reader.read_optional_output_include().unwrap(), mode);
         }
     }
 
@@ -2260,8 +2161,6 @@ mod tests {
         writer.write_counterparty(Some(&Counterparty::Self_));
         writer.write_protocol_id(&Protocol::new(SecurityLevel::App, "test protocol"));
         writer.write_action_status(Some(ActionStatus::Completed));
-        writer.write_query_mode(QueryMode::All);
-        writer.write_output_include(OutputInclude::EntireTransactions);
 
         let mut reader = WireReader::new(writer.as_bytes());
 
@@ -2283,11 +2182,6 @@ mod tests {
         assert_eq!(
             reader.read_action_status().unwrap(),
             Some(ActionStatus::Completed)
-        );
-        assert_eq!(reader.read_query_mode().unwrap(), QueryMode::All);
-        assert_eq!(
-            reader.read_output_include().unwrap(),
-            OutputInclude::EntireTransactions
         );
 
         assert!(reader.is_empty());

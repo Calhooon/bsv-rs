@@ -1303,49 +1303,17 @@ mod wire_protocol_tests {
         use bsv_rs::wallet::QueryMode;
 
         let mut writer = WireWriter::new();
-        writer.write_query_mode(QueryMode::Any);
-        writer.write_query_mode(QueryMode::All);
         writer.write_optional_query_mode(Some(QueryMode::Any));
         writer.write_optional_query_mode(None);
 
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_query_mode().unwrap(), QueryMode::Any);
-        assert_eq!(reader.read_query_mode().unwrap(), QueryMode::All);
         assert_eq!(
             reader.read_optional_query_mode().unwrap(),
             Some(QueryMode::Any)
         );
         assert_eq!(reader.read_optional_query_mode().unwrap(), None);
-    }
-
-    #[test]
-    fn test_output_include_roundtrip() {
-        use bsv_rs::wallet::OutputInclude;
-
-        let mut writer = WireWriter::new();
-        writer.write_output_include(OutputInclude::LockingScripts);
-        writer.write_output_include(OutputInclude::EntireTransactions);
-        writer.write_optional_output_include(Some(OutputInclude::LockingScripts));
-        writer.write_optional_output_include(None);
-
-        let bytes = writer.into_bytes();
-        let mut reader = WireReader::new(&bytes);
-
-        assert_eq!(
-            reader.read_output_include().unwrap(),
-            OutputInclude::LockingScripts
-        );
-        assert_eq!(
-            reader.read_output_include().unwrap(),
-            OutputInclude::EntireTransactions
-        );
-        assert_eq!(
-            reader.read_optional_output_include().unwrap(),
-            Some(OutputInclude::LockingScripts)
-        );
-        assert_eq!(reader.read_optional_output_include().unwrap(), None);
     }
 
     #[test]

@@ -209,17 +209,6 @@ impl KVStoreInterpreter {
         wallet.verify_signature(args).is_ok_and(|r| r.valid)
     }
 
-    /// Legacy verify_signature that takes PushDrop and PublicKey.
-    ///
-    /// `true` only when `pushdrop` carries a KVStore token of five or six
-    /// fields whose controller field is `controller` and whose signature
-    /// field is `controller`'s signature over the other fields; `false` for
-    /// anything else.
-    #[deprecated(note = "A signature verdict alone, for a token in the key-bound form only")]
-    pub fn verify_signature_legacy(pushdrop: &PushDrop, controller: &PublicKey) -> bool {
-        super::legacy_signature::signed_by(pushdrop, controller, get_anyone_wallet())
-    }
-
     /// Extract value from a PushDrop token without validation.
     ///
     /// This is a convenience method for extracting just the value field.

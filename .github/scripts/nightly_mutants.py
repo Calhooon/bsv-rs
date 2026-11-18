@@ -54,9 +54,10 @@ def test_skips(surface):
     root = {"script": "script", "beef": "transaction", "merkle": "transaction",
             "wire": "wallet", "substrates": "wallet"}[surface]
     # libtest's --skip matches anywhere in a test's name, so a crate-root module's
-    # name must not be a substring of a kept module's path: `transaction::` would
-    # also skip `script::transaction::tests`, and `error::` the script evaluation
-    # error's tests. A root module whose name occurs inside the kept root's module
+    # name must not be a substring of a kept module's path: `error::` would also
+    # skip `script::evaluation_error::`'s tests (and `transaction::` skipped
+    # `script::transaction::tests` until that module's removal, #843). A root
+    # module whose name occurs inside the kept root's module
     # tree is expanded to its own submodules instead; a root module without tests
     # that collides is dropped. `skips_never_match_inside_the_kept_root` pins it.
     kept_tree = {f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs")}

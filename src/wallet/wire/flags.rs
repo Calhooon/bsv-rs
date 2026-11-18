@@ -4,7 +4,7 @@
 //! result. Each refusal is the reference's sentence, pinned against its
 //! recorded frames by `tests/wallet_wire_flags_1002.rs`.
 
-use super::{refused, WireReader};
+use super::{refused, status_codes, WireReader};
 use crate::wallet::types::{ActionStatus, QueryMode};
 use crate::Error;
 
@@ -89,14 +89,14 @@ impl WireReader<'_> {
 /// words (`#parseActionStatus`, `WalletWireTransceiver.ts:395-399`).
 pub(super) fn action_status(code: i8) -> Result<ActionStatus, Error> {
     Ok(match code {
-        1 => ActionStatus::Completed,
-        2 => ActionStatus::Unprocessed,
-        3 => ActionStatus::Sending,
-        4 => ActionStatus::Unproven,
-        5 => ActionStatus::Unsigned,
-        6 => ActionStatus::NoSend,
-        7 => ActionStatus::NonFinal,
-        8 => ActionStatus::Failed,
+        status_codes::COMPLETED => ActionStatus::Completed,
+        status_codes::UNPROCESSED => ActionStatus::Unprocessed,
+        status_codes::SENDING => ActionStatus::Sending,
+        status_codes::UNPROVEN => ActionStatus::Unproven,
+        status_codes::UNSIGNED => ActionStatus::Unsigned,
+        status_codes::NOSEND => ActionStatus::NoSend,
+        status_codes::NONFINAL => ActionStatus::NonFinal,
+        status_codes::FAILED => ActionStatus::Failed,
         code => return Err(refused(format!("Unknown status code: {code}"))),
     })
 }

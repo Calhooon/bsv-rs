@@ -2458,23 +2458,6 @@ mod complex_type_roundtrips {
         }
     }
 
-    /// Tests output include mode roundtrip including optional variant.
-    #[test]
-    fn test_output_include_optional_roundtrip() {
-        let cases = [
-            None,
-            Some(OutputInclude::LockingScripts),
-            Some(OutputInclude::EntireTransactions),
-        ];
-        for mode in cases {
-            let mut writer = WireWriter::new();
-            writer.write_optional_output_include(mode);
-            let mut reader = WireReader::new(writer.as_bytes());
-            let read = reader.read_optional_output_include().unwrap();
-            assert_eq!(read, mode, "output include mismatch for {:?}", mode);
-        }
-    }
-
     /// Tests Unicode string roundtrip through wire encoding.
     #[test]
     fn test_unicode_string_roundtrip() {

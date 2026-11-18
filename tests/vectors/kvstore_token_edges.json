@@ -1,0 +1,3147 @@
+{
+ "reference": {
+  "pin": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "head": "ts-stack@11faa7d16dd2b9567006e7d82d125d634dee128e",
+  "node": "v22.18.0",
+  "reader": "decodeAndVerifyKVStoreToken",
+  "head_note": "a cell carries `head` only where the head answers otherwise than the pin"
+ },
+ "cells": [
+  {
+   "row": "R01",
+   "name": "lock_key_tag_05",
+   "sha256": "5f811ae16322281c3a746dd171155e579cbeb16430ced196c8e7723406bf6695",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_uncompressed",
+   "sha256": "8b715ed5bd42ad2feebc49c1b9f5af89aa30c6e1ba6770e0bc25609c5c189d4c",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_hybrid_06",
+   "sha256": "c113d898bd090210b808d2e19ab26aa1e2800d619361915ff5d78885ef1c4bff",
+   "pin": {
+    "accepted": false,
+    "words": "Point string value is wrong length"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_hybrid_07",
+   "sha256": "c12db8074c30acde0c8cc6537738de320675a0be82f53b71a5cfefe20a8c8188",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_x_5",
+   "sha256": "da11b78302a18ac57a30bc84100c4406cdc0150954d080fd4b64c40d2f23a061",
+   "pin": {
+    "accepted": false,
+    "words": "Invalid point"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_x_p_plus_2",
+   "sha256": "4d82ba8ac92e59c675df4d19fa54d7156736682ae4228d26fbc9defc80300921",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R01",
+   "name": "lock_key_x_all_ff",
+   "sha256": "d506d05a94879aa1f197f23dcd72b5bc7c194eb7fd7483d009da403ae3c9797d",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R02",
+   "name": "fields_4",
+   "sha256": "cea3dd8495d3fc2df9ceb013553bfbd0c9dc3e1977b62eda98a90b2b13db2965",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected PushDrop token field count"
+   }
+  },
+  {
+   "row": "R02",
+   "name": "fields_5",
+   "sha256": "f0abeede55451a66942b2262b6772e57842cd2af855d84cbf88ddc70dc9ab190",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R02",
+   "name": "fields_6",
+   "sha256": "7b6aded09643c1c4ffa6e87f220cc447b1f94fc4494c449501adc3c86515f1e3",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R02",
+   "name": "fields_7",
+   "sha256": "a21f56c56409b59553acb9ebd31831ceb91727a1e66e1a58efd0b0116732cde1",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected PushDrop token field count"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "value_1mib_less_1",
+   "sha256": "f2ac0486208a9b62197939cb3eeb545cb76e0381a933d70736be00f47a56d3b7",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "9e833471875b8776d4cd50202f418a547f42a7a6b7bd8b4084914708d73de8a5",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R03",
+   "name": "value_1mib",
+   "sha256": "4e82da86daf1005c646cf87ded48e46970a51c0105ef817ff3398b63c7c57fe1",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "847c07ea01306ed99172827c370c2599553fd9907944c56ffe6466afc1aca257",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R03",
+   "name": "value_1mib_plus_1",
+   "sha256": "d43cf739d1c117fccf7fdc180474a88963f9b8f15b60896b3dfb2a22c3053cf5",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "key_1mib_plus_1",
+   "sha256": "2ba404eab887fd67d395357dcfd208b3eb489a17ef8a1ef011ed0704693b1ff2",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "protocol_1mib",
+   "sha256": "0937eb8a3b1ad3cc512fd762738a8e03427af8c502f5edbcc13527187701619c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "controller_1mib",
+   "sha256": "73d2dfdebcc1b0937c64ed871235d7518477c93b5c8a7cccbe2bc70fdd363ecc",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore controller is invalid"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "tags_1mib",
+   "sha256": "7e7e663eb0e675bdcdbc80ca1c2dfa21ddb794fa84daf3bacd0e46b11c54e2b8",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R03",
+   "name": "signature_1mib",
+   "sha256": "9f70a517db70955ad9054f65e0c1c4ed638d3f8efc34176cc8feecd025eaf84f",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be at most 72 bytes"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "protocol_1mib_plus_1",
+   "sha256": "d752b0431b1ed198b2bac431833b7a8971dbdfb20ad45bd98acc41c9897b28cf",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "controller_1mib_plus_1",
+   "sha256": "46e892e069de77c1f955ec543096d2907780e882800c375540fadb9cbf2a254c",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "tags_1mib_plus_1",
+   "sha256": "5fe222641c5defaa2ac01ed0bc558fd932ce2a49e62e389d65746a1eb217f1c2",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "signature_1mib_plus_1",
+   "sha256": "d1ccc42e3ec54d9eb7b1b11af0c4e1e725e14e26cb7a64957cc0cd587d56d156",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token contains an oversized field"
+   }
+  },
+  {
+   "row": "R03",
+   "name": "key_1mib",
+   "sha256": "d70930f9058ad9d64f80bb4e0e6bf3650c8a3321c2a6e09f6e3c78ecda21d8a2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_less_1_5_fields",
+   "sha256": "296b4c8cb6d453e3052f30ba59663e76ffa400308dd0a8fde7fd2a4b928193f3",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_exact_5_fields",
+   "sha256": "437104f22e6da48cb18dfb918da53c1b1b2a1b3f220611603efcc26d3d65e552",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_plus_1_5_fields",
+   "sha256": "aecdf0f38a3c9abc5c95dd174d67f5f81a76ca6d52e204ba29f644ecd53b5cf2",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token payload is too large"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_less_1_6_fields",
+   "sha256": "a7850806e15dca6cedb1d44a7b4e45d316b4d50afa73942a2a2057abd21f9de4",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_exact_6_fields",
+   "sha256": "86f3dcf0ec7497a7a47717403f5a77b94bab29190f3748d70f6d3f28a1d54fba",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R04",
+   "name": "payload_plus_1_6_fields",
+   "sha256": "90c2d70dd360bc0a7f223df8af20da0a62a87bbcd3f3a8240e692d85f9b14740",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token payload is too large"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "all_drops_5_fields",
+   "sha256": "b30315c9e0878a1c8b6ee0c6fd261f21ef5b441314864c06d32fdc5fbbec3ba2",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "all_drops_6_fields",
+   "sha256": "eb927fbeed1a81fc55e308c8067e32d5199b44e343606cc8176146cb597197dd",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "trailing_op_1",
+   "sha256": "17f490fd769e6217feb870bfd822f9134632eb8f8011678492cf28f0d162a5ef",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "trailing_op_drop",
+   "sha256": "e009d1b60589003fc4d8b08a020a5dc2f75288030d212b2445b074768fb13c91",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "trailing_op_checksig",
+   "sha256": "3297ae208d20d348f5fce332b77fc5aa475a9760b4d8429e7cde8beff43ded21",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "key_pushdata1",
+   "sha256": "521d45ab8d297db2c96ed2f1d285b3650a3424c70254a1ab2b25037ac8404b2c",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "value_0x81_direct_push",
+   "sha256": "482a8186823ae0389237f0340db39d67ff9f6e67a0fe3187021e6a46c5be0b0c",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "value_0x05_direct_push",
+   "sha256": "d977ae8162104bf016b4d418909385a42a537ba5042af0d236fb2cd727c12046",
+   "pin": {
+    "accepted": false,
+    "words": "PushDrop token must use the canonical PushDrop envelope"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "value_0x81_as_op_1negate",
+   "sha256": "1c28f24803920089177ec2da560e3eee36facfab86a9bd8163494b205d0964c3",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R05",
+   "name": "value_0x05_as_op_5",
+   "sha256": "461cbb729df1edded7b2428c04802c060189f026e99b1c362e1b3c5a16028aea",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "e77b9a9ae9e30b0dbdb6f510a264ef9de781501d7b6b92ae89eb059c5ab743db",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R05",
+   "name": "key_0x00_as_op_0",
+   "sha256": "f6eff7aa3713eddbcbe250a6fc5ff96ac4f9fa08536c77479bbca172d6ecdda2",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R05",
+   "name": "key_0x01_as_op_1",
+   "sha256": "523a0a41e91919ed0f4a43603f1f1c09d71724e458b38d59b38814c618ad6433",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_byte_ff",
+   "sha256": "afc08922c44130cde53951722e6f07189c16791245930ea4140613cf4918bc8f",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_overlong_nul",
+   "sha256": "42914c5c115ae8ac7c6bed349e6211ea807cdd594d34e1b9a03358fcaf56d7cc",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_surrogate_bytes",
+   "sha256": "946a04073def30223c7b3b7526454c57bf960ded3b66f2dfde6e63091dcd2fe5",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_bom",
+   "sha256": "0fb40220fc12d0d99ecccfddcc85c7e79f93d52a2e59c437b676b714ac01ee09",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_bom_twice",
+   "sha256": "f2c2d8917fea4ca97668d771f4da29897132001d43db4f4b076a7c3f0d83008b",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected token '﻿', \"﻿[1,\"kvstore\"]\" is not valid JSON"
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_truncated_sequence",
+   "sha256": "74a3b1ac80cd2d0f1938a02fa6ff5e9997100c4ba4b98c52eb510da3307442ac",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R06",
+   "name": "protocol_past_10ffff",
+   "sha256": "ac401fc86a4f5cb65e04117052743dce15fcdfba50b3ec22306d5d06f66ad5bb",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R07",
+   "name": "protocol_no_json",
+   "sha256": "e3029a8a58c97094db4727869fa47475e7bdb26d895cf1548bebdb7e311fa28d",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected token 'k', \"kvstore\" is not valid JSON"
+   }
+  },
+  {
+   "row": "R07",
+   "name": "protocol_truncated",
+   "sha256": "035da8dbe7507f26d189ef43f2c4a1fe66d7b111a54e17ce36f067fe088db7ae",
+   "pin": {
+    "accepted": false,
+    "words": "Expected ',' or ']' after array element in JSON at position 12 (line 1 column 13)"
+   }
+  },
+  {
+   "row": "R07",
+   "name": "protocol_trailing_comma",
+   "sha256": "8542361da2f6f0180bee8c39e0df4b1c7e0598909f14fbf543d2900ad1f07c0d",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected token ']', \"[1,\"kvstore\",]\" is not valid JSON"
+   }
+  },
+  {
+   "row": "R07",
+   "name": "protocol_level_1e400",
+   "sha256": "26669922f199affeddf747209b108ecff4d3ec21220c869ffd01ac7a9b4c6e5e",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "empty_array",
+   "sha256": "aa2c56c44532915a80fca8f0430a84ab4118fa356e1480c2eef8ace3b76fa9d4",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "one_member",
+   "sha256": "2706d4a0a58025f4b22c1776b0cb0de7567508bf4a7d140a49ba4be10b34afc9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "three_members",
+   "sha256": "a1c619bdc641687450da410a8190595a841d27ee20c5fee1eb5e91d4dae2ae5d",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "object",
+   "sha256": "c9fffe9741b8f0fd4b4b364b94132fa3dc757d31a63188d1541fd4f141618545",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "string",
+   "sha256": "7d646118d34bbc91b0b98361ec0b9d3a36d3ba8079ca729b03603c01c9ea8a6d",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "null",
+   "sha256": "a2fbb291c7d40b2681cc77b3cf96974a11324d693cd946581e048a3f142e84eb",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R08",
+   "name": "number",
+   "sha256": "e1a81586a04a146f105110f7636ea3b9bd61af8389169a70fd60cbbec035a315",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_minus_1",
+   "sha256": "5ce74d1fa608f7654df68846e38fce5dc614e594a895495259e3cef5f657b0dd",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_3",
+   "sha256": "ca79e7ff092a2769b92de5a257448a1b0e08ecf3a4e20557d89e37ea67324ecd",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1_5",
+   "sha256": "b4c060cf33a7a32b79fee3bd71ec89cd48d0597301126eb343607c8131e1b1f2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_text_1",
+   "sha256": "9d500518ce8b671996de1f6486bf3c7325a94a0ae8240994b1662159a66269b0",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_true",
+   "sha256": "4178de60c4332430042338827e8de31877296c00f3e4f127e881e15133016f23",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_null",
+   "sha256": "a876e9fe04e2beb0987d38851da61bbdc5556ecdec996db51b3ba22d0ff96035",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_0_0",
+   "sha256": "ee277dfc53cb6bbfb3d1387e8c3253fc39cfa1a6b67d8f03c57ee7642a47fb14",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1_0",
+   "sha256": "ef3d083e3edc69d1b4ff73343fa71089858c0da40adacd22859a4951ccce57c5",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_2_0",
+   "sha256": "4ff64b7f10b73e6cd51c88c5dc30ddf2239dc39aac68fbb188eda2fa602ac7df",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_minus_0",
+   "sha256": "2cd12a8651da2fbd8833d76e14091501a3661545de9bc8a886c20c8d178eef2f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_minus_0_0",
+   "sha256": "6460fb93f3846ceb25703f9d114c9936d2b1a906ae716510f74d8dd590c01c0b",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1e0",
+   "sha256": "387488b17b5df00d30e30e42f2659558536d5fa61181d7b7b0db2b3c58b9f56f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1E0",
+   "sha256": "8cbd06922325e6d3c4a27e86bddea8d65670170a9f3e8ef206fc361a5bbd8229",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_10e_minus_1",
+   "sha256": "662c4f13c2dfc9fcf94efe780b2a56bdc4e4bda186bba63e7a8aadbe5b6430bf",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1_plus_tiny",
+   "sha256": "d53918d6ac3c4b2be24023051066b87cf19793c4ca6269891c0a3d3cd26a36d9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_2_pow_64_plus_1",
+   "sha256": "3ca4cac7e3a82adabb16802ebe9566d951faf0cc953efa1aee3571128b3cfb85",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_after_0",
+   "sha256": "254799fd0f8a9d38cc198b8c4feea3b857456edba224cf25a6aa5678bb45a8e7",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_before_0",
+   "sha256": "17dd5b6073f84db6bcc6c6c3ef00d4166cd3bd031e52db4a593e1836ded5ffb4",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_before_1",
+   "sha256": "3f4368b4c9d8d8433f61a1272ec5082ed8fe86528113fd99280e2a4be155fb96",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_after_1",
+   "sha256": "e8fcfec73be722619d245ba6450b0e04489099374223d814b1e34521db802eaa",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_before_2",
+   "sha256": "aa9c81cc41696b65cc91a299cb513dd6db820629eda040c59c2b8cf1cdf8bae2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f64_after_2",
+   "sha256": "fdd998208638dd677a3deaffd9fcf4144428a3d6364cadf3db8757ac1f2c0a28",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_after_0",
+   "sha256": "29bbf1e967e62910e807c7bd360f976afe7f9a7cdb35bedadfa043883a2edfa0",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_before_0",
+   "sha256": "22aad2e39e15460a2c238cb62563a529004318b1ffa66997252aa101f35b339d",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_before_1",
+   "sha256": "a103f8eb40c1b7180dbbf3ac2de12be224abd4e95d9dc223a704ee99c8de0aba",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_after_1",
+   "sha256": "17d37cd41c36521a30897ad18c12361bde28aba949ded0a76443948fab4ceade",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_before_2",
+   "sha256": "335d2ffbbe8328a83e752f90a5b2b829810262d31211ad13390ed499a0fd47a2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_f32_after_2",
+   "sha256": "04b873ba814ca4a9726ba2cd6462581ee5de64970472fc7964466b394ba24257",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1e_minus_400",
+   "sha256": "40256a889686991670beaf794f96549ce8ca036ede08a21aceb50530ac1ca2fe",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_minus_1e_minus_400",
+   "sha256": "70b948fd563e7848435fd75d07b6cbb9ca779ba41a3d6481727e6cec1c766c70",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_0e5",
+   "sha256": "80626af0640495a4b5916ec81ba0edeb1ea25de0aa9002f93ee469349bc3ca28",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_0_99999999999999999",
+   "sha256": "2e3f0d1dbabee05391fedc2cca93602c15c3b91298a7086d3ee19807135239e1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_0_1e1",
+   "sha256": "e8efec7622948e83af9f7ce375e644da09fd61f299bd763d5b42ee9ecd3d6ac2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1_9999999999999999",
+   "sha256": "a1106d636069d8768e2565a1d23bb0db17855de376fa604e2a537fc2644515fc",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_2_0000000000000001",
+   "sha256": "d7e3a27ea6f495aa8eb1297924cc4754d408003809109c5c4ea2d06f8151d424",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_200e_minus_2",
+   "sha256": "b00a01c4b06415b18fd12932e1630536a9e192a4c85737e206b4743067855546",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "level_1_05",
+   "sha256": "70766122e60898ba9bae660c3474757c6d7ff48678d379e2fabf71f7a0cfbeb8",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "name_number",
+   "sha256": "426f5c3d597392838f8a6456e2bc56b15263aa3701514cf49e0566619cfb2668",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "name_null",
+   "sha256": "e1cfd57a9e0d3c69ef5f8db9c7e9d5c7fa4b05103af3eb52c649b116099ffdff",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "name_array",
+   "sha256": "67c90d20c2b0dc726e866d5b04126817372e3b9d3f0072b0874dce4c31513a3d",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R09",
+   "name": "name_object",
+   "sha256": "1ba51d7a6371e6766a401b6ed2db831c9521dd79ac8ab9f69b220a46125f1c9a",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_level_0",
+   "sha256": "c45a5c1f4f65b38818588a6defae2cdd0d13217d947dc88c7844f195dc272743",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_5_bytes_level_0",
+   "sha256": "09f541a711883859587632004c2e173a66be6b18900cd231353fd5c0574cd1a8",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"kvsto\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_400_bytes_level_0",
+   "sha256": "84adbd503233f9f7463b37303a998899034c514b8e47ce3b41542627a688c675",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_401_bytes_level_0",
+   "sha256": "1a7f4b2018d863a198407374d85ef56ce3421cadae7e1cd4dc627c4af4afff2e",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_6_bytes_level_0",
+   "sha256": "cbf1cac6464836a714c89e8b73cac91839b78601e2d2cd8601b3c6a6efd7523b",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"kvstor\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_399_bytes_level_0",
+   "sha256": "e8733f08227304c4ed1ce357f349c9bda28cd2120bb152c234bb93d2d208a4ee",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_two_chars_level_0",
+   "sha256": "12a67a0e705475d68d9967758bab1bf08ca1482ed4ac0782bac0ddc6beaccc00",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_level_1",
+   "sha256": "06e99e63c17c73a75998231c0dc99d1c5dc7c02981edbe9ac5ffc0ede20d3eec",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_5_bytes_level_1",
+   "sha256": "a8e75906448d7a4527b870bde91adfdadaa691ae4046eb84aefe9c1c04b788f6",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvsto\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_400_bytes_level_1",
+   "sha256": "b4606e49078608932c579ad98106609a07de290b6d22262372b77f1827d96b9f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_401_bytes_level_1",
+   "sha256": "71f2f81c947f1540e5368d9f60272e288f7a2332f4fbc226204379a9ed2691f9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_6_bytes_level_1",
+   "sha256": "ba61e35072a24d6574958af6f424d484b10f7a15050f0fec332c1163d64666d9",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstor\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_399_bytes_level_1",
+   "sha256": "7fcd4be65eeda6d380fe17f42067ff7bff957c28938d19cf0d151beb06d7d32f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_two_chars_level_1",
+   "sha256": "0ff77c04de44a88d2208030f14e64de465698d177adef8098283d5260323d4aa",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_level_2",
+   "sha256": "9abc176c3d25e867b21802321b9593f20bf8da6363572eebf59ac0d3fdf1c25a",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_5_bytes_level_2",
+   "sha256": "972b5e1b15cb07ba1485f68b6a708e226570f2dbe483b5cf6b97c5b2c17c881b",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"kvsto\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_400_bytes_level_2",
+   "sha256": "0b3cd02567f5e1e6666d8c834eedad9f6d689081a6f6826973c0cbabe9f1d9f8",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_401_bytes_level_2",
+   "sha256": "afb60858da9ba40da8b071de872f4ddd47a502fabec21843176bbc474d3d01aa",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_6_bytes_level_2",
+   "sha256": "8622122e03e1abdef8f2063f57e48d04ee0183034e7dbc7950392b7c0a9f8804",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"kvstor\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_399_bytes_level_2",
+   "sha256": "545c8130570d711944820fa37611c63145cd7fee6740ad5ae290a944d492671b",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R10",
+   "name": "name_4_bytes_two_chars_level_2",
+   "sha256": "c9fa5a4fdcd0ee46053329793e42e532a33d8576719e77b95a640a86ff5fab0f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol name is invalid"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "canonical_level_0",
+   "sha256": "a2147184caac043215395b17926dc88b6fb91fd5ef76231b3dba80433449ae70",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_comma_level_0",
+   "sha256": "42f79f27cff89fbc9a5fe40c66fa72f15662a7a3c0ccaa24f4d60d839422d792",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_bracket_level_0",
+   "sha256": "afaf78cb7e8065ad3c711939984c8163e1d764dcae5829df062a4e78e2e0eb91",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_before_comma_level_0",
+   "sha256": "2eea0ca3a708c79e5c8f2f96588a8510d44394183d054807d90776a71cd3754f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_end_level_0",
+   "sha256": "36f1d9cc5bf05a8a06084f30f4f58dcb776fc7e38e80a1eab266815c9ed04c9e",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_start_level_0",
+   "sha256": "6888a961e5ca15b58372da813d181b01800fbd5aa262bf5cdc92ff7fea45ae52",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "newline_at_end_level_0",
+   "sha256": "485db2bb1296718b3586afeb60145bcba81f51bdd3ccd3882cf3753b4900fa16",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "crlf_at_end_level_0",
+   "sha256": "64988e4a8862bbe8fd8a4903a090d381e401921162d43cd115985492353fc38c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "tab_at_start_level_0",
+   "sha256": "092d28f5403b382380d396ba366b92e43b27ae3639bf7f30a7538022cb68aec5",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_o_level_0",
+   "sha256": "2eaefd99523c00ca3fe72f1964afe9782cae0a941dcf7e1aa3e28b83a27cdd08",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_solidus_level_0",
+   "sha256": "ff4fc637802c21a0bf1443ac72838ef81e75cf539d543c929f0c5f611585815c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_point_0_level_0",
+   "sha256": "e5ce7b3b462ef6b6b92a83041789e4d08695a9805981ce27d62925a5702f2b86",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_e0_level_0",
+   "sha256": "a1ed7e7220b0cb6372ac4163be7c41f309bfae5dbf6bd0dfafce26c9a7d8fb46",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "canonical_level_1",
+   "sha256": "f0abeede55451a66942b2262b6772e57842cd2af855d84cbf88ddc70dc9ab190",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_comma_level_1",
+   "sha256": "ed5b41aa2cb4f25b61e8ebb5500a2888ce674985f76df1bc6c62587204023309",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_bracket_level_1",
+   "sha256": "dfb3c03746339d37d692440b879d5e6bdaefe1051f85e7ab64510a79b1bbfab9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_before_comma_level_1",
+   "sha256": "85b857c089cb5f89b80dab6e681f972fdb2488872ca3f57ec4bd1d7911243079",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_end_level_1",
+   "sha256": "f0b8c33b58ba7dacf995d3a03baffed33cb8bd32eb5032181e175939ba9646b3",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_start_level_1",
+   "sha256": "e8afec2ed11a398335394b91dbfa93f5c93874bd74d2b00b114d352e4f2135ae",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "newline_at_end_level_1",
+   "sha256": "035592b8af908d5ef29a22e2212a2ebf5361218f9df31775e3e3ab114bd6429f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "crlf_at_end_level_1",
+   "sha256": "ee50684ea9aab9daa7197ea5a16725714194801be91e23812267e7a3955f68a7",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "tab_at_start_level_1",
+   "sha256": "819f6a91f8af01d94114fb61d55f5a127a2640cc992a375520124df417fdd17c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_o_level_1",
+   "sha256": "9268f26c6b50efd55b2f516f101a8bd33d33fce7cb867fa3022024f0b8f8a0c0",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_solidus_level_1",
+   "sha256": "3dc6100458a7b632e780be4e379344bd67b8e9e1e97ae7b8c59e16911dfa086f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_point_0_level_1",
+   "sha256": "ef3d083e3edc69d1b4ff73343fa71089858c0da40adacd22859a4951ccce57c5",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_e0_level_1",
+   "sha256": "387488b17b5df00d30e30e42f2659558536d5fa61181d7b7b0db2b3c58b9f56f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "canonical_level_2",
+   "sha256": "e6de67be1f376acd50ad397e5887643a655150814d7f6cf45ede3e27c2fa3440",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_comma_level_2",
+   "sha256": "c333bbc6eaa330bf2df66c70f2bc5740558525dad855050ac7a223500ff79990",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_after_bracket_level_2",
+   "sha256": "9369b723b7e02b2ea0e8077a31538cc8524a259899fbcfccc89a55c8f9e3d2f1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_before_comma_level_2",
+   "sha256": "dbd4cba9b1fa000b484d9205ac39088cb2329e7970aba7424a0be6e995d7811f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_end_level_2",
+   "sha256": "36bb8461350bbddbb198ca6c45dcb5cffa6836b6055308c115b568b5426e4b02",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "space_at_start_level_2",
+   "sha256": "53a0e732c97f4e990fd472a056eac40084380bdd458fdf35e318986f2eb1891c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "newline_at_end_level_2",
+   "sha256": "1622dc8cb1a219eb66fb22ae4fb38046d02507eb36a449f160849d101c32cfc1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "crlf_at_end_level_2",
+   "sha256": "001ec9b13006bc62b9533229fa59ca803b9006304af44bcce6646217fc0320d8",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "tab_at_start_level_2",
+   "sha256": "74398605866659bad314cf2694acbbcc5054604811bbb33c803b9ad07e94e024",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_o_level_2",
+   "sha256": "bf72b33d980ebbd7f82d7f6233dd7b109eddbd45bbe876c86b61415a3b9decaa",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "escaped_solidus_level_2",
+   "sha256": "697c5fe8450eb2a9fb8df5810533ee08a9ee439b89ca9fad26e73eb10c6ef65c",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_point_0_level_2",
+   "sha256": "9d1d2f5cf5f7a2d98d4628bee79726eb8e601f609defdbe6d262b69cabf40a32",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_e0_level_2",
+   "sha256": "c0277cd2b2179bf8c6c80a4cbe434913bdfa44a0edfb1ace71e6dc42e0f0f068",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_minus_0_signed_level_0",
+   "sha256": "be3533184540a477636d43d1efca726250482d7412146fdf4dc1930aa771eb91",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "level_1_0_signed_level_1",
+   "sha256": "ef3d083e3edc69d1b4ff73343fa71089858c0da40adacd22859a4951ccce57c5",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "control_escape_long_form",
+   "sha256": "52dd9039b60acdbe44c2378814a7b48f230e098e6ff75f6d67e83e161358f6aa",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must use canonical JSON"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "lone_surrogate_escape",
+   "sha256": "e9388b81b349d19d2e3d3c36331d75fd587d054810c6490e0d23f37b0d9daaf7",
+   "pin": {
+    "accepted": false,
+    "words": "Protocol names can only contain letters, numbers and spaces"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "protocol_depth_127",
+   "sha256": "ebd6df3d218dd7af97ec4641103c3b077d66ec136302330065d08013650ff97b",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "protocol_depth_128",
+   "sha256": "0f3eba421dc9362ee74ec02bb29a1cf8a3a83470e88a3d80f3f4e92dbf2a2895",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R11",
+   "name": "protocol_depth_129",
+   "sha256": "af5ef8b5482a3e21d76561ac4d65ddca5da368840629745d8ca7c35df2ffb6b2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore protocol ID must contain exactly two fields"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_bom_only",
+   "sha256": "17226ccb7df790d8d870bf5cff6ba2dd56ee250749fa300aa3b8d60854bfce14",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_bom_then_k",
+   "sha256": "dd0e3d1024e40fcabe69587b73f62c95f7e510aee2a771bb7e87756ca2fe4814",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_1_byte",
+   "sha256": "73df2cc55b323fd3986fe75015df5ce0884a2359c4b78731d873a5ce364ca078",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8e35c2cd3bf6641bdb0e2050b76932cbb2e6034a0ddacc1d9bea82a6ba57f7cf",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_800_bytes",
+   "sha256": "3ad6c94cd7597c9b13f48d57849a964e2d5ebf495bfe3e1447660dd745ad3831",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "eccdf2123ea0cf0fcd9dfefaa2978c2972f3f64b6cfca2e90b05c5a4af97ee56",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_801_bytes",
+   "sha256": "8879cb288741610d1651c7ebe9abd335a236c988d63a632399120b7d1c6c9ce8",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_bom_then_800_bytes",
+   "sha256": "b837f10356e7f501d063d309ffeacff0bc86d70b846e89893bd066f71dd97a8b",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "eccdf2123ea0cf0fcd9dfefaa2978c2972f3f64b6cfca2e90b05c5a4af97ee56",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_800_bytes_400_chars",
+   "sha256": "54933599bc994d7885bc2053b5a73593d05845caca0070250c499630a978744d",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "fc377241c748e4454a131383f00393cbfaec45de7f7b748f83fce9b865b15abd",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_802_bytes_401_chars",
+   "sha256": "aa2596121953e35dc5b7d55bfad12f476a902d40f8f7fa1110aae284ebeedfeb",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_byte_ff",
+   "sha256": "521ad305e67879932be6890b9d5696862962d2b42d149efab4bf0ff7244e8db7",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_overlong_nul",
+   "sha256": "8bda5854c81a8a0106f29551a9df24d9ea2edabe769dd601fb6bb21f0477e739",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_surrogate_bytes",
+   "sha256": "bf9e8d8baf8e7aa9503cfd2be2bfea208636e3e169dcd83a9a549aa9aa57f88a",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_truncated_sequence",
+   "sha256": "e15141028ea9511a2fe535f4d7c68ebd4f1daa052483959dce418377623b435a",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_past_10ffff",
+   "sha256": "10e689231daf0a099cf3c86ebb019597bb925902d49c8bdc54347fd14a0ff8a1",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_max_code_point",
+   "sha256": "7e8c8e5d19347c964115550dac176b765a87521ba456ba2073cbaa41657aeca3",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "ae51210e4f57ec8fd8778403f2973d455de8d2f029fadb44a5bfa110f078230f",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_bom_twice_then_k",
+   "sha256": "d2e78f55cc48db551d0f36e5cae31bf0b7e1df9d5d71c1327defe2dda1ebdd2a",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "a03894e6b7846364dade7b8627955605b93938dae52b52c665a91f3652eb6618",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_k_then_bom",
+   "sha256": "94d885a8f50a84f17bb1af0c5e8cda0b0b5447580de1ffed6202659bfc5e2902",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "475d6e45bb6652ceea80d11970e0d9aae22f3e19abe655a3474b36a585ab844a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_2_bytes_2_chars",
+   "sha256": "6b5a066c04642282a7a92f192d47c9f4476ae5e83cb75074ced8b1b55ac291e0",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "ee68759e9670e5201c197a2f2b0b3dc4cc7d8c3762ad942df8a125d4cc8aa031",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_799_bytes_799_chars",
+   "sha256": "c63914ddf87fcee1266b7594fe0e411bf6ee34ee0430cc543326ae741e618c51",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "d0dd8d865b2566dc9450da5b9c92a3d9af4f21a49a31c703fd69d83d36548b19",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_800_bytes_200_chars",
+   "sha256": "42214cdac73f53471bb40dcfdfd32b4d3a98904b54016a6612f4c35f420886ec",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "be0dd5625e999de4a629c08e0d2f7d8005c8fce643c7e469066c249d0bd51978",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R12",
+   "name": "key_804_bytes_201_chars",
+   "sha256": "809ec3966ef037469e3b5bb55979eb238a5a971776d6fd135079bdae9fe5df94",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore key has an invalid length"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_bom_only",
+   "sha256": "961a3e66678d0fbb4c6feb27721e59ef419c7b2cbaa1d4cf0abf6597009ac964",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore value has an invalid length"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_bom_then_v",
+   "sha256": "d10f69a085fdd8d400187c2f57effc46bac3539d2ee5bb2ab981e087931cac43",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_bom_then_1mib_less_3",
+   "sha256": "23904f7a98de4d29bb1683c84cd9e0a7542067ddf64255eaf692835be57e667f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "e628e89ae6df309fc7dcb616dabf8ecc42077af617ccc89ea61fb96e012b7093",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_byte_ff",
+   "sha256": "c19e145564b4633ae164d5a1354a26008f3a3db3cedcea360c6c1dbdeaf5709c",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_overlong_nul",
+   "sha256": "b645489cab7acf3cc93a41d492bd6948bf0feafdd50283e23a25fb7ba914766c",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_surrogate_bytes",
+   "sha256": "2814d63ec060aaebecd4efb04fa75b6d0af6ea4c9118bf4e7d537a67e209c436",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_truncated_sequence",
+   "sha256": "631fd6e6fb075d0e688d6b32c96c037acf35cab7b460f8b60385ae068cc6b173",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_past_10ffff",
+   "sha256": "81d1fac237507c88bbeedc82294ae78f763642fc2d240007b0eed6cd7f8a443c",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_max_code_point",
+   "sha256": "0e73e0ac9821cef69e479313f329ee10ea22a910906b6016b95ef98ccb5c5ce0",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "03f95c82471ab282b1d160d0e2c9f809563d0e53421bcc30ead677228067bb82",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_bom_twice_then_v",
+   "sha256": "a3db541eaaf01e248419b9bca8217a74f876fd9c33ca35acfd8ef8be475ad25e",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "e444fd57eda1804b1071e4ada0abc06160706e2bc467f87553b9ec2ba40be641",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_v_then_bom",
+   "sha256": "2aa1a38b4f851f50b355685adc210ec6134635a479a2b62724d3aa7606dd2c59",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "fe4b4f4dd9c8f5bf8c282c6152bbd631b39443f02dfa4bdf486e446961be68b3",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_2_bytes",
+   "sha256": "89d36b8d4f23eb7c145df0f4b07550f691c073a0bf0954ee450a74df544da70c",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "eac42ad34c8f70c750fec028bcca658e27582f140dee8b0ec6b4a3ebafd946e9",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R13",
+   "name": "value_1mib_two_byte_chars",
+   "sha256": "63d2723de224d0d4e62bf3d95aadc85aa37245a686e0a7a34d305d58c81f76b5",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "f09174b501fc23341df3455a669e479aad297a973a25e6a38b57364785611ff4",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R14",
+   "name": "controller_32_bytes",
+   "sha256": "1ea46c56512b4589b3ba62142f11dfc51f3a9666db625cae0a688035a771ccf9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore controller is invalid"
+   }
+  },
+  {
+   "row": "R14",
+   "name": "controller_34_bytes",
+   "sha256": "69ff91fe2c81920a1c4c806875f9c4b67fea6c40498e225b251f79c9746d3ce1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore controller is invalid"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_other_parity",
+   "sha256": "562cf71ee3211f66498b10405f9de20678ccdc843806b21012a90207d8e296a3",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_00",
+   "sha256": "534c61442e0b71b19aeb9e153ba55be124b8371b064bfe9f7c808587fe245f08",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_01",
+   "sha256": "8023bc53954d4ae1a4545bcccd953423d79c53d054a8854ef3545d5aab95e5cf",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_04",
+   "sha256": "ac72222361e19dc26cae042f9e9c4d2c1d1d3095ea25d28c95324fdeb26d02c3",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_05",
+   "sha256": "08ec00f97762df359b56633be568a6e5eddf60468624db62124c38f75ce9be4f",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_06",
+   "sha256": "42daef309c029a845320bec2d5d772f3b289165035d52e07db6c4cd8a987bf70",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_07",
+   "sha256": "69b9fe40b8296ca8f7e010f61730ad5d5dac99c961fef9d11037421be3f1c164",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_tag_08",
+   "sha256": "3c6a4afe02461cabb3fde3c8232414be4a502e8515c52ddcd5b5befc726b464d",
+   "pin": {
+    "accepted": false,
+    "words": "Unknown point format"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_5",
+   "sha256": "21e1bdcc586e3d6dc2c8f8a738c8bdbbb36c8595e845033e409f8a1f45285d68",
+   "pin": {
+    "accepted": false,
+    "words": "Invalid point"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_0",
+   "sha256": "a5b93b4b9331bceff865062fe91ffdfb76bcb47906cbb448c4e5a934b52c8059",
+   "pin": {
+    "accepted": false,
+    "words": "Invalid point"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_p",
+   "sha256": "f44869c8529cc485bca0b18650c8e67c4598fc725498a49da7ded5189adda4d5",
+   "pin": {
+    "accepted": false,
+    "words": "Invalid point"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_p_plus_1",
+   "sha256": "f86d3d3d285527fa7cc4622446391f550fe9a80937aef48c40c8e0f3d4c6df26",
+   "pin": {
+    "accepted": false,
+    "words": "Invalid point"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_p_plus_2",
+   "sha256": "cc41400004ef9f34013f4ca5800b693514803aa99bf912b9b9897d57ddc7ee18",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R15",
+   "name": "controller_x_all_ff",
+   "sha256": "ed7f938ce45384b90df5e687b526ffdeed4310701781a1590e27a4798739a450",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_empty_array",
+   "sha256": "5da8ef3024b30e65405824472e4eb3836d603953406511cf36716dcea1d24773",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": []
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_null",
+   "sha256": "0d803d6b8a34943c27cf42f87801164b2f4c2a6a1fe705d60aa90aa320577737",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be a bounded array"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_object",
+   "sha256": "ef5bb64b49308df9f2b105bba25f95b2a08aaf48f49c42e58458c0d1c44b5916",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be a bounded array"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_string",
+   "sha256": "318d495496a8f393edbd3b25453b953f889587ecf07af0d5c1d69cb806ad2e46",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be a bounded array"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_number",
+   "sha256": "857c74e92dc6d23f22a7125370ea62e75ebe3006ff17906490b2495d795188e1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be a bounded array"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_32",
+   "sha256": "d1ad89d720d184fd619eb7309ef2df8afa1e41671d327e5c8ca4f04e12b87683",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t0",
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9",
+     "t10",
+     "t11",
+     "t12",
+     "t13",
+     "t14",
+     "t15",
+     "t16",
+     "t17",
+     "t18",
+     "t19",
+     "t20",
+     "t21",
+     "t22",
+     "t23",
+     "t24",
+     "t25",
+     "t26",
+     "t27",
+     "t28",
+     "t29",
+     "t30",
+     "t31"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_33",
+   "sha256": "e51b556193d1b46190ca203fe5761fe6b74f7879e5e9be7770478da59d9a7a71",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be a bounded array"
+   },
+   "head": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t0",
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9",
+     "t10",
+     "t11",
+     "t12",
+     "t13",
+     "t14",
+     "t15",
+     "t16",
+     "t17",
+     "t18",
+     "t19",
+     "t20",
+     "t21",
+     "t22",
+     "t23",
+     "t24",
+     "t25",
+     "t26",
+     "t27",
+     "t28",
+     "t29",
+     "t30",
+     "t31",
+     "t32"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_empty",
+   "sha256": "99eb8a22e5141c149a3f4620926cd7305181b5c8cdc1eb7eb9176999ed7238b1",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_1_byte",
+   "sha256": "7b6aded09643c1c4ffa6e87f220cc447b1f94fc4494c449501adc3c86515f1e3",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_256_bytes",
+   "sha256": "3a0d2ee456d70737ec42df181d37ee4e5d5543f6faefa8081ae3410b7d01a499",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_257_bytes",
+   "sha256": "259a92d631ca0d7e065ec830e8a498f12817afbc3802243891251a927183d848",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_256_bytes_64_chars",
+   "sha256": "aee322edf8ce0f6d75c54a2b69d0299e7382f6043ba2a4cd2fbeb6aa8f4e4a39",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_257_bytes_65_chars",
+   "sha256": "2e057e27605a9f20c30ce503d200bee147a85cab0652f742a4733870b45c485e",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_number",
+   "sha256": "1159843d09d197028aaf288e695ecf0099379f037119b06f4142f67b288a86d5",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_null",
+   "sha256": "efca0aaee957e5e7876d359daaf280802919bd1ced30e8c57adcf6ebe365c2fc",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_array",
+   "sha256": "7c15b9037984bd26873363afbba4060b3f449477009a5a2895bf7c3dd6e0178f",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_twice",
+   "sha256": "5c42c4d48a33e42169c15c96f229615da64014cdd8ee61cab2b2925722dea6f9",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be unique"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_differ_in_case",
+   "sha256": "975b6a4f4e7960f952e265b2407a7015601ae2635bcfcc4bb6b9b8e6d9fe17fe",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t",
+     "T"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_bom",
+   "sha256": "73fe1352e3782b6cf45697cba537a253056fe491186aef54f2de5a8fa959d0fb",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_not_utf8",
+   "sha256": "a7c79ebb3b7ac78fe1ab4c4082e888a634bb0e8de58b7be5395aece4589a5020",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_no_json",
+   "sha256": "8419630fcb175f76654567346fe2f2616e219721806e513e805041d20a92e840",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected end of JSON input"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_spaced",
+   "sha256": "fd679c1fa2928dd5cfe18ba38ddfe4afd91976ad23ad79ca9af35f78dc98f1c9",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_31",
+   "sha256": "3d465c73a1c444b241f6448c9111b81478f34c19413a6971b2aa1f46db2db98f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t0",
+     "t1",
+     "t2",
+     "t3",
+     "t4",
+     "t5",
+     "t6",
+     "t7",
+     "t8",
+     "t9",
+     "t10",
+     "t11",
+     "t12",
+     "t13",
+     "t14",
+     "t15",
+     "t16",
+     "t17",
+     "t18",
+     "t19",
+     "t20",
+     "t21",
+     "t22",
+     "t23",
+     "t24",
+     "t25",
+     "t26",
+     "t27",
+     "t28",
+     "t29",
+     "t30"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_2_bytes",
+   "sha256": "dc3b496feb683801bb8d73a06aec597b6569723d9dc602018ed1714b94e702bb",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "tu"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_255_bytes",
+   "sha256": "08d426a81b65275e7f7d691eba6a7c932a936350568c764e9f692e96911835de",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_256_bytes_128_chars",
+   "sha256": "10148436122caeea0e3f1cb2360a3a1cf13e9f66e9e813b88cfa56acd05906a5",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_257_bytes_129_chars",
+   "sha256": "b7e0efcdd3988683fb79e536de9e912f0430392d7f7b3812875e2ab9ebb7b451",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_overlong_nul",
+   "sha256": "3274de53fb9981faa1d1b9837b8492df08aa87bb18ae39b6c615c6fd65da7f35",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_surrogate_bytes",
+   "sha256": "8688eee2c52430deee443f13b86ef1ff48e89cbb817b6e75d15275e474a9932a",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_truncated_sequence",
+   "sha256": "59b87c1ebd769f08d3f0cdd0ce52a89ccfb7b330f52c132280662999dd8c962a",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_past_10ffff",
+   "sha256": "c6db5bd679a2585947ddcb0042e2f27b0521db899d5b2091c712b3e3ae1b37d9",
+   "pin": {
+    "accepted": false,
+    "words": "The encoded data was not valid for encoding utf-8"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_max_code_point",
+   "sha256": "c9bd5a7b511d6bd288c42f96f57d10f2c9ff1c4f82970c27812f177012bda944",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "􏿿"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_bom_twice",
+   "sha256": "0a3674fd46839b890bf8d00c73479353be90cfccb55858954b2a2018a1507f48",
+   "pin": {
+    "accepted": false,
+    "words": "Unexpected token '﻿', \"﻿[\"t\"]\" is not valid JSON"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_bom_inside",
+   "sha256": "925c3aa63900ffc401e927dab3adada9dfc268bf7e8ceabfba6c5121493094d8",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "﻿t"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_escaped_t",
+   "sha256": "e0d973e52675858994a12d850c537f5e374d3e8eea45a997a831115d6f059329",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_escaped_twice",
+   "sha256": "33fad36dc627175348f40606ebf9e6ded6ca726491a57cae9ee660fd41309280",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tags must be unique"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_surrogate_pair_escape",
+   "sha256": "4c80a88266740da66dc67655f261d381aabe28dee937ae24f22d4339fd79bd8f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "😀"
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_lone_surrogate_escape",
+   "sha256": "52093d18449b585b4d19ea52e35272cb348a9e36ee9ab6819a2f73f5028fa926",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     {
+      "utf16": [
+       55296
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tag_number_1e400",
+   "sha256": "3d5a2e68ba173ba38367e709dc6782a091e4315d1321ff47b41f43a08bf9c063",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_depth_127",
+   "sha256": "6bd403b9c9e96b42bae29516e6858222f78cec6df7618d38447d84fb065a6f88",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_depth_128",
+   "sha256": "94dffea1d6e0f13426a3a9ad8c565023e28b31b20f2866c0a447970b0e0fa1a6",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R16",
+   "name": "tags_depth_129",
+   "sha256": "da04c573eedae51259419b09180cc7af4f296088e39fb73c9022ac5b49193605",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore tag has an invalid length"
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_hyphen",
+   "sha256": "9750c69fe28e2fdc9991e86814f0141b0a6a247402913739c68b8cb52a062e71",
+   "pin": {
+    "accepted": false,
+    "words": "Protocol names can only contain letters, numbers and spaces"
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_double_space",
+   "sha256": "1f7a69263d117f47c3f141091cda73b121e405f5cee922ca88c392bac3bfe98e",
+   "pin": {
+    "accepted": false,
+    "words": "Protocol names cannot contain multiple consecutive spaces (\"  \")"
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_ends_protocol",
+   "sha256": "1d498c65a17af05058c2abde51f683675899d6f22d5f366f87f39be689d91dfc",
+   "pin": {
+    "accepted": false,
+    "words": "No need to end your protocol name with \" protocol\""
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_three_chars_six_bytes",
+   "sha256": "b93739f7864c36d7f8fbc1be2513587961df6b1e9a10593f5301f9625bca7417",
+   "pin": {
+    "accepted": false,
+    "words": "Protocol names must be 5 characters or more"
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_short_after_trim",
+   "sha256": "8b3fbc70218186159f66a2d8d1cb95a2a198f8ab561e767d56b3e4ce7720a688",
+   "pin": {
+    "accepted": false,
+    "words": "Protocol names must be 5 characters or more"
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_upper_case",
+   "sha256": "6cc081ecb9e2b3787a83fdf4f7560cb2a2c64d0a2e204727f1cec9a2a751bdf6",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"KVSTORE\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_leading_space",
+   "sha256": "b35bf5039bb033a150931fb26e721b11fdca4f1e6a883641679c634931862dfc",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\" kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_trailing_space",
+   "sha256": "12c80a0fcf99df5d3c849d0965e1d648071fdff1cd32915d6476907639aa795c",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore \"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R17",
+   "name": "name_kelvin_sign",
+   "sha256": "72053a3f50d3165e4e28effe27a38dd4d1385649ee7624b45a519e6e5b1db35f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"Kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_level_0",
+   "sha256": "a2147184caac043215395b17926dc88b6fb91fd5ef76231b3dba80433449ae70",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_6_fields_level_0",
+   "sha256": "d0e8b12eac0dc2135643ccc0a7922777172e7e80b5ca66ac1c28f10c9956bf90",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[0,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_key_id_level_0",
+   "sha256": "2762910fd1a6391c14c97ba720544954e5436f46b363036e740760026caddb1e",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_level_level_0",
+   "sha256": "4fa3b6445d9b6ef99586b1a8810f4daacdb663f2d7e8035646c943ab61677359",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "not_for_self_level_0",
+   "sha256": "d721943d5874f8c1601b77ca11e1bd9ace6cb8a46cfa9cb544a03bab5ce781c3",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_controller_level_0",
+   "sha256": "eb83a87c583c3694b4f8512611496634eccb066188675482c9bddefc4bae77a2",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_level_1",
+   "sha256": "f0abeede55451a66942b2262b6772e57842cd2af855d84cbf88ddc70dc9ab190",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_6_fields_level_1",
+   "sha256": "7b6aded09643c1c4ffa6e87f220cc447b1f94fc4494c449501adc3c86515f1e3",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_key_id_level_1",
+   "sha256": "d798cf154905092b11732f80fab6bae5283874aea2003681c8048b32e39f839b",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_level_level_1",
+   "sha256": "d9081b8705c9a797482856bfbc0093b2f53aae91017588fefc2a49fc073bebac",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "not_for_self_level_1",
+   "sha256": "29ea757d1e09bfeba427af910e0da8bf4072291c6c4250a1c013c9397f4aefc6",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_controller_level_1",
+   "sha256": "5682a7a2cf73aede5eb175bb898451ee3e7ff33c340fb67cb4c93d3cca53877b",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_level_2",
+   "sha256": "e6de67be1f376acd50ad397e5887643a655150814d7f6cf45ede3e27c2fa3440",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R18",
+   "name": "honest_6_fields_level_2",
+   "sha256": "14bacb1cf3bd94c19cc456e84c6c63c17cde66473cd95979bddffb5b42a9505c",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[2,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_key_id_level_2",
+   "sha256": "84abead6e8971e62fbc1f170c0fda394203ae74269c67fd721bff5d95ba5f633",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_level_level_2",
+   "sha256": "9655f654a060c949b2191aed29993af8a0f88abd173d2987dad225d7057dc633",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "not_for_self_level_2",
+   "sha256": "404c196c56d7a81081b46a65ab769f5c74a34da0292ede9523615978426143bc",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R18",
+   "name": "other_controller_level_2",
+   "sha256": "2536bcf33273611564a1c89e8ec034883bb7dec2f57369cc45359d2d4afd56f4",
+   "pin": {
+    "accepted": false,
+    "words": "KVStore token locking key is not linked to its controller"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "other_signer",
+   "sha256": "34819795a5f4b7bc8a7cd87fa1cfb513182eff4bc16c20f2bb3af2c5b3cf0810",
+   "pin": {
+    "accepted": false,
+    "words": "Signature is not valid"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "other_signer_6_fields",
+   "sha256": "2a200f364927552f0613857f9ea016475570f7d20e81e02ccef476bc7ee0e20f",
+   "pin": {
+    "accepted": false,
+    "words": "Signature is not valid"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "other_data",
+   "sha256": "d92754dbc0f5c3c6a636e4fdfc0605bc834c104c46474498c8619c2ce5796d34",
+   "pin": {
+    "accepted": false,
+    "words": "Signature is not valid"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "other_data_6_fields",
+   "sha256": "f1209f9344bbeee8297b88e803e8532c194414507175568eaaa00f60f9cf06d2",
+   "pin": {
+    "accepted": false,
+    "words": "Signature is not valid"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "high_s",
+   "sha256": "b2b1d729d2385f06427767d0ca7d2a56a7b1e6ab8b1f8f0273ebf1e4bbf2532e",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": null
+   }
+  },
+  {
+   "row": "R19",
+   "name": "high_s_6_fields",
+   "sha256": "21f591bbf51bd42fbd143dea594ae9659c1d74cbf6af72c11591b236a92a2a6f",
+   "pin": {
+    "accepted": true,
+    "protocol_id_text": "[1,\"kvstore\"]",
+    "name_sha256": "8254c329a92850f6d539dd376f4816ee2764517da5e0235514af433164480d7a",
+    "value_sha256": "4c94485e0c21ae6c41ce1dfe7b6bfaceea5ab68e40a2476f50208e526f506080",
+    "controller": "0333f2873948ebb7d6183c950569513afe2d405ba74912bcbc23075b08a72848aa",
+    "tags": [
+     "t"
+    ]
+   }
+  },
+  {
+   "row": "R19",
+   "name": "trailing_byte",
+   "sha256": "2db7b8f0f4e7ca097b49dd190f4ba582f330fd5b2f6cc67f759d8773a196cfba",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "trailing_byte_6_fields",
+   "sha256": "1b0e78647c5843b090405a5845b9cfe4ada4fa9f35598e65e933361b23ae9e74",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "eight_bytes_0x30",
+   "sha256": "93ebc7e4cc6e1418fb101121d347b050a20bce78132e92bea26bf2c86b1bcf9b",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "eight_bytes_0x30_6_fields",
+   "sha256": "fe90dd2c21fbc86a7b9b19fb7c27012c49d7dde862d9bbf50d269acf7e0c63e2",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "one_byte_0x01",
+   "sha256": "742c2c2a2b2800129c6ec0217a2f5034e59b63b2e15cb4ae93bb2d5b287a91a9",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "one_byte_0x01_6_fields",
+   "sha256": "e19732c1150be19421fc63a91134d1bb5edbbe5d2f6fa3125fb0f3a7f92e2e3f",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "ascii_text",
+   "sha256": "4fbd7d68dbc7ceb2706d448e1ed4a425df7f5d3b06f275e1aeb3af68e53639b6",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  },
+  {
+   "row": "R19",
+   "name": "ascii_text_6_fields",
+   "sha256": "1cc07689c39f075f82ce797e58fa5f9a2851344311cc9a6dc8a4d98e4dba9d59",
+   "pin": {
+    "accepted": false,
+    "words": "The signature parameter must be a canonical DER-encoded ECDSA signature"
+   }
+  }
+ ]
+}
