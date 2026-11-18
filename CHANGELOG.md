@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the direction rule's seventh class (an additive item a dependent's stable line needs) and the advisories shape beside the classes, by the owner's word of 2026-11-17
+
+- **What was open.** The owner's word of 2026-11-17, on the captain's recommendation, given for #1042 and #1043 and for the pick of #1034's workflow (pull request #1035): the stable line takes an additive item that a live dependent's stable line needs, under a bar, and `main` takes the advisories shape of #1034. `RELEASING.md`'s direction rule named six classes and did not say either.
+- **What changed.** Documents alone, no code and no workflow: `RELEASING.md`'s direction rule counts seven classes and names the seventh as it names the fifth and sixth; its seventh bullet (a public item `beta` already carries, asked for by an issue here by a dependent `docs/DEPENDENTS.md` names, ported by hand, each port commit naming its `beta` source by step 17's `(cherry picked from commit <sha>)` line; its bar: no answer of the newest published stable version changes, the asking dependent's tests run against the port, three reads, a patch of its own carrying items of this class alone and never a release carrying an advisory's fix); the paragraph beside the classes lists `.github/workflows/advisories.yml`, the `deny` step's change in `ci.yml` and the tag's `advisories` job in `release.yml`, with their test; step 8's count of the classes follows. The root `CLAUDE.md`'s rule 10 and `docs/lanes/README.md` (which still said four) count seven. `beta-born` reads no class and is unchanged: a stand-in port carrying the `-x` line passed its shell, run by hand, and one naming its source in prose alone was refused (`docs/lanes/docs-direction-seventh.md`).
+- **Pinned by.** No test pins the count of the classes; `tests/arch_ci_lines.rs` pins the class of a security advisory, unchanged.
+- **Migration.** None.
+
 ## [0.9.0-beta.10] - 2026-11-18
 
 The 0.9.0 line's tenth prerelease (RELEASING.md point 14), cut from `beta` at `acbe6f21` after the stable line's 0.8.13 was synced in. 1 entry since beta.9.
