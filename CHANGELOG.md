@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.13] - 2026-11-18
+
 ### Security: GlobalKVStore selector queries enforce the query's controller, protocol and tags against the overlay resolver's answer
 
 - **What was reachable.** `GlobalKVStore::query`, `get_by_controller` and `get_by_tags` sent the caller's selector (a controller, a protocol or tags) to the overlay lookup resolver and returned its answer without re-checking the selector on the client side. A token's fields are controller-signed (the token-authentication fixes), so a lookup host cannot forge a token, but it can answer a selector query with any real, validly-signed token of any controller or tags; a caller that trusted `get_by_controller(X)` to return only `X`'s entries was served another controller's token, honestly self-labelled with its true controller. Reachable from an untrusted lookup host on the default read path (no feature flag). The existing-token lookup that `set` and `remove` run reads the same path and did not re-check the controller of each returned entry either, so a host's wrong-controller token could be taken as the caller's existing token; spending such a token still needs the caller's own key, so the caller-facing loss is on the three read doors.
