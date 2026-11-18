@@ -1,0 +1,7 @@
+error[unexpected-keys]: found 1 unexpected keys, expected: ["version", "db-path", "db-urls", "vulnerability", "notice", "unmaintained", "unsound", "yanked", "ignore", "severity-threshold", "git-fetch-with-cli", "disable-yank-checking", "maximum-db-staleness", "unused-ignored-advisory"]
+   ┌─ /home/runner/work/bsv-rs/bsv-rs/deny.toml:12:1
+   │
+12 │ not-a-key = true
+   │ ─────────
+
+2026-11-17 18:37:12 [ERROR] failed to deserialize config from '/home/runner/work/bsv-rs/bsv-rs/deny.toml'

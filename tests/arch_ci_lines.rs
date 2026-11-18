@@ -2396,6 +2396,7 @@ fn a_tags_run_refuses_a_version_that_is_already_published_867() {
             "msrv",
             "features",
             "machete",
+            "advisories",
             "bench",
             "publish",
             "page",
@@ -2488,7 +2489,7 @@ fn a_release_whose_refusal_is_weakened_absorbed_or_bypassed_is_refused_867() {
     );
     // the publish no longer behind the version job
     let loose = plant(
-        "    needs: [version, ci, docs, msrv, features, machete]\n",
+        "    needs: [version, ci, docs, msrv, features, machete, advisories]\n",
         "    needs: [ci, docs, msrv, features, machete]\n",
     );
     assert_eq!(
@@ -2499,7 +2500,7 @@ fn a_release_whose_refusal_is_weakened_absorbed_or_bypassed_is_refused_867() {
     let beside = release
         .replacen("    name: CI\n    needs: version\n", "    name: CI\n", 1)
         .replacen(
-            "    needs: [version, ci, docs, msrv, features, machete]\n",
+            "    needs: [version, ci, docs, msrv, features, machete, advisories]\n",
             "    needs: [ci]\n",
             1,
         );
@@ -2515,8 +2516,8 @@ fn a_release_whose_refusal_is_weakened_absorbed_or_bypassed_is_refused_867() {
     );
     // the publish run whatever the version job answered
     let always = plant(
-        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete]\n",
-        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete]\n    if: always()\n",
+        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete, advisories]\n",
+        "    name: Publish to crates.io\n    needs: [version, ci, docs, msrv, features, machete, advisories]\n    if: always()\n",
     );
     assert_eq!(
         release_once(&always),

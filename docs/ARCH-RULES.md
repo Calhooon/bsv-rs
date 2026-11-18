@@ -302,6 +302,56 @@ script, each under `|| result=1`, the step ending `exit "$result"`), and
 `deny.toml`'s `multiple-versions = "warn"` with no `skip`: cargo-deny keeps
 naming every duplicate, the list is the one record of the ones allowed.
 
+The gate's three `cargo-deny` lines run `check bans licenses sources`, and
+the step never names `advisories` (#1034): the RustSec database moves by its
+own clock, so it is read by `.github/workflows/advisories.yml` (a schedule
+and a dispatch alone; `main` and `beta` from the one file; the same three
+graphs; one issue a line, `advisories: <line>`; `contents: read` and
+`issues: write` alone, no secret, every action pinned by its sha) and by
+`release.yml`'s `advisories` job on a tag (all four checks, behind the
+version job, `publish` waiting for it). `tests/arch_advisories_1034.rs`
+pins the three sites and `deny.toml` whole (byte for byte, and no other
+configuration file of cargo-deny beside it), each rule shown to refuse the
+edit that would break it; the daily workflow, which gates
+nothing, is pinned whole: byte for byte from its `on:` line, and above it
+its `name:` line, comments and blank lines alone; the tag's `advisories`
+job is pinned byte for byte, and `release.yml`'s top-level keys, what every
+job inherits, its job ids and `publish`'s keys by structure (#1034's third
+fold); and every workflow file is held to one plain block style in which a
+mapping key has one spelling and a block is two spaces past its key, so a
+key's whole path is readable from text (`tests/arch_workflow_plain_style_1034.rs`,
+the fourth and fifth folds; its reader `key_paths`, `tests/support/workflow_style.rs`).
+What another workflow can do to the alarm or the tag's gate (share their
+concurrency group, call a reusable workflow, react to or start another
+workflow, hold `actions: write` or `issues: write`, name an expression) is
+pinned as six sets over those paths, every row of every file today written
+down once (`GROUPS`, a group's name folded for case as the platform compares
+it; `CALLS`; `TRIGGERS`; `PERMISSIONS`; `EXPRESSIONS`, every expression of
+every workflow as written, the whole value of each `if` and each `${{ ... }}`
+of every other value; `HOLDERS`, each job holding a grant, or one of the
+rows of `EXPRESSIONS` chosen by hand as handing it a secret, by a digest of
+its pairs), a row added, removed or changed failing by the set's name
+(`tests/arch_workflow_pinned_sets_1034.rs`, the fifth and sixth folds).
+Nothing about what an expression names is read from its spelling: the set
+of expressions is pinned, and a change of it is deliberate and seen; what a
+pinned expression may reach at run time (a secret's own rights, the
+repository's settings, an action's default use of the token) is judged by
+no test. A differential under a real parser (libyaml 0.2.5) respelled
+the 195 plants of the earlier folds and 297 changes of the sets' values in
+every style its emitter offers: every copy the parser reads as a plant or as
+a change of a set is refused, and on every copy the style lets through the
+reader's pairs equal the parser's (`docs/lanes/fix-1034-deny-shape.md`, the
+fifth fold, with its counts and its stated bounds:
+another repository's workflow file, the repository's default token setting,
+a run cancelled or a workflow disabled from outside the files, a spelling
+GitHub's parser reads and libyaml does not). Its three answers (clean, a
+finding, could not judge) are each shown by a run of the pinned cargo-deny:
+`tests/arch_advisories_answers_1034.rs` runs the issue step's decision lines,
+lifted from the workflow, on the recorded logs of seven states
+(`tests/data/advisories_1034/`), a config cargo-deny could not read never
+a finding; and the tag's job is bounded at 15 minutes, as a gating job that
+hangs would hold the release.
+
 The required contexts become `lint` and `checks` in place of the nine;
 `tests/arch_ci_pr_runs_the_required_set.rs`'s `REQUIRED_ON_BETA` (five) and
 `REQUIRED_ON_MAIN` (six) carry them.

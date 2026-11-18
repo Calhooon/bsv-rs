@@ -1,0 +1,114 @@
+error[vulnerability]: Out-of-bounds access in `get_disjoint_mut` due to incorrect bounds check
+    ┌─ /home/runner/work/bsv-rs/bsv-rs/Cargo.lock:165:1
+    │
+165 │ slab 0.4.10 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2025-0047
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2025-0047
+    ├ ## Impact
+      The `get_disjoint_mut` method in slab v0.4.10 incorrectly checked if indices were within the slab's capacity instead of its length, allowing access to uninitialized memory. This could lead to undefined behavior or potential crashes.
+      
+      ## Patches
+      This has been fixed in slab v0.4.11.
+      
+      ## Workarounds
+      Avoid using `get_disjoint_mut` with indices that might be beyond the slab's actual length, or upgrade to v0.4.11 or later.
+      
+      ## References
+      * [https://github.com/tokio-rs/slab/pull/152](https://github.com/tokio-rs/slab/pull/152)
+    ├ Announcement: https://github.com/tokio-rs/slab/pull/152
+    ├ Solution: Upgrade to >=0.4.11 (try `cargo update -p slab`)
+    ├ slab v0.4.10
+      ├── futures-util v0.3.34
+      │   ├── futures v0.3.34
+      │   │   ├── bsv-rs v0.9.0-beta.8
+      │   │   └── wiremock v0.6.2
+      │   │       └── (dev) bsv-rs v0.9.0-beta.8 (*)
+      │   ├── futures-executor v0.3.34
+      │   │   └── futures v0.3.34 (*)
+      │   └── js-sys v0.3.107
+      │       ├── getrandom v0.2.17
+      │       │   ├── bsv-rs v0.9.0-beta.8 (*)
+      │       │   └── rand_core v0.6.4
+      │       │       ├── crypto-common v0.1.7
+      │       │       │   ├── aead v0.5.2
+      │       │       │   │   └── aes-gcm v0.10.3
+      │       │       │   │       └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   ├── cipher v0.4.4
+      │       │       │   │   ├── aes v0.8.4
+      │       │       │   │   │   ├── aes-gcm v0.10.3 (*)
+      │       │       │   │   │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   │   ├── aes-gcm v0.10.3 (*)
+      │       │       │   │   ├── cbc v0.1.2
+      │       │       │   │   │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   │   └── ctr v0.9.2
+      │       │       │   │       └── aes-gcm v0.10.3 (*)
+      │       │       │   └── universal-hash v0.5.1
+      │       │       │       └── polyval v0.6.2
+      │       │       │           └── ghash v0.5.1
+      │       │       │               └── aes-gcm v0.10.3 (*)
+      │       │       ├── rand v0.8.8
+      │       │       │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       └── rand_chacha v0.3.1
+      │       │           └── rand v0.8.8 (*)
+      │       └── web-sys v0.3.107
+      │           └── plotters v0.3.7
+      │               └── criterion v0.5.1
+      │                   └── (dev) bsv-rs v0.9.0-beta.8 (*)
+      └── h2 v0.4.20
+          └── hyper v1.12.0
+              ├── hyper-util v0.1.21
+              │   └── wiremock v0.6.2 (*)
+              └── wiremock v0.6.2 (*)
+
+error[yanked]: detected yanked crate (try `cargo update -p slab`)
+    ┌─ /home/runner/work/bsv-rs/bsv-rs/Cargo.lock:165:1
+    │
+165 │ slab 0.4.10 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ yanked version
+    │
+    ├ slab v0.4.10
+      ├── futures-util v0.3.34
+      │   ├── futures v0.3.34
+      │   │   ├── bsv-rs v0.9.0-beta.8
+      │   │   └── wiremock v0.6.2
+      │   │       └── (dev) bsv-rs v0.9.0-beta.8 (*)
+      │   ├── futures-executor v0.3.34
+      │   │   └── futures v0.3.34 (*)
+      │   └── js-sys v0.3.107
+      │       ├── getrandom v0.2.17
+      │       │   ├── bsv-rs v0.9.0-beta.8 (*)
+      │       │   └── rand_core v0.6.4
+      │       │       ├── crypto-common v0.1.7
+      │       │       │   ├── aead v0.5.2
+      │       │       │   │   └── aes-gcm v0.10.3
+      │       │       │   │       └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   ├── cipher v0.4.4
+      │       │       │   │   ├── aes v0.8.4
+      │       │       │   │   │   ├── aes-gcm v0.10.3 (*)
+      │       │       │   │   │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   │   ├── aes-gcm v0.10.3 (*)
+      │       │       │   │   ├── cbc v0.1.2
+      │       │       │   │   │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       │   │   └── ctr v0.9.2
+      │       │       │   │       └── aes-gcm v0.10.3 (*)
+      │       │       │   └── universal-hash v0.5.1
+      │       │       │       └── polyval v0.6.2
+      │       │       │           └── ghash v0.5.1
+      │       │       │               └── aes-gcm v0.10.3 (*)
+      │       │       ├── rand v0.8.8
+      │       │       │   └── bsv-rs v0.9.0-beta.8 (*)
+      │       │       └── rand_chacha v0.3.1
+      │       │           └── rand v0.8.8 (*)
+      │       └── web-sys v0.3.107
+      │           └── plotters v0.3.7
+      │               └── criterion v0.5.1
+      │                   └── (dev) bsv-rs v0.9.0-beta.8 (*)
+      └── h2 v0.4.20
+          └── hyper v1.12.0
+              ├── hyper-util v0.1.21
+              │   └── wiremock v0.6.2 (*)
+              └── wiremock v0.6.2 (*)
+
+advisories FAILED
