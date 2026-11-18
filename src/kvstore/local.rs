@@ -356,7 +356,14 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             )
             .await?;
 
-        Ok(list_result.total_outputs as usize)
+        // The wallet's total is 64-bit (#843); a total this target's `usize`
+        // cannot hold (wasm32 past `2^32 - 1`) is an error, never truncated.
+        usize::try_from(list_result.total_outputs).map_err(|_| {
+            lookup::refused(format!(
+                "Wallet totalOutputs {} exceeds the platform",
+                list_result.total_outputs
+            ))
+        })
     }
 
     /// Get multiple values by key.

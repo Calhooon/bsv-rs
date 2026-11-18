@@ -33,7 +33,7 @@ fn wallet_listing(script: Option<&LockingScript>) -> Counting {
     let wallet = Counting::of_scalar(9);
     let source = script.map(|script| lock_position::source_of(script.clone()));
     *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
-        total_outputs: u32::from(source.is_some()),
+        total_outputs: u64::from(source.is_some()),
         beef: None,
         outputs: source
             .iter()

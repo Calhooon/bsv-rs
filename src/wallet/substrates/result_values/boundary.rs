@@ -50,6 +50,8 @@ fn request_fields(call: &str) -> &'static [&'static str] {
         "createAction" => &["inputs", "outputs", "version", "lockTime", "options"],
         "signAction" => &["spends", "options"],
         "listActions" | "listOutputs" => &[
+            // listOutputs alone: a BRC-112 balance query is told by it (#843).
+            "basket",
             "labels",
             "tags",
             "labelQueryMode",

@@ -107,6 +107,7 @@
 //! bsv-rs = { version = "0.3", features = ["wallet"] }
 //! ```
 
+mod balance_query;
 mod cached_key_deriver;
 mod client;
 mod client_instance;

@@ -512,8 +512,9 @@ pub(crate) fn require_page_capacity(
 /// `#assertPageCount` (`WalletWireTransceiver.ts:1940-1946`), after the page
 /// is read (`:1550`, `:1759`): no more entries than the declared total, the
 /// total of every page (bsv-rs#190).
-pub(crate) fn assert_page_count(returned: usize, total: u32, call: &str) -> Result<(), Error> {
-    if returned > total as usize {
+pub(crate) fn assert_page_count(returned: usize, total: u64, call: &str) -> Result<(), Error> {
+    // A count past `u64` (no target has one) is above every total.
+    if u64::try_from(returned).map_or(true, |returned| returned > total) {
         return Err(refused(format!(
             "Wallet Wire {call} response returned {returned} records but declared a total of {total}"
         )));

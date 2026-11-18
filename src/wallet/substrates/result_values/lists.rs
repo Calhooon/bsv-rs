@@ -294,12 +294,46 @@ fn history_output(output: &Object<'_>, call: &str, field: &str, request: &Value)
     Ok(())
 }
 
+/// A BRC-112 balance query's answer (`validateListOutputs`,
+/// `WalletResultValidation.ts:2093-2106` at `ts-stack@11faa7d16`; #843): a
+/// nonnegative integral number of any magnitude, no outputs and no BEEF.
+fn balance(result: &Object<'_>, call: &str) -> Result<()> {
+    let total = member(result, "totalOutputs");
+    if !total
+        .and_then(|raw| serde_json::from_str::<f64>(raw.get()).ok())
+        .is_some_and(|n| n.fract() == 0.0 && n >= 0.0)
+    {
+        return Err(invalid(
+            call,
+            "totalOutputs",
+            "a nonnegative integer balance for a balance query",
+        ));
+    }
+    if !array(member(result, "outputs"), call, "outputs").is_ok_and(|outputs| outputs.is_empty()) {
+        return Err(invalid(
+            call,
+            "outputs",
+            "an empty array for a balance query",
+        ));
+    }
+    if member(result, "BEEF").is_some() {
+        return Err(invalid(call, "BEEF", "absent for a balance query"));
+    }
+    Ok(())
+}
+
 pub(super) fn outputs(
     result: &Object<'_>,
     call: &str,
     request: &Value,
     bytes: &bytes::Fields<'_>,
 ) -> Result<()> {
+    if request["basket"]
+        .as_str()
+        .is_some_and(crate::wallet::balance_query::is_balance_query)
+    {
+        return balance(result, call);
+    }
     let outputs = page(result, call, "totalOutputs", "outputs", request)?;
     let beef = member(result, "BEEF")
         .map(|raw| beef::read(Some(raw), call, "BEEF", bytes))

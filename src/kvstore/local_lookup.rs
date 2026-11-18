@@ -23,7 +23,7 @@ pub(crate) struct LookupValueResult {
     pub input_beef: Option<Vec<u8>>,
     pub outputs: Vec<WalletOutput>,
     pub value_exists: bool,
-    pub total_outputs: u32,
+    pub total_outputs: u64,
 }
 
 impl LookupValueResult {
@@ -45,7 +45,7 @@ impl LookupValueResult {
         outputs: Vec<WalletOutput>,
     ) -> Self {
         Self {
-            total_outputs: outputs.len() as u32,
+            total_outputs: count_of(outputs.len()),
             value,
             outpoints,
             input_beef,
@@ -62,6 +62,12 @@ pub(crate) struct WalletOutput {
     pub satoshis: u64,
     pub locking_script: Vec<u8>,
     pub tags: Vec<String>,
+}
+
+/// A page's length beside the wallet's 64-bit total (#843): a length past
+/// `u64` (no target has one) is above every total.
+pub(super) fn count_of(length: usize) -> u64 {
+    u64::try_from(length).unwrap_or(u64::MAX)
 }
 
 pub(super) fn refused(message: impl Into<String>) -> Error {
@@ -88,9 +94,12 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 self.originator(),
             )
             .await?;
-        if result.total_outputs < result.outputs.len() as u32
-            || result.total_outputs > MAX_LOCAL_OUTPUTS
-            || result.outputs.len() > MAX_LOCAL_OUTPUTS as usize
+        // The total is the wallet's, any 64-bit value (#843): compared as
+        // one, never narrowed.
+        let returned = count_of(result.outputs.len());
+        if result.total_outputs < returned
+            || result.total_outputs > u64::from(MAX_LOCAL_OUTPUTS)
+            || returned > u64::from(MAX_LOCAL_OUTPUTS)
         {
             return Err(refused("Wallet returned an invalid KVStore output list"));
         }
@@ -123,7 +132,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         if !allow_multiple && (listed.outputs.len() != 1 || listed.total_outputs != 1) {
             return Err(refused("Multiple KVStore outputs make the current value ambiguous; call set to collapse them"));
         }
-        if allow_multiple && listed.outputs.len() != listed.total_outputs as usize {
+        if allow_multiple && count_of(listed.outputs.len()) != listed.total_outputs {
             return Err(refused(
                 "Wallet did not return every KVStore output needed for an atomic collapse",
             ));

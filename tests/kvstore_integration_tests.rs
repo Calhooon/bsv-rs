@@ -342,7 +342,7 @@ impl WalletInterface for MockWallet {
             })
             .collect();
 
-        let total = matching.len() as u32;
+        let total = matching.len() as u64;
         // Apply limit
         let limited: Vec<&MockOutput> = if let Some(limit) = args.limit {
             matching.into_iter().take(limit as usize).collect()

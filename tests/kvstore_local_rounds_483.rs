@@ -19,7 +19,7 @@ struct FreshWallet {
     inner: Counting,
     source: Mutex<Transaction>,
     page: ListOutputsResult,
-    totals: Vec<u32>,
+    totals: Vec<u64>,
     empty_from: Option<usize>,
 }
 
@@ -99,7 +99,7 @@ fresh_wallet! {
     (get_version, GetVersionResult),
 }
 
-async fn store(totals: &[u32], empty_from: Option<usize>) -> (LocalKVStore<FreshWallet>, Counting) {
+async fn store(totals: &[u64], empty_from: Option<usize>) -> (LocalKVStore<FreshWallet>, Counting) {
     let h = support::setup(false, 1).await;
     let page = h.wallet.listed.lock().unwrap().clone().unwrap();
     let mut wallet = h.wallet;

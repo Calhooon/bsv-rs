@@ -47,7 +47,15 @@ async fn check(row: usize) {
                 .unwrap()
         });
         let ours = cases::invoke(override_wallet.as_ref().unwrap_or(&wallet), c).await;
-        let matches = if let Some(residue) = &c.residue {
+        // #843: `totalOutputs` is 64-bit, so the recorded residue of
+        // `row_47_listOutputs_wide_total` (a `u32` total) is closed: the
+        // case is judged by the reference's verdict, as every other is. The
+        // vector keeps its annotation (never edited to pass).
+        let residue = c
+            .residue
+            .as_ref()
+            .filter(|_| c.name != "row_47_listOutputs_wide_total");
+        let matches = if let Some(residue) = residue {
             assert!(!residue.is_empty());
             c.reference["accepted"] == true
                 && matches!(&ours, Err(Error::WalletError(words)) if

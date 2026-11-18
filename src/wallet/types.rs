@@ -1272,8 +1272,13 @@ pub struct ListOutputsArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListOutputsResult {
-    /// Total number of matching outputs.
-    pub total_outputs: u32,
+    /// The number of matching outputs across every page, at most `2^32 - 1`
+    /// on the binary wire. For a BRC-112 balance query (a basket of
+    /// `balance <basket>` or `p <module> balance <basket>`) it is the
+    /// balance instead, any 64-bit value, with no outputs and no BEEF: the
+    /// reference's `PositiveInteger64OrZero` (`ts-stack@11faa7d16`
+    /// `Wallet.interfaces.ts:36-44,662-673`; #843). A `u32` until 0.9.0.
+    pub total_outputs: u64,
     /// Optional aggregated BEEF data; `BEEF`, an array of byte numbers, in
     /// JSON (#105).
     #[serde(rename = "BEEF", skip_serializing_if = "Option::is_none", default)]

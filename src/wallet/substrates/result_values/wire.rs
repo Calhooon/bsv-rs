@@ -173,7 +173,7 @@ impl WireResult for ListOutputsResult {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Outputs<'a> {
-            total_outputs: u32,
+            total_outputs: u64,
             #[serde(rename = "BEEF", skip_serializing_if = "Option::is_none")]
             beef: Option<[u8; 0]>,
             outputs: Vec<Output<'a>>,

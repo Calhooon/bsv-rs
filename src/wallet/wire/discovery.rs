@@ -108,7 +108,7 @@ fn parse_discovery_result(
             decrypted_fields,
         });
     }
-    super::assert_page_count(certificates.len(), total_certificates, "discover")?;
+    super::assert_page_count(certificates.len(), total_certificates.into(), "discover")?;
 
     Ok(DiscoverCertificatesResult {
         total_certificates,
