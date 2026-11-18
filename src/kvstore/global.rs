@@ -123,8 +123,14 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
     /// Get a value by key.
     ///
-    /// Queries the overlay lookup service for entries matching the key.
-    /// If a controller is not specified in options, returns the first matching entry.
+    /// Queries the overlay lookup service for entries matching the key and
+    /// returns the first matching entry.
+    ///
+    /// `get` matches the key under the store's configured protocol and takes
+    /// no controller. A key may be written by more than one controller, so
+    /// read `entry.controller` when the application expects a particular
+    /// writer. A returned entry's signature authenticates its controller and
+    /// contents, not the lookup service's claim that its token is unspent.
     ///
     /// # Arguments
     ///
@@ -251,6 +257,15 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     /// Query entries from the overlay.
     ///
     /// Supports filtering by key, controller, protocol ID, and tags.
+    ///
+    /// Each member left unset selects nothing: without a `controller`, entries
+    /// of every controller are kept; without `tags`, every tag set; without a
+    /// `key`, every protocol unless `protocol_id` names one (with a `key`, the
+    /// store's configured protocol stands in for an unset `protocol_id`). In the
+    /// `any` tag mode an entry carrying one of the tags is kept, and an empty
+    /// `tags` list keeps every entry in the `all` mode and none in the `any`
+    /// mode. Narrow the `KVStoreQuery`, or filter the returned `Vec`, to obtain
+    /// a specific subset.
     ///
     /// # Arguments
     ///

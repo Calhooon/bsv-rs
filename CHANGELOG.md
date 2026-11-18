@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs: the GlobalKVStore read doors state what the caller still checks after a selector read (GHSA-j4w5-4g84-q3f4)
+
+- **What was added.** Four caller notes in rustdoc, each on the public door a `GlobalKVStore` selector read returns through, saying what that door checks and what it leaves to the caller. `GlobalKVStore::get` now says it matches the key under the store's configured protocol and takes no controller, that a key may be written by more than one controller, so a caller reads `entry.controller` when it expects a particular writer, and that an entry's signature authenticates its controller and contents, not the lookup service's claim that its token is unspent, as the reference's `get` says (`ts-stack@edf6e03` `GlobalKVStore.ts:63-66,153-154`) (`src/kvstore/global.rs`). `GlobalKVStore::query` now says what each member left unset keeps (every controller, every tag set, every protocol without a key, the configured protocol with one), that the `any` tag mode keeps an entry carrying one of the tags, and that an empty tag list keeps every entry in the `all` mode and none in the `any` mode, so a narrower query or a filter on the returned `Vec` selects a subset (`src/kvstore/global.rs`). `KVStoreQuery` now says `limit`, `skip` and `sort_order` are hints the service applies on its side and the returned entries are unordered (`src/kvstore/types.rs`). `KVStoreEntry` now says a `value` read from the overlay is authenticated as its controller's own content rather than validated as safe input, to be parsed and bounded like any external input (`src/kvstore/types.rs`).
+- **Why.** These notes accompany the selector-filter fix of the security entry under `0.9.0-beta.10` (the advisory GHSA-j4w5-4g84-q3f4). They record what each read door checks and what it leaves to the caller, behaviour the fix does not change.
+- **Migration.** None. Documentation only; no code, test or type change.
+
 ## [0.9.0-beta.10] - 2026-11-18
 
 The 0.9.0 line's tenth prerelease (RELEASING.md point 14), cut from `beta` at `acbe6f21` after the stable line's 0.8.13 was synced in. 1 entry since beta.9.
