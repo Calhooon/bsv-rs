@@ -137,6 +137,11 @@ impl KVStoreToken {
 ///
 /// Represents a stored key-value pair along with controller info, protocol,
 /// tags, and optional token data.
+///
+/// A `value` read from the overlay is authenticated as its controller's own
+/// content (the controller's signature over the token's fields), not validated
+/// as safe input. Parse, bound and escape it before use, as you would any other
+/// external input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KVStoreEntry {
@@ -250,6 +255,11 @@ impl KVStoreLookupResult {
 ///
 /// Supports filtering by key, controller, protocol ID, and tags with
 /// pagination and sorting options.
+///
+/// `limit`, `skip` and `sort_order` are hints sent to the overlay lookup
+/// service, which orders, limits and pages the matching entries on its side.
+/// Treat the returned entries as unordered, and apply your own ordering or cap
+/// when you depend on one.
 ///
 /// Its JSON is the type's serde (`serde_json::to_value(&query)`); `to_json`
 /// is the store's own door since #843dforeign:
