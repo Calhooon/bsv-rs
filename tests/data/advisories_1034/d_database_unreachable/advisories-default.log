@@ -1,0 +1,4 @@
+2026-11-17 18:37:24 [ERROR] failed to fetch advisory database https://advisory-db.invalid/RustSec/advisory-db with cli: failed to clone: ["clone", "--depth=1", "--branch", "main", "https://advisory-db.invalid/RustSec/advisory-db", "/home/runner/advisory-dbs/advisory-db-6cd7e1a561430efc"]
+Cloning into '/home/runner/advisory-dbs/advisory-db-6cd7e1a561430efc'...
+fatal: unable to access 'https://advisory-db.invalid/RustSec/advisory-db/': Could not resolve host: advisory-db.invalid
+
