@@ -97,7 +97,7 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         }
         ListOutputs => {
             let r = ListOutputsResult::from_fixture(value.clone());
-            w.write_var_int(r.total_outputs.into())
+            w.write_var_int(r.total_outputs)
                 .write_optional_bytes(r.beef.as_deref());
             for output in r.outputs {
                 w.write_wallet_output(&output);

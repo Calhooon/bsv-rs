@@ -50,7 +50,7 @@ async fn local_wrapper_uses_authenticated_count_for_set_and_reported_total_for_r
         }
         let listed = &case["listed"];
         *wallet.listed.lock().unwrap() = Some(ListOutputsResult {
-            total_outputs: listed["totalOutputs"].as_u64().unwrap() as u32,
+            total_outputs: listed["totalOutputs"].as_u64().unwrap(),
             beef: Some(from_hex(listed["BEEF"].as_str().unwrap()).unwrap()),
             outputs: serde_json::from_value::<Vec<WalletOutput>>(listed["outputs"].clone())
                 .unwrap(),

@@ -306,7 +306,7 @@ macro_rules! basket {
                     beef.to_binary().unwrap()
                 });
                 Ok(ListOutputsResult {
-                    total_outputs: outputs.len() as u32,
+                    total_outputs: outputs.len() as u64,
                     outputs,
                     beef,
                 })

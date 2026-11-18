@@ -1,0 +1,2858 @@
+{
+  "source": "ts-stack@11faa7d16",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "totalOutputs_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":0e5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-0E-3,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1e2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_upper",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1E2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_plus",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1e+2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1.5e1,\"outputs\":[]}",
+      "reference": {
+        "accepted": "15"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_negative_integral",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":100e-2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":100.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zeros",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":100.000,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_negative",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-1,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-1e2,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_small_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":-0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_tiny",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1e-7,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_u32_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":4294967295,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967295"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":4294967296,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":4294967296.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_less_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740991,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740991"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740992,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740993,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_two",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740994,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740994"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_less_2047",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709549568,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709549568"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551615,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551616,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1.8446744073709552e19,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_65",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":36893488147419103232,\"outputs\":[]}",
+      "reference": {
+        "accepted": "36893488147419103232"
+      }
+    },
+    {
+      "name": "totalOutputs_big_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1e30,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1000000000000000019884624838656"
+      }
+    },
+    {
+      "name": "totalOutputs_past_double",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":1e400,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_digits",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":\"5\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_empty",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":\"\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_null",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":null,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_true",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":true,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_false",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":false,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":[],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array_digit",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":[5],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_object",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":{},\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_absent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "outputs_empty",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "outputs_one_output",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[{\"outpoint\":\"abababababababababababababababababababababababababababababababab.0\",\"satoshis\":1,\"spendable\":true}]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_absent",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_null",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_object",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_string",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_number",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_true",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_array_null",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[null]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_absent",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "BEEF_null",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_bytes",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[1]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_empty_array",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_byte_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{\"0\":1}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_base64_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"AQ==\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_number",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_true",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_false",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":false}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0e5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0E-3,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_upper",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1E2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_plus",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e+2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.5e1,\"outputs\":[]}",
+      "reference": {
+        "accepted": "15"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_negative_integral",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100e-2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zeros",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100.000,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_negative",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-1,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-1e2,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_small_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_tiny",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e-7,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_u32_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967295,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967295"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967296,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967296.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_less_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740991,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740991"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740992,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740993,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_two",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740994,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740994"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_less_2047",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709549568,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709549568"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551615,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551616,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.8446744073709552e19,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_65",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":36893488147419103232,\"outputs\":[]}",
+      "reference": {
+        "accepted": "36893488147419103232"
+      }
+    },
+    {
+      "name": "totalOutputs_big_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e30,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1000000000000000019884624838656"
+      }
+    },
+    {
+      "name": "totalOutputs_past_double",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e400,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_digits",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":\"5\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_empty",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":\"\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_null",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":null,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_true",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":true,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_false",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":false,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":[],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array_digit",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":[5],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_object",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":{},\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_absent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "outputs_empty",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "outputs_one_output",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[{\"outpoint\":\"abababababababababababababababababababababababababababababababab.0\",\"satoshis\":1,\"spendable\":true}]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_absent",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_null",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_object",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_string",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_number",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_true",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_array_null",
+      "member": "outputs",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[null]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_absent",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "BEEF_null",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_bytes",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[1]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_empty_array",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_byte_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{\"0\":1}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_base64_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"AQ==\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_number",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_true",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_false",
+      "member": "BEEF",
+      "args": {
+        "basket": "balance default",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":false}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":0e5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-0E-3,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1e2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_upper",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1E2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_plus",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1e+2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1.5e1,\"outputs\":[]}",
+      "reference": {
+        "accepted": "15"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_negative_integral",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":100e-2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":100.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zeros",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":100.000,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_negative",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-1,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-1e2,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_small_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":-0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_tiny",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1e-7,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_u32_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":4294967295,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967295"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":4294967296,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":4294967296.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_less_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740991,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740991"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740992,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740993,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_two",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740994,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740994"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_less_2047",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709549568,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709549568"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551615,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551616,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1.8446744073709552e19,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_65",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":36893488147419103232,\"outputs\":[]}",
+      "reference": {
+        "accepted": "36893488147419103232"
+      }
+    },
+    {
+      "name": "totalOutputs_big_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1e30,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1000000000000000019884624838656"
+      }
+    },
+    {
+      "name": "totalOutputs_past_double",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":1e400,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_digits",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":\"5\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_empty",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":\"\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_null",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":null,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_true",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":true,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_false",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":false,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":[],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array_digit",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":[5],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_object",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":{},\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_absent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "outputs_empty",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "outputs_one_output",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[{\"outpoint\":\"abababababababababababababababababababababababababababababababab.0\",\"satoshis\":1,\"spendable\":true}]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_absent",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_null",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_object",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_string",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_number",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_true",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_array_null",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[null]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_absent",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "BEEF_null",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_bytes",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[1]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_empty_array",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_byte_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{\"0\":1}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_base64_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"AQ==\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_number",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_true",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_false",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa"
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":false}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0e5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_minus_zero_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0E-3,\"outputs\":[]}",
+      "reference": {
+        "accepted": "0"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_upper",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1E2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_plus",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e+2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.5e1,\"outputs\":[]}",
+      "reference": {
+        "accepted": "15"
+      }
+    },
+    {
+      "name": "totalOutputs_exponent_negative_integral",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100e-2,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_hundred_point_zeros",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":100.000,\"outputs\":[]}",
+      "reference": {
+        "accepted": "100"
+      }
+    },
+    {
+      "name": "totalOutputs_negative",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-1,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-1e2,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_small_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_negative_fraction",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":-0.5,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_tiny",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e-7,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_u32_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967295,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967295"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967296,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_32_point_zero",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":4294967296.0,\"outputs\":[]}",
+      "reference": {
+        "accepted": "4294967296"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_less_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740991,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740991"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740992,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_one",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740993,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740992"
+      }
+    },
+    {
+      "name": "totalOutputs_two_53_plus_two",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":9007199254740994,\"outputs\":[]}",
+      "reference": {
+        "accepted": "9007199254740994"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_less_2047",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709549568,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709549568"
+      }
+    },
+    {
+      "name": "totalOutputs_u64_max",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551615,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":18446744073709551616,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_64_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1.8446744073709552e19,\"outputs\":[]}",
+      "reference": {
+        "accepted": "18446744073709551616"
+      }
+    },
+    {
+      "name": "totalOutputs_two_65",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":36893488147419103232,\"outputs\":[]}",
+      "reference": {
+        "accepted": "36893488147419103232"
+      }
+    },
+    {
+      "name": "totalOutputs_big_exponent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e30,\"outputs\":[]}",
+      "reference": {
+        "accepted": "1000000000000000019884624838656"
+      }
+    },
+    {
+      "name": "totalOutputs_past_double",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":1e400,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_digits",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":\"5\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_string_empty",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":\"\",\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_null",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":null,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_true",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":true,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_false",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":false,\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":[],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_array_digit",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":[5],\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_object",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":{},\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "totalOutputs_absent",
+      "member": "totalOutputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"outputs\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result totalOutputs: expected a nonnegative integer balance for a balance query"
+      }
+    },
+    {
+      "name": "outputs_empty",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "outputs_one_output",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[{\"outpoint\":\"abababababababababababababababababababababababababababababababab.0\",\"satoshis\":1,\"spendable\":true}]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_absent",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_null",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_object",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_string",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_number",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_true",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "outputs_array_null",
+      "member": "outputs",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[null]}",
+      "reference": {
+        "error": "Invalid listOutputs result outputs: expected an empty array for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_absent",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[]}",
+      "reference": {
+        "accepted": "5"
+      }
+    },
+    {
+      "name": "BEEF_null",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":null}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_bytes",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[1]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_empty_array",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":[]}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_byte_object",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":{\"0\":1}}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_base64_string",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":\"AQ==\"}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_number",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":0}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_true",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":true}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    },
+    {
+      "name": "BEEF_false",
+      "member": "BEEF",
+      "args": {
+        "basket": "p color balance aa",
+        "limit": 10
+      },
+      "bodyText": "{\"totalOutputs\":5,\"outputs\":[],\"BEEF\":false}",
+      "reference": {
+        "error": "Invalid listOutputs result BEEF: expected absent for a balance query"
+      }
+    }
+  ]
+}

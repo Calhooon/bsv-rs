@@ -130,7 +130,7 @@ impl WireReader<'_> {
             super::require_page_capacity(actions.len(), limit, "listActions")?;
             actions.push(self.read_wallet_action()?);
         }
-        super::assert_page_count(actions.len(), total_actions, "listActions")?;
+        super::assert_page_count(actions.len(), total_actions.into(), "listActions")?;
         Ok(ListActionsResult {
             total_actions,
             actions,
@@ -140,8 +140,17 @@ impl WireReader<'_> {
     pub(super) fn read_outputs_page(
         &mut self,
         limit: Option<u32>,
+        balance: bool,
     ) -> Result<ListOutputsResult, Error> {
-        let total_outputs = self.read_var_int_u32("listOutputs totalOutputs")?;
+        // A BRC-112 balance is not an output count: the whole canonical
+        // varint, to `2^64 - 1` (`readVarIntBnStrict`,
+        // `WalletWireTransceiver.ts:725-733` at `ts-stack@11faa7d16`); a
+        // count keeps its `2^32 - 1` bound (#843).
+        let total_outputs = if balance {
+            self.read_var_int()?
+        } else {
+            self.read_var_int_u32("listOutputs totalOutputs")?.into()
+        };
         let beef = self.read_optional_bytes()?;
         let mut outputs = Vec::new();
         while !self.is_empty() {

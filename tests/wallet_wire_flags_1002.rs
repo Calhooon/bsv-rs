@@ -682,7 +682,7 @@ fn result_frame(row: &Value) -> Vec<u8> {
             let result: ListOutputsResult =
                 serde_json::from_value(row["answered"].clone()).unwrap();
             writer
-                .write_var_int(result.total_outputs.into())
+                .write_var_int(result.total_outputs)
                 .write_optional_bytes(result.beef.as_deref());
             for output in &result.outputs {
                 writer.write_wallet_output(output);

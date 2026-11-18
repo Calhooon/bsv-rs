@@ -348,7 +348,7 @@ async fn a_list_outputs_total_above_u32_max_is_refused_not_truncated() {
     let read = list_outputs(0).await.unwrap();
     assert_eq!((read.total_outputs, read.beef), (0, None));
     let read = list_outputs(u32::MAX as u64).await.unwrap();
-    assert_eq!(read.total_outputs, u32::MAX);
+    assert_eq!(read.total_outputs, u64::from(u32::MAX));
     assert!(read.outputs.is_empty());
     assert_eq!(
         list_outputs(OVER).await.unwrap_err(),

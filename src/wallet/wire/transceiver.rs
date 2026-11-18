@@ -877,7 +877,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        binding.check(reader.read_outputs_page(args.limit)?)
+        let balance = crate::wallet::balance_query::is_balance_query(&args.basket);
+        binding.check(reader.read_outputs_page(args.limit, balance)?)
     }
 
     /// Relinquishes an output from a basket.
@@ -1111,7 +1112,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 verifier,
             });
         }
-        super::assert_page_count(certificates.len(), total_certificates, "listCertificates")?;
+        super::assert_page_count(
+            certificates.len(),
+            total_certificates.into(),
+            "listCertificates",
+        )?;
 
         binding.check(ListCertificatesResult {
             total_certificates,

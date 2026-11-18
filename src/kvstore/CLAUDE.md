@@ -773,6 +773,17 @@ unchanged, as do consistent-wallet requests and #454 vectors. The four tests in
 (one-second timeouts on the base), two-page removal and zero-total success.
 Migration: handle the new refusal in the existing variant; no API additions.
 
+### The wallet's 64-bit total (#843)
+
+`ListOutputsResult::total_outputs` is a `u64` since #843. The private
+`LookupValueResult::total_outputs` follows it (the wallet's total is assigned
+to it unconverted), page lengths are compared with it through
+`local_lookup::count_of` (a checked widening), `remove`'s round totals are
+`u64`, and `count` converts with `usize::try_from`: a total the target's
+`usize` cannot hold (wasm32 past 2^32 - 1) is `Error::KvStoreLocalError`
+(`Wallet totalOutputs N exceeds the platform`), never a truncation. No `as`
+cast of the total is left. `tests/kvstore_local_total64_843.rs`.
+
 ### Removal round policy (#483)
 
 | Policy | Reason and reference | Refusal |

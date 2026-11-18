@@ -672,7 +672,7 @@ fn listing_token_times(count: usize) -> Counting {
         let listing = listed.as_mut().unwrap();
         let one = listing.outputs[0].clone();
         listing.outputs = vec![one; count];
-        listing.total_outputs = count as u32;
+        listing.total_outputs = count as u64;
     }
     wallet
 }
@@ -997,7 +997,7 @@ async fn contact_listing(
             labels: None,
         });
     }
-    let total_outputs = outputs.len() as u32;
+    let total_outputs = outputs.len() as u64;
     let listing = ListOutputsResult {
         outputs,
         total_outputs,
