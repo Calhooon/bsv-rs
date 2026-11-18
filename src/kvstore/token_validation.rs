@@ -78,7 +78,13 @@ fn protocol(text: &str) -> Result<Protocol> {
         .as_array()
         .filter(|pair| pair.len() == 2)
         .ok_or_else(|| refused("KVStore protocol ID must contain exactly two fields"))?;
-    let (Some(level @ 0..=2), Some(name)) = (pair[0].as_u64(), pair[1].as_str()) else {
+    // `security !== 0 && security !== 1 && security !== 2` on the number
+    // `JSON.parse` read (`:34` at the pin, the head's `:33`): `1.0`, `1e0` and `-0` are the level there,
+    // refused after as not canonical JSON (`:96-98`), not as invalid.
+    let level = pair[0]
+        .as_f64()
+        .and_then(|level| [0.0, 1.0, 2.0].iter().position(|&l| l == level));
+    let (Some(level), Some(name)) = (level, pair[1].as_str()) else {
         return Err(refused("KVStore protocol ID is invalid"));
     };
     if !(5..=400).contains(&name.len()) {
@@ -173,3 +179,7 @@ pub(crate) fn decode_and_verify(script: &LockingScript) -> Result<AuthenticatedT
 #[cfg(test)]
 #[path = "token_validation_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "token_edges_tests.rs"]
+mod edges;

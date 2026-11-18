@@ -117,8 +117,7 @@ mod work_budget;
 // Re-exports for convenience
 pub use crate::error::TransportFault;
 pub use beef::{
-    Beef, BeefLimits, BeefLinkBudget, BeefLinkLimits, BeefValidationResult, LinkedTransaction,
-    SortResult,
+    Beef, BeefLinkBudget, BeefLinkLimits, BeefValidationResult, LinkedTransaction, SortResult,
 };
 pub use beef_stream::{
     referenced_outpoints, resume, verify_stream, verify_stream_async, verify_stream_structure,

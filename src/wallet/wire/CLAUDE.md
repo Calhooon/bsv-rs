@@ -9,11 +9,11 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) and its unique-key rule for both discovery readers (`set_unique_record_entry`, #192), the signature calls' data-type flag writer (#199), the key-related parameters' and privileged pair's writers (#193), the certificate pages' limit and total checks (`require_page_capacity`, `assert_page_count`, #190), the discovery maps' one reading for both readers (`read_discovery_maps`, `read_counted_wire_record`: strict count, key 1 to 50 bytes and safe, unique) and listActions' satoshis in the reference's bound (`read_action_satoshis`, #236), the certificate checks the readers and the writer share (`require_compressed_key`, the field-name and DER checks, #189); the u32 field readers and `integer_refusal` (`#requireInteger`'s words, `WalletWireTransceiver.ts:2018-2025`, every integer bound's; #255) | ~600 |
+| `mod.rs` | Module root, WalletWire trait, the status and counterparty codes (`pub(crate)` since the 0.9.0 cut, #843, read by the codec and `flags.rs`: one definition), the `#[doc(hidden)]` re-export of the codec, the u32 field readers, the reference's strict certificate and record readers (#183) and its unique-key rule for both discovery readers (`set_unique_record_entry`, #192), the signature calls' data-type flag writer (#199), the key-related parameters' and privileged pair's writers (#193), the certificate pages' limit and total checks (`require_page_capacity`, `assert_page_count`, #190), the discovery maps' one reading for both readers (`read_discovery_maps`, `read_counted_wire_record`: strict count, key 1 to 50 bytes and safe, unique) and listActions' satoshis in the reference's bound (`read_action_satoshis`, #236), the certificate checks the readers and the writer share (`require_compressed_key`, the field-name and DER checks, #189); the u32 field readers and `integer_refusal` (`#requireInteger`'s words, `WalletWireTransceiver.ts:2018-2025`, every integer bound's; #255) | ~600 |
 | `result_validation.rs` | #487/#495 metadata snapshots and borrowed typed byte fields into the shared result rows; request (#496), response and whole-certificate bounds | 105 |
 | `bounds.rs` | #473 pre-entry collection checks (maximum before available bytes), unsigned satoshi range/precision, getHeight precision/trailing/range, and listActions/listOutputs page readers; `read_optional_response_strings`, a result's optional list with an empty list kept apart from an absent one (#1002); generic string-array/map codecs keep their existing behavior | ~158 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls; a byte outside 1 to 28 refused as `WalletError("Invalid call code: N")`, the reference's sentence (`WalletWireProcessor.ts:276-283`, `HTTPWalletWire.ts:33-40` at `ts-stack@edf6e03`), framed code 1 by the processor and refused unsent by `HttpWalletWire` (#914; call 29, the head's certificate profile, not served) | ~203 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support; basic reads and `wire_length` in `reader.rs` (#458), every byte length through `wire_length`/`read_length`, compared with the bytes remaining before it is narrowed to `usize` (#192); `certificate_bytes`, the certificate writers' one body: the reference's checks and three bounds, the fields in the signed order (#189, #246); `write_optional_query_mode` and `read_optional_query_mode` are listActions' `labelQueryMode`, 1 `any` and 2 `all` (#1002) | ~2399 |
+| `encoding.rs` | WireReader/WireWriter (`#[doc(hidden)]` since the 0.9.0 cut, #843: no part of the public contract, reachable for this repository's tests, benches and fuzz target) with Go-compatible nil sentinel and complex type support; basic reads and `wire_length` in `reader.rs` (#458), every byte length through `wire_length`/`read_length`, compared with the bytes remaining before it is narrowed to `usize` (#192); `certificate_bytes`, the certificate writers' one body: the reference's checks and three bounds, the fields in the signed order (#189, #246); `write_optional_query_mode` and `read_optional_query_mode` are listActions' `labelQueryMode`, 1 `any` and 2 `all` (#1002) | ~2293 |
 | `flags.rs` | The flag bytes read as the reference reads them (#1002): a request's optional boolean and one-byte optional length by the reference's field names (`#readOptionalBooleanFlag`, `#readOptionalInt8Length`, `WalletWireProcessor.ts:46-61` at `ts-stack@edf6e03`), listActions' `labelQueryMode` (-1, 1 `any`, 2 `all`, `:831-842`), an action result's `txid` and `tx` behind their presence flags (0 or 1, `WalletWireTransceiver.ts:238-244,310-315`), a listed action's status (1 to 8, `Unknown status code: N`, `:395-399`), and the single-byte result of isAuthenticated and getNetwork (exactly one byte, 0 or 1, `:1855-1858,1915-1916`); every refusal the reference's sentence, pinned by `tests/wallet_wire_flags_1002.rs` | ~114 |
 | `processor.rs` | Generic server-side processor over WalletInterface; complete requests above 256 MiB refused before reader construction or allocation via #496's shared `wire_request_length`: `process_message` returns `Err(WalletError("Wallet Wire request exceeds the maximum permitted size"))`, no frame, as the reference's `transmitToWallet` throws outside `#processMessage`'s catch; exactly-at-cap accepted (`WalletWireProcessor.ts:248-274`, #505); every call it reads ends in `assert_request_consumed` (#193), then the reference's argument validation, the wallet, the result check (#216); a wallet's `WalletRefusal` or boxed `AbortAccepted` framed with its class's SDK code and words, a class with none as `Wallet operation failed` (#137, #439); the acceptance record stays in Rust; optional event formatting lives in `diagnostics.rs`; the originator read and normalization live in `originator.rs` (#338) | ~934 |
 | `reader.rs` | The basic `WireReader` methods, precision check and `wire_length` (#458): short reads return `WalletError("ReaderUint8Array read exceeds available data")`; byte and collection lengths from `2^53` use `number too large to retain precision - use readVarIntBn` before a read, with signed `u64::MAX` retained as absence. Migration: match `WalletError(message)` instead of `ReaderUnderflow { .. }` for `WireReader` short reads; primitives `Reader` unchanged | ~120 |
@@ -147,7 +147,6 @@ The eleven `read_var_int_u32` callers check `readVarIntNumStrict(false)` precisi
 | listActions `labelQueryMode` | `i8` -1 absent, 1 `any`, 2 `all` (`write_optional_query_mode`, `read_optional_query_mode`; #1002, 0 and 1 until then) |
 | listOutputs `tagQueryMode` | `i8` -1 absent, 1 `all`, 2 `any` (the other assignment; written inline by `list_outputs`) |
 | listOutputs `include` | `i8` -1 absent, 1 `locking scripts`, 2 `entire transactions` (written inline by `list_outputs`) |
-| `write_query_mode`, `write_output_include`, `write_optional_output_include` | `0` and `1` (the optional form -1 absent): bytes no method of the wire carries, used by no method here (#1002's question for the cut) |
 | Presence flag of a result (createAction and signAction `txid` and `tx`, createAction `signableTransaction`, listCertificates `keyring`; a listed action's `isOutgoing`, an output's `spendable`) | `i8` 0 or 1, another byte refused in the reference's words (`Invalid createAction txid present flag: expected 0 or 1, received N`; #1002, #183) |
 | isAuthenticated, getNetwork result | exactly one byte, 0 or 1 (`Wallet Wire <call> response has an invalid length`, `Wallet returned an invalid authentication verdict`, `Wallet returned an invalid network`; #1002) |
 | SendWithResultStatus | `1=unproven, 2=sending, 3=failed`, another byte refused `Unknown sendWith result status code: N` (N signed, the reference's `readInt8`; BRC-100 `wallet/0100.md:1726`, #590) |
@@ -159,7 +158,7 @@ Every flag byte and optional scalar of the 28 methods is set beside the referenc
 ### Counterparty Encoding
 
 ```rust
-pub mod counterparty_codes {
+pub(crate) mod counterparty_codes {
     pub const UNDEFINED: u8 = 0;   // None
     pub const SELF: u8 = 11;       // Counterparty::Self_
     pub const ANYONE: u8 = 12;     // Counterparty::Anyone
@@ -170,7 +169,7 @@ pub mod counterparty_codes {
 ### Action Status Codes
 
 ```rust
-pub mod status_codes {
+pub(crate) mod status_codes {
     pub const COMPLETED: i8 = 1;
     pub const UNPROCESSED: i8 = 2;
     pub const SENDING: i8 = 3;
@@ -185,7 +184,7 @@ pub mod status_codes {
 
 ## WireReader / WireWriter
 
-`WireReader<'a>` and `WireWriter` wrap the primitives `Reader`/`Writer` with Go-compatible nil sentinel support and wallet-specific type methods.
+`WireReader<'a>` and `WireWriter` are no part of the public contract (the 0.9.0 cut, #843, the captain's ruling of 2026-11-17 on three design reads): `#[doc(hidden)]` at their one re-export, the module docs saying so, they may change or vanish in any release; the tests, the benches, `fuzz_wire_protocol` and one dependent's test keep compiling. The six methods that wrote or read a 0/1 mode byte no wire call carries (`write_query_mode`, `read_query_mode`, `write_output_include`, `read_output_include`, `write_optional_output_include`, `read_optional_output_include`) are removed (ruling 5 of 2026-11-15); `tests/arch_removed_names_843.rs` holds both. They wrap the primitives `Reader`/`Writer` with Go-compatible nil sentinel support and wallet-specific type methods.
 
 **Basic types:** `read/write_u8`, `i8`, `u16_le`, `u32_le`, `u64_le`, `var_int`, `signed_var_int`, `optional_var_int`, `bytes`, plus `read_remaining`/`remaining`/`is_empty`/`position` on reader and `len`/`is_empty`/`as_bytes`/`into_bytes`/`with_capacity` on writer.
 
@@ -194,7 +193,6 @@ pub mod status_codes {
 - `optional_bool`, `outpoint`, `outpoint_string`, `counterparty`
 - `protocol_id`, `optional_protocol_id`, `action_status`
 - `txid_hex`, `pubkey_hex` (reader only), `optional_query_mode` (listActions' `labelQueryMode`)
-- `query_mode`, `output_include`, `optional_output_include` (no method's bytes, see the table above)
 - `string_map`, `optional_string_map`
 - `send_with_result_status`, `send_with_result`, `send_with_result_array`
 - `sign_action_spend`, `sign_action_spends`
@@ -287,6 +285,7 @@ All 28 call codes are dispatched in the match statement. The twelve stub handler
 
 ```rust
 pub use calls::WalletCall;
+#[doc(hidden)] // no part of the public contract (#843)
 pub use encoding::{WireReader, WireWriter};
 pub use processor::WalletWireProcessor;
 pub use transceiver::WalletWireTransceiver;
@@ -296,8 +295,8 @@ pub trait WalletWire: Send + Sync {
     async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error>;
 }
 
-pub mod counterparty_codes { /* UNDEFINED=0, SELF=11, ANYONE=12 */ }
-pub mod status_codes { /* COMPLETED=1 .. FAILED=8, UNKNOWN=-1 */ }
+pub(crate) mod counterparty_codes { /* UNDEFINED=0, SELF=11, ANYONE=12 */ }
+pub(crate) mod status_codes { /* COMPLETED=1 .. FAILED=8, UNKNOWN=-1 */ }
 ```
 
 ## Testing
@@ -317,7 +316,7 @@ impl WalletWire for LoopbackWire {
 ```
 
 **Test coverage:**
-- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
+- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, the optional query mode, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
 - `tests/wire_identity_certificate_writer.rs` and `tests/wire_identity_certificate_roundtrip.rs`: the identity certificate's writer and readers against the reference's bytes and the shared discovery vector (#182, #184), the trust byte bounded on both (#183, #247).
 - processor.rs: Tests for getPublicKey, getNetwork and getVersion (ProtoWallet's answers forwarded, #222), isAuthenticated, invalid call codes, and createAction error.
 - transceiver.rs: End-to-end loopback tests for get_public_key, encrypt/decrypt roundtrip, create/verify HMAC, create/verify signature, is_authenticated, get_network, get_version.

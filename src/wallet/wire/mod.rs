@@ -71,6 +71,14 @@
 //! // Use wallet methods
 //! let result = wallet.get_public_key(args, Some("example.com")).await?;
 //! ```
+//!
+//! # The codec is no part of the public contract
+//!
+//! `WireReader` and `WireWriter`, the field codec the transceiver and the processor are
+//! built on, are hidden from the documentation, no part of the public contract, and may
+//! change or vanish in any release, a patch included. They stay reachable at this path
+//! so that this repository's tests, benches and `fuzz_wire_protocol` keep compiling; at
+//! this writing one dependent's test reaches the writer here too, on no promise.
 
 mod bounds;
 mod calls;
@@ -91,6 +99,7 @@ mod transceiver;
 mod validation;
 
 pub use calls::WalletCall;
+#[doc(hidden)]
 pub use encoding::{WireReader, WireWriter};
 pub use processor::WalletWireProcessor;
 pub use transceiver::WalletWireTransceiver;
@@ -656,8 +665,8 @@ pub trait WalletWire: Send + Sync {
     async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error>;
 }
 
-/// Counterparty wire encoding constants.
-pub mod counterparty_codes {
+/// Counterparty wire encoding constants, read by the codec alone.
+pub(crate) mod counterparty_codes {
     /// Counterparty is undefined/null.
     pub const UNDEFINED: u8 = 0;
     /// Counterparty is "self".
@@ -666,8 +675,8 @@ pub mod counterparty_codes {
     pub const ANYONE: u8 = 12;
 }
 
-/// Action status wire encoding.
-pub mod status_codes {
+/// Action status wire encoding, read by the codec alone.
+pub(crate) mod status_codes {
     /// Status code for "completed".
     pub const COMPLETED: i8 = 1;
     /// Status code for "unprocessed".

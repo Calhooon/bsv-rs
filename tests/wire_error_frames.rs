@@ -131,9 +131,6 @@ async fn every_wallet_error_variant_is_framed_as_the_same_constant() {
         Error::InvalidHex("zz".into()),
         Error::ProtocolValidationError("/home/wallet/keys.db".into()),
         Error::InvalidCounterparty("fixture".into()),
-        Error::HmacMinimalLengthKey {
-            leading_zero_bytes: 1,
-        },
         Error::HmacLegacyKey {
             leading_zero_bytes: 1,
         },

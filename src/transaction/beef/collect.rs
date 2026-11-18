@@ -28,7 +28,6 @@
 
 use std::collections::HashMap;
 
-use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::Writer;
 use crate::Result;
 
@@ -38,7 +37,7 @@ use super::super::beef_stream::{
 use super::super::beef_tx::BeefTx;
 use super::super::merkle_path::MerklePath;
 use super::super::Transaction;
-use super::{Beef, BeefLimits};
+use super::Beef;
 
 /// A byte after the frame: refused ([`Beef::from_binary`]), or left to the
 /// caller ([`Beef::from_reader`]).
@@ -107,24 +106,11 @@ fn refusal_error(refusal: &Refusal) -> crate::Error {
 
 impl Beef {
     /// The whole-BEEF reader: `bin` cut by the stream's decoder and
-    /// collected, with the bytes the frame took. `hints` reserves room for
-    /// that many BUMPs and transactions, never more than the bytes could
-    /// fill (a BUMP is at least 3 bytes, an entry at least 10); it refuses
-    /// nothing.
-    pub(super) fn collect(
-        bin: &[u8],
-        after: AfterFrame,
-        hints: Option<&BeefLimits>,
-    ) -> Result<(Self, usize)> {
+    /// collected, with the bytes the frame took.
+    pub(super) fn collect(bin: &[u8], after: AfterFrame) -> Result<(Self, usize)> {
         let mut decoder = BeefDecoder::collecting();
         let mut judge = Judge::new();
         let mut beef = Self::new();
-        if let Some(hints) = hints {
-            beef.bumps
-                .reserve(bounded_capacity(hints.max_bumps, bin.len(), 3));
-            beef.txs
-                .reserve(bounded_capacity(hints.max_txs, bin.len(), 10));
-        }
         let mut input = bin;
         loop {
             match decoder.next(&mut input) {

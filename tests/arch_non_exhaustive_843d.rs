@@ -411,7 +411,7 @@ enum Class {
 const PENDING_LEN: usize = 20;
 /// The rows of `Unruled`: only lowered, as each struct takes a class or the
 /// attribute.
-const UNRULED_LEN: usize = 57;
+const UNRULED_LEN: usize = 56;
 
 /// `file:Name`, the class, the reason: every all-public struct under `src/`
 /// without `#[non_exhaustive]`.
@@ -544,7 +544,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/primitives/bsv/sighash.rs:SighashParams", Class::ParameterBlock, "every field a caller's choice of the digest's inputs"),
     ("src/script/spend/mod.rs:SpendParams", Class::ParameterBlock, "every field a caller's choice of the input judged and its budgets"),
     ("src/script/spend/mod.rs:TxSpendParams", Class::ParameterBlock, "every field a caller's choice of the input judged and its budgets"),
-    ("src/transaction/beef.rs:BeefLimits", Class::Deprecated, "the hints of the deprecated `Beef::from_binary_with_limits` door alone (0.4.0)"),
     ("src/transaction/broadcasters/arc.rs:ArcConfig", Class::Deprecated, "deprecated since 0.9.0 with ARC (#350, the owner's word of 2026-10-27): ARCade is the standard"),
     ("src/identity/types.rs:IdentityClientConfig", Class::Pending, "the freeze plan's row 8c"),
     ("src/identity/types.rs:ContactsManagerConfig", Class::Pending, "the freeze plan's row 8c"),
@@ -595,7 +594,6 @@ const ROWS: &[(&str, Class, &str)] = &[
     ("src/script/evaluation_error.rs:ScriptResourceLimit", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/script/template.rs:SigningContext", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/script/templates/multisig.rs:Multisig", Class::Unruled, "no class holds it and no ruling names it"),
-    ("src/script/transaction.rs:SimpleUtxo", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/storage/types.rs:UploadMetadata", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/transaction/beef.rs:SortResult", Class::Unruled, "no class holds it and no ruling names it"),
     ("src/transaction/beef.rs:BeefValidationResult", Class::Unruled, "no class holds it and no ruling names it"),
@@ -897,7 +895,7 @@ fn the_scan_reads_every_form_by_name_843d8a() {
         set(KEY_ARGS),
         "the key_args! structs"
     );
-    assert_eq!(public.len(), 220, "all-public structs under src/");
+    assert_eq!(public.len(), 218, "all-public structs under src/");
     assert_eq!(
         public.iter().filter(|f| f.attributed).count(),
         13,

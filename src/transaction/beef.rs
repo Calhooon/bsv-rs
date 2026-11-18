@@ -81,23 +81,6 @@ pub struct BeefValidationResult {
     pub roots: HashMap<u32, String>,
 }
 
-/// Memory hints for [`Beef::from_binary_with_limits`]: how many entries of
-/// each kind the in-memory parse may reserve room for ahead of reading them.
-///
-/// These are not limits on what is accepted. Since 0.4.0 a valid BEEF is
-/// never refused for its size or its counts: a BEEF with more transactions
-/// or BUMPs than the hints is read all the same, and the vectors grow as the
-/// entries arrive. A door that reads a stranger's BEEF reads it with
-/// [`verify_stream`](super::beef_stream::verify_stream), which holds one
-/// element at a time and ignores these hints.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BeefLimits {
-    /// The most transactions (full or txid-only) to reserve room for.
-    pub max_txs: usize,
-    /// The most BUMPs (merkle paths) to reserve room for.
-    pub max_bumps: usize,
-}
-
 /// BEEF (Background Evaluation Extended Format) for SPV proofs.
 ///
 /// A BEEF contains:
@@ -697,26 +680,7 @@ impl Beef {
     /// (bsv-stack-lean NL-8 W3). [`from_reader`](Self::from_reader) reads a
     /// BEEF out of a longer stream and leaves what follows to its caller.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
-        Ok(Self::collect(bin, AfterFrame::Refuse, None)?.0)
-    }
-
-    /// Parses a BEEF from binary data, reserving room for at most
-    /// `limits.max_bumps` BUMPs and `limits.max_txs` transactions ahead of
-    /// reading them.
-    ///
-    /// Deprecated in 0.4.0. Through 0.3 this refused a BEEF over a byte
-    /// length, a BUMP count or a transaction count; it refuses none of them
-    /// now and reads exactly what [`Beef::from_binary`] reads. A valid BEEF
-    /// is never refused for its size or its counts, and a count the bytes
-    /// cannot honor is refused where the bytes run out. The streaming reader
-    /// is [`verify_stream`](super::beef_stream::verify_stream).
-    #[deprecated(
-        since = "0.4.0",
-        note = "the limits no longer refuse anything; use `Beef::from_binary` for a small body \
-                and `beef_stream::verify_stream` for a stranger's"
-    )]
-    pub fn from_binary_with_limits(bin: &[u8], limits: &BeefLimits) -> Result<Self> {
-        Ok(Self::collect(bin, AfterFrame::Refuse, Some(limits))?.0)
+        Ok(Self::collect(bin, AfterFrame::Refuse)?.0)
     }
 
     /// Parses a BEEF from a hex string.
@@ -728,7 +692,7 @@ impl Beef {
     /// the frame at the reader's position, the reader left after it. A
     /// refusal's offset counts from the frame's leading byte.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let (beef, used) = Self::collect(reader.clone().read_remaining(), AfterFrame::Leave, None)?;
+        let (beef, used) = Self::collect(reader.clone().read_remaining(), AfterFrame::Leave)?;
         reader.read_bytes(used)?;
         Ok(beef)
     }

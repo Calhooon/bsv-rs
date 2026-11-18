@@ -23,7 +23,7 @@ use bsv_rs::wallet::{
     AcquireCertificateArgs, ActionStatus, Counterparty, CreateActionArgs, CreateHmacArgs,
     CreateSignatureArgs, DecryptArgs, DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs,
     EncryptArgs, GetPublicKeyArgs, InternalizeActionArgs, ListActionsArgs, ListActionsResult,
-    ListCertificatesArgs, ListOutputsArgs, ListOutputsResult, OutputInclude, ProtoWallet, Protocol,
+    ListCertificatesArgs, ListOutputsArgs, ListOutputsResult, ProtoWallet, Protocol,
     ProveCertificateArgs, QueryMode, SecurityLevel, SignActionArgs, VerifyHmacArgs,
     VerifySignatureArgs,
 };
@@ -901,98 +901,5 @@ fn the_action_status_helpers_are_the_recorded_status_bytes_1002() {
     for code in [0u8, 9] {
         let error = WireReader::new(&[code]).read_action_status().unwrap_err();
         assert_eq!(words(&error), format!("Unknown status code: {code}"));
-    }
-}
-
-/// Three helpers no method uses, whose bytes are no method's: the captain's
-/// question (the lane record). Their bytes today, beside the recorded bytes
-/// of the two fields their names suggest; the reference's processor refuses
-/// the 0 each writes.
-#[test]
-fn the_unused_mode_helpers_write_no_methods_bytes_stated_1002() {
-    let flags = rows("request_flag_rows", 29);
-    let byte = |write: fn(&mut WireWriter)| written_byte(write);
-    // write_query_mode: 0 any, 1 all
-    let query = (
-        byte(|writer| {
-            writer.write_query_mode(QueryMode::Any);
-        }),
-        byte(|writer| {
-            writer.write_query_mode(QueryMode::All);
-        }),
-    );
-    assert_eq!(query, (0, 1));
-    let label = (
-        flag(&flags, LABEL_QUERY_MODE, "any"),
-        flag(&flags, LABEL_QUERY_MODE, "all"),
-    );
-    let tag = (
-        flag(&flags, "listOutputs tagQueryMode", "any"),
-        flag(&flags, "listOutputs tagQueryMode", "all"),
-    );
-    assert_eq!((label, tag), ((1, 2), (2, 1)));
-    assert!(query != label && query != tag);
-    // write_output_include and its optional form: 0 locking scripts, 1 entire transactions
-    let include = (
-        byte(|writer| {
-            writer.write_output_include(OutputInclude::LockingScripts);
-        }),
-        byte(|writer| {
-            writer.write_output_include(OutputInclude::EntireTransactions);
-        }),
-    );
-    let optional = (
-        byte(|writer| {
-            writer.write_optional_output_include(Some(OutputInclude::LockingScripts));
-        }),
-        byte(|writer| {
-            writer.write_optional_output_include(Some(OutputInclude::EntireTransactions));
-        }),
-    );
-    assert_eq!((include, optional), ((0, 1), (0, 1)));
-    let recorded = (
-        flag(&flags, "listOutputs include", "locking scripts"),
-        flag(&flags, "listOutputs include", "entire transactions"),
-    );
-    assert_eq!(recorded, (1, 2));
-    assert_eq!(
-        byte(|writer| {
-            writer.write_optional_output_include(None);
-        }),
-        flag(&flags, "listOutputs include", "absent")
-    );
-    // the readers are their writers' twins
-    assert_eq!(
-        WireReader::new(&[0]).read_query_mode().unwrap(),
-        QueryMode::Any
-    );
-    assert_eq!(
-        WireReader::new(&[1]).read_output_include().unwrap(),
-        OutputInclude::EntireTransactions
-    );
-    assert_eq!(
-        WireReader::new(&[0])
-            .read_optional_output_include()
-            .unwrap(),
-        Some(OutputInclude::LockingScripts)
-    );
-    // the reference's processor refuses the 0 each helper writes
-    let refused = rows("processor_refusal_rows", PROCESSOR_REFUSALS);
-    for (name, words) in [
-        (
-            "listActions labelQueryMode = 0",
-            "Invalid labelQueryMode flag: expected -1, 1, or 2, received 0",
-        ),
-        (
-            "listOutputs tagQueryMode = 0",
-            "Invalid tagQueryMode flag: expected -1, 1, or 2, received 0",
-        ),
-        (
-            "listOutputs include = 0",
-            "Invalid include flag: expected -1, 1, or 2, received 0",
-        ),
-    ] {
-        let row = refused.iter().find(|row| row["name"] == name).unwrap();
-        assert_eq!(refusal(&unhex(row, "response_hex")), (1, words.to_string()));
     }
 }

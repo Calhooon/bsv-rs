@@ -80,7 +80,6 @@ pub mod spend;
 pub mod template;
 mod template_push;
 pub mod templates;
-pub mod transaction;
 pub mod unlocking_script;
 
 // Re-exports for convenience
@@ -102,9 +101,5 @@ pub use spend::{Spend, SpendParams, TxSpendParams};
 pub use template::{
     chronicle_unlocking_script_code, ScriptTemplate, ScriptTemplateUnlock, SignOutputs,
     SigningContext,
-};
-pub use transaction::{
-    SimpleUtxo, SpendValidation, TransactionContext, TransactionInputContext,
-    TransactionOutputContext, UtxoProvider,
 };
 pub use unlocking_script::UnlockingScript;

@@ -91,7 +91,7 @@ const CUTS_NO_TEXT: &[(&str, &str, &str)] = &[
     ("overlay/lookup_resolver/discovery.rs", "find_competent_hosts", SENDS),
     (
         "overlay/overlay_admin_token_template.rs",
-        "create_overlay_admin_token create_signed_overlay_admin_token",
+        "create_signed_overlay_admin_token",
         DERIVES,
     ),
     ("primitives/ec/private_key.rs", "derive_child", DERIVES),

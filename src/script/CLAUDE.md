@@ -57,7 +57,6 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `input_flags.rs` | Under `block`, `Word::{Standard, Block}` and `ChainParams::word_for_input` expose typed refusals and own the no-tip latest-era rule (#520); the private `checked_input_script_flags` composes spend-era flags plus source-era UTXO bits, shared with the unchanged `input_script_flags` API (#440) |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `template_push.rs` | `template_push`: the push a standard template holds, by the opcode that is its length; the one check `is_p2pkh`, `is_p2pk`, `is_p2sh` and `is_multisig` ask (`pub(crate)`) |
-| `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
 | `templates/p2pkh.rs` | P2PKH (Pay-to-Public-Key-Hash) template |
 | `templates/p2pk.rs` | P2PK (Pay-to-Public-Key) template |
@@ -90,12 +89,6 @@ pub use spend::{Spend, SpendParams, TxSpendParams};
 
 // Template types
 pub use template::{chronicle_unlocking_script_code, ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
-
-// Transaction interface types
-pub use transaction::{
-    SimpleUtxo, SpendValidation, TransactionContext, TransactionInputContext,
-    TransactionOutputContext, UtxoProvider,
-};
 
 // Templates (via templates module)
 pub use templates::{P2PKH, P2PK, Multisig, RPuzzle, RPuzzleType, PushDrop, LockPosition};
@@ -522,18 +515,9 @@ Summary: each template provides `lock()` (via `ScriptTemplate` trait or direct),
 
 A template refuses a lock whose spend no word lets pass (#625): `P2PK::lock` a hybrid `06`/`07` key; `Multisig::lock` a 33-byte key not tagged `02`/`03` only where every spend reaches one, i.e. with `j` the highest bad index, when `n - 1 - j < m` (CHECKMULTISIG walks the keys from the last pushed, index n - 1, down and stops at the threshold's last match: bitcoin-sv v1.2.3 `interpreter.cpp:1538-1633`, this crate's `op_checkmultisig` popping them in that order). `Error::InvalidPublicKey` names the tag (and for Multisig the index, the count after it and the threshold) and the node's `IsCompressedOrUncompressedPubKey` (`interpreter.cpp:132-152`, under STRICTENC, which every word carries). The reference has no P2PK or Multisig template; its interpreter refuses what is refused and spends a Multisig lock whose bad keys a spend avoids, as this crate's does in every mode (`tests/p2pk_hybrid_625.rs`, the vector's 125-shape sweep; a stated divergence in the root `CLAUDE.md`).
 
-## Transaction Interface Traits
+## Transaction Interface Traits (removed in 0.9.0)
 
-Traits for Transaction module integration (implemented by the `transaction` module):
-
-```rust
-pub trait TransactionInputContext   // source_txid, output_index, sequence, satoshis, locking_script, unlocking_script
-pub trait TransactionOutputContext  // satoshis, locking_script
-pub trait TransactionContext        // version, inputs, outputs, lock_time + default impls
-pub trait SpendValidation           // validate_input, validate_all_inputs
-pub trait UtxoProvider              // get_utxo(txid, index) -> Option<(u64, LockingScript)>
-pub struct SimpleUtxo               // Test implementation of TransactionOutputContext
-```
+`script::transaction` (`TransactionInputContext`, `TransactionOutputContext`, `TransactionContext`, `SpendValidation`, `UtxoProvider` and `SimpleUtxo`) is removed in the 0.9.0 cut (#843, the captain's ruling of 2026-11-17 on three design reads): nothing in the crate or in a dependent implemented or consumed a trait, and `TransactionContext::version() -> i32` disagreed with `Transaction::version() -> u32`. A caller judging an input uses `transaction::verify_input` / `SpendingTransaction` (the one-input door) or `Transaction::verify`. `tests/arch_removed_names_843.rs` refuses the names and the module under `src/`.
 
 ## Implementation Notes
 

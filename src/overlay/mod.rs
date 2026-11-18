@@ -95,8 +95,6 @@ pub use lookup_limits::{
 };
 
 // Re-exports from overlay_admin_token_template
-#[allow(deprecated)]
-pub use overlay_admin_token_template::create_overlay_admin_token;
 pub use overlay_admin_token_template::{
     create_signed_overlay_admin_token, decode_and_verify_overlay_admin_token,
     decode_overlay_admin_token, is_overlay_admin_token, is_ship_token, is_slap_token,
