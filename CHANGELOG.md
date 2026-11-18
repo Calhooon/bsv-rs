@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-beta.10] - 2026-11-18
+
+The 0.9.0 line's tenth prerelease (RELEASING.md point 14), cut from `beta` at `acbe6f21` after the stable line's 0.8.13 was synced in. 1 entry since beta.9.
+
+**Security carry.** This prerelease carries the fix the stable line shipped in 0.8.13, the advisory GHSA-j4w5-4g84-q3f4; see its entry; a dependent pinned to `=0.9.0-beta.9` or earlier moves to this prerelease.
+
+**Breaking since beta.9.** None. No public item changed shape, so a `=0.9.0-beta.9` pin moves to this prerelease by the version alone. `cargo-semver-checks` reports no breaking change.
+
+**Behaviour since beta.9.** One answer an untrusted input could make wrong is now filtered. A `GlobalKVStore` selector query (`get_by_controller`, `get_by_tags`, `query`) drops an overlay lookup host's answer entry that does not match the query's controller, protocol or tags before it is returned.
+- Migration: none. An honest caller talking to an honest host sees the same entries, values and errors; only a host-injected non-matching entry is now dropped. No public API or type change.
+
+**The rest, by kind.** The 1 entry since beta.9 is Security 1; it carries its own migration line.
+
 ### Security: GlobalKVStore selector queries enforce the query's controller, protocol and tags against the overlay resolver's answer
 
 - **What was reachable.** `GlobalKVStore::query`, `get_by_controller` and `get_by_tags` sent the caller's selector (a controller, a protocol or tags) to the overlay lookup resolver and returned its answer without re-checking the selector on the client side. A token's fields are controller-signed (the token-authentication fixes), so a lookup host cannot forge a token, but it can answer a selector query with any real, validly-signed token of any controller or tags; a caller that trusted `get_by_controller(X)` to return only `X`'s entries was served another controller's token, honestly self-labelled with its true controller. Reachable from an untrusted lookup host on the default read path (no feature flag). The existing-token lookup that `set`/`remove` run already re-checked the controller and protocol of each returned entry (`current_tokens`), so only the three read doors were affected.
