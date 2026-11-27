@@ -1306,6 +1306,11 @@ impl Transaction {
     /// Returns an error if:
     /// - Any output is missing a satoshi amount (except change outputs)
     /// - Change outputs haven't been computed (call `fee()` first)
+    /// - An input's `source_txid` (64 hex digits) is not the id of its linked
+    ///   source, and that source has an input or a merkle path (#848, the
+    ///   reference's refusal and words, `Transaction.ts:964-984`); no template
+    ///   runs and no field moves. A descriptor source (no input, no path) is
+    ///   exempt.
     /// - Template signing fails
     pub async fn sign(&mut self) -> Result<()> {
         self.invalidate_caches();
@@ -1328,6 +1333,11 @@ impl Transaction {
                 }
             }
         }
+
+        // No complete or anchored source linked under another txid is signed
+        // (#848): the signature would commit to the named outpoint with the
+        // linked source's amount and script.
+        super::source_link::refuse_at_sign(&self.inputs)?;
 
         // Sign each input with a template
         let raw_tx = self.to_binary();
@@ -1707,6 +1717,13 @@ impl Transaction {
     /// every input in full. The earlier object-graph walk forced that second
     /// structure, which is exponential on a diamond chain (0.3.21).
     ///
+    /// An input whose `source_txid` (64 hex digits) names a transaction other
+    /// than the one it links as `source_transaction` is refused, whatever the
+    /// source holds (#848, the reference's refusal and words,
+    /// `Transaction.ts:1423-1432`): it does not spend the coin it links. A
+    /// stub that links nothing (its named txid resolved from the map) and an
+    /// input whose named txid is its own linked source's id are unaffected.
+    ///
     /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`,
     /// whose inputs share one source object per txid by reference.
     ///
@@ -1799,6 +1816,17 @@ impl Transaction {
                 Vec::with_capacity(tx.inputs.len());
             let mut input_total: u64 = 0;
             for (vin, input) in tx.inputs.iter().enumerate() {
+                // An input that links a source under another txid (#848) does
+                // not spend the coin it links; refuse it, whatever the source
+                // holds, as the reference does (`Transaction.ts:1423-1432`).
+                if super::source_link::source_named_otherwise(input).is_some() {
+                    return Err(crate::Error::TransactionError(format!(
+                        "Verification failed because input {} of transaction {} does not \
+                         reference its supplied source transaction.",
+                        vin,
+                        tx.id()
+                    )));
+                }
                 let missing = || {
                     crate::Error::TransactionError(format!(
                         "Input {} has no source transaction",
