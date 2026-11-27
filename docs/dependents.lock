@@ -1,4 +1,6 @@
 # Remote default-branch snapshots read 2026-10-23. Pin-move PRs refresh these records.
+# The chaintracks-cloudflare row moved on 2026-11-27, to the tip of its main, which commits its
+# Cargo.lock (docs/DEPENDENTS.md, "The chaintracks row's move of 2026-11-27").
 # Version requirements belong to the consumers; this lock never widens one.
 schema = 1
 # The private app trees (the agents, Zanaadu, Teragun, the-composer) are not rows here: their
@@ -73,9 +75,9 @@ test_args = ["--workspace", "--lib", "--tests"]
 id = "chaintracks-cloudflare"
 repository = "Calhooon/chaintracks-cloudflare"
 branch = "main"
-rev = "dcfa491a33d21e7acfa800327c3850bc047a6211"
+rev = "54336437beab04f6878fe71cbbe338130cf96e78"
 private = false
-requirement = "0.8.1"
+requirement = "0.8.12"
 sdk_features = ["block"]
 sdk_default_features = false
 manifests = ["Cargo.toml"]
