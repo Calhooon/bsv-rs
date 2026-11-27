@@ -30,7 +30,7 @@ features; the current messagebox manifest requests auth/wallet/transaction/wasm.
 | [bsv-wallet-toolbox-rs](https://github.com/Calhooon/bsv-wallet-toolbox-rs/blob/e9857b8b7494b56c6b44abce7bdff1de9f952d1b/Cargo.toml) | `0.8.0` | default + `full,http` | Native, `sqlite`; library and integration tests | [D] Unknown | Toolbox captain, stack keeper |
 | [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/c127bccd983a1f4c32f92c1ef637c1ac0d24c838/Cargo.toml) | `0.8.0` | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/d0dba8d2ef4d956614a7cf99787dec951dadb813/Cargo.toml), alias `bsv-sdk` | `0.8.1` | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
-| [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare/blob/dcfa491a33d21e7acfa800327c3850bc047a6211/Cargo.toml), crate `bsv-chaintracks-cloudflare` | `0.8.1` | `block`, no defaults | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
+| [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare/blob/54336437beab04f6878fe71cbbe338130cf96e78/Cargo.toml), crate `bsv-chaintracks-cloudflare` | `0.8.12` (2026-11-27; `Cargo.lock` committed) | `block`, no defaults | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/190a8a78f99733af47b3c789e88112257f13c8ed/Cargo.toml) | `0.8.1` | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard pins bsv-rs 0.8.1 in the lock and is excluded until the row re-pins; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-rs](https://github.com/Calhooon/bsv-middleware-rs/blob/5a1fd275e0fc5cb2fc3982aa157769d44f0729bf/Cargo.toml) | `0.8.0` | default + `auth,wallet,transaction` | Native with consumer feature `axum`; library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-cloudflare](https://github.com/Calhooon/bsv-middleware-cloudflare/blob/d7ccb6c1a56708687c6d044989f9ff06ea024823/Cargo.toml), alias `bsv-sdk` | `0.8` | default + `auth,wallet,transaction,wasm`; workspace `core` takes the same slice without `wasm` | wasm32 with consumer features `refund,d1-claims`; native workspace library and integration tests | [D] Unknown; see Zanaadu's historical embedded worker below | Stack keeper until named |
@@ -93,6 +93,22 @@ Other admitted workers and LOW re-pin by their captains after the CLI gate,
 as [RELEASING.md](../RELEASING.md) describes. Re-pin PRs update the exact remote
 revision, requirement, manifests, features, targets and test selection in the
 lock; new feature/target shapes also update the architecture lane's matrix.
+
+## The chaintracks row's move of 2026-11-27
+
+The `chaintracks-cloudflare` row moved to `54336437` (the tip of its `main` on
+2026-11-27), its requirement to `0.8.12` as the manifest at that revision states
+it; no feature, target, manifest or test selection moved. The reason is the
+lock, not the code: the revision this row named before (`dcfa491a`) commits no
+`Cargo.lock`, so the `dependents` job resolved the consumer's graph afresh from
+the registry on every run. On 2026-11-27 a dispatch of `ci.yml` on `main`'s tip
+(run 46060791591) was red at that one cell with no change of this crate or of
+the consumer: between that run and the green one of 2026-11-18 (run
+44211319788) a release in the registry moved one proc-macro crate of the graph,
+and another crate of it stopped compiling. The consumer has committed its lock
+since `413f9eec` (2026-11-17), so at the new revision the job builds what the
+consumer ships. A row pinned at a revision with no committed lock can turn red
+the same way on any day.
 
 ## How the checks work
 
