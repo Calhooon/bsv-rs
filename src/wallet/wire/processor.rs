@@ -605,7 +605,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         // Read height argument
-        let height = reader.read_var_int()? as u32;
+        let height = reader.read_var_int_u32("height")?;
 
         let args = crate::wallet::GetHeaderArgs { height };
         let result = self.wallet.get_header_for_height(args, originator).await?;
