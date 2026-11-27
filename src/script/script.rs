@@ -324,7 +324,14 @@ impl Script {
     }
 
     /// Computes the serialized length of the chunks.
-    fn compute_serialized_length(chunks: &[ScriptChunk]) -> usize {
+    ///
+    /// `pub(crate)` so the interpreter can turn a chunk index (the position of
+    /// the last executed `OP_CODESEPARATOR`) into a byte offset into the
+    /// script's original bytes when it builds a signature's scriptCode from
+    /// those bytes (#654). The prefix up to and including a codeseparator holds
+    /// no data-carrying `OP_RETURN` (a fold would have swallowed the separator),
+    /// so this length is the separator's byte position in the original script.
+    pub(crate) fn compute_serialized_length(chunks: &[ScriptChunk]) -> usize {
         let mut total = 0;
         for chunk in chunks {
             total += 1; // opcode byte
