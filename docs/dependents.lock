@@ -37,9 +37,11 @@ sdk_features = ["full", "http"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["native"]
-features = ["sqlite"]
-check_args = ["--workspace", "--all-targets"]
-test_args = ["--workspace", "--lib", "--tests"]
+features = []  # "sqlite" is named in the two argument lists below, so that nothing follows the test names after `--`
+check_args = ["--workspace", "--all-targets", "--features", "sqlite"]
+# One test is not run until this row re-pins: `tsc_proof::tests::test_hex_roundtrip` builds a BUMP whose offset lies
+# outside its tree and expects it to parse; the stable line's next security patch refuses such a BUMP at the reader.
+test_args = ["--workspace", "--lib", "--tests", "--features", "sqlite", "--", "--skip", "tsc_proof::tests::test_hex_roundtrip"]
 
 [[consumer]]
 id = "bsv-tracker"
@@ -114,9 +116,12 @@ sdk_features = ["auth", "wallet", "transaction"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["native"]
-features = ["axum"]
-check_args = ["--workspace", "--all-targets"]
-test_args = ["--workspace", "--lib", "--tests"]
+features = []  # "axum" is named in the two argument lists below, so that nothing follows the test names after `--`
+check_args = ["--workspace", "--all-targets", "--features", "axum"]
+# One test is not run until this row re-pins: `the_door_verifies_against_the_sdks_dispatched_signing_digest` spends at
+# transaction version 1 with a SIGHASH_CHRONICLE signature and expects it verified; the stable line's next security
+# patch refuses that signature at version 1 in the default mode, as the 0.9 line already does.
+test_args = ["--workspace", "--lib", "--tests", "--features", "axum", "--", "--skip", "payment_core::tests::the_door_verifies_against_the_sdks_dispatched_signing_digest"]
 
 [[consumer]]
 id = "bsv-middleware-cloudflare"
