@@ -718,3 +718,94 @@ fn test_749_shared_budget_caps_concurrent_peak() {
         without_peaks[0],
     );
 }
+
+// ============================================================================
+// bsv-rs#374 (ported to the stable line, m1118b): the arithmetic room guard
+// ============================================================================
+
+/// The guard's own bookkeeping beside its probe (the operands' lengths, a few
+/// bytes), with room to spare.
+const STEP_SLACK: u64 = 4096;
+
+/// A minimally encoded negative operand of `len` bytes.
+fn step_operand(len: usize) -> Vec<u8> {
+    let mut bytes = vec![0x5a; len];
+    bytes[len - 1] = 0xd5;
+    bytes
+}
+
+/// The heap's peak past the operands while `opcode` runs on them, measured by
+/// dhat. The operands are pushed by the unlocking script, built before the
+/// profiler starts, so the peak past their stack copies is the step's own.
+fn arith_step_peak(opcode: u8, lens: &[usize]) -> u64 {
+    use bsv_rs::script::op::{OP_1, OP_DROP};
+    use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+
+    let mut unlock = Script::new();
+    for &len in lens {
+        unlock.write_bin(&step_operand(len));
+    }
+    let mut lock = Script::new();
+    lock.write_opcode(opcode)
+        .write_opcode(OP_DROP)
+        .write_opcode(OP_1);
+    let mut spend = Spend::new(SpendParams {
+        source_txid: [0u8; 32],
+        source_output_index: 0,
+        source_satoshis: 1000,
+        locking_script: LockingScript::from_script(lock),
+        transaction_version: 2,
+        other_inputs: vec![],
+        outputs: vec![],
+        input_index: 0,
+        unlocking_script: UnlockingScript::from_script(unlock),
+        input_sequence: 0xffff_ffff,
+        lock_time: 0,
+        memory_limit: None,
+        work_limit: None,
+    });
+    let profiler = dhat::Profiler::new_heap();
+    assert_eq!(spend.validate().map_err(|e| e.message), Ok(true));
+    let peak = dhat::HeapStats::get().max_bytes as u64;
+    drop(profiler);
+    peak.saturating_sub(lens.iter().sum::<usize>() as u64)
+}
+
+/// Each guarded arithmetic step's measured heap peak is within the room its
+/// guard asks of the allocator first (`src/script/spend/arithmetic_room.rs`,
+/// `STEP_PEAK_*`): the operands' combined bytes times 8 for `OP_MUL`, 12 for
+/// `OP_DIV`/`OP_MOD`, 6 for the linear kinds. The multiples are ceilings
+/// measured on THIS line's `BigNumber` arithmetic (higher than the 0.9 line's
+/// owned-arithmetic peaks, so the 0.9 line's 6/12/2 are NOT reused): `OP_MUL`
+/// where the shorter operand is just over half the longer (~4.9 times the
+/// operands), `OP_DIV`/`OP_MOD` a dividend just past a power of two over a
+/// small divisor (~7.6 times), the linear kinds ~3.5 times. A step whose peak
+/// ever grew past its declared room — so the probe would pass and the real
+/// allocation abort — shows here as a failure.
+#[test]
+fn test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks() {
+    use bsv_rs::script::op::{OP_1ADD, OP_ADD, OP_BIN2NUM, OP_DIV, OP_MOD, OP_MUL};
+
+    let _serial = serial();
+    let cases: [(u8, &str, &[usize], u64); 6] = [
+        (OP_MUL, "OP_MUL", &[262_144, 144_000], 8),
+        (OP_DIV, "OP_DIV", &[2_098_000, 513], 12),
+        (OP_MOD, "OP_MOD", &[2_098_000, 513], 12),
+        (OP_ADD, "OP_ADD", &[1 << 20, 1 << 20], 6),
+        (OP_1ADD, "OP_1ADD", &[1 << 20], 6),
+        (OP_BIN2NUM, "OP_BIN2NUM", &[1 << 20], 6),
+    ];
+    for (opcode, name, lens, multiple) in cases {
+        let operands = lens.iter().sum::<usize>() as u64;
+        let peak = arith_step_peak(opcode, lens);
+        println!(
+            "{name} of {lens:?}: the step's peak {peak} bytes, {:.3} times the operands; its guard asks {multiple} times",
+            peak as f64 / operands as f64
+        );
+        assert!(
+            peak <= multiple * operands + STEP_SLACK,
+            "{name}: a peak of {peak} bytes past the {} its guard asks (the guard would under-reserve)",
+            multiple * operands
+        );
+    }
+}

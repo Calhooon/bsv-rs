@@ -111,6 +111,13 @@ use std::sync::Arc;
 /// The interpreter's one reading of a signature (#842's fold, #847).
 mod signature_read;
 
+/// The room an arithmetic step needs, asked of the allocator before it so an
+/// out-of-memory is a decline, not an abort (bsv-rs#374, ported from the 0.9
+/// line to the stable line's single interpreter file).
+mod arithmetic_room;
+#[cfg(all(test, feature = "transaction"))]
+pub(crate) use arithmetic_room::with_allocator_ceiling;
+
 mod num;
 mod pre_genesis;
 /// The scriptCode a signature check commits to, built from the script's bytes (#654).
@@ -1388,6 +1395,13 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                // Ask the allocator for the re-encoding's room before it is
+                // built infallibly, so an out-of-memory is a decline, not an
+                // abort (bsv-rs#374). The 0.9 line leaves `OP_BIN2NUM` bounded
+                // by the element bound alone (its result is no longer than its
+                // operand); this line's smaller default budget takes the probe
+                // too, abort-safe at this door as well.
+                self.arithmetic_room(opcode, &[buf.as_slice()])?;
                 let result = ScriptNum::minimally_encode(&buf);
                 // A result longer than the limit in force is refused as the
                 // reference refuses it (`IsMinimallyEncoded(max)`,
@@ -1552,6 +1566,10 @@ impl Spend {
                     )));
                 }
                 let buf = self.pop_stack()?;
+                // Ask the allocator for the step's room before `BigNumber`
+                // allocates it infallibly, so an out-of-memory is a decline,
+                // not an abort (bsv-rs#374).
+                self.arithmetic_room(opcode, &[buf.as_slice()])?;
                 let mut bn = self.read_number(&buf)?;
 
                 bn = match opcode {
@@ -1603,6 +1621,10 @@ impl Spend {
                 }
                 let buf2 = self.pop_stack()?;
                 let buf1 = self.pop_stack()?;
+                // Ask the allocator for the step's room before `BigNumber`
+                // allocates it infallibly, so an out-of-memory is a decline,
+                // not an abort (bsv-rs#374).
+                self.arithmetic_room(opcode, &[buf1.as_slice(), buf2.as_slice()])?;
                 let bn1 = self.read_number(&buf1)?;
                 let bn2 = self.read_number(&buf2)?;
 

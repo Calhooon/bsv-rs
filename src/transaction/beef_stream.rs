@@ -1699,6 +1699,12 @@ use budget::Budget;
 mod headers;
 pub use headers::{ChainTip, Headers, HeadersFn};
 
+/// The arithmetic room guard (bsv-rs#374) reaches the streaming door: a spend
+/// the stream runs whose step the allocator refuses is a resource decline, not
+/// an abort.
+#[cfg(test)]
+mod arithmetic_room_stream_tests;
+
 // ---------------------------------------------------------------------------
 // The index
 // ---------------------------------------------------------------------------
