@@ -110,7 +110,7 @@ pub enum Language {
 **Trait Implementations:**
 - `Display` for `Mnemonic` - Displays the phrase via `phrase()` method
 - `Clone` for `Mnemonic` - Enables cloning mnemonic instances
-- `NfkdNormalize` for `str` and `String` (private) - Pass-through NFKD normalization matching Go SDK
+- `NfkdNormalize` for `str` and `String` (private) - NFKD via `unicode-normalization` (#163)
 
 ## Usage
 
@@ -304,21 +304,18 @@ Error::CryptoError(String)
 
 ### NFKD Normalization
 
-The implementation includes a simplified `NfkdNormalize` trait for Unicode normalization. The current behavior:
+BIP-39 asks NFKD of a wordlist (`bip-0039.mediawiki:86-87` at `bitcoin/bips@100ba872`) and of the mnemonic and passphrase that seed PBKDF2 (`:94-96`). Since #163 the private `NfkdNormalize` trait is `unicode_normalization`'s `nfkd()` (the `unicode-normalization` crate, a dependency of the `compat` feature, pure Rust, wasm32-clean), applied at three places:
 
-- **Go SDK**: Does NOT perform NFKD normalization (passes raw UTF-8 bytes)
-- **TypeScript SDK**: DOES perform NFKD normalization via `String.normalize('NFKD')`
-- **This implementation**: Matches Go SDK (no normalization, passes through unchanged)
+- `from_phrase_with_language` normalizes the phrase before it splits it (so Japanese reads with U+3000 or an ASCII space: NFKD maps U+3000 to U+0020), and lower-cases each token;
+- `Language::word_index` compares the word's NFKC form with the list's bytes: two strings share an NFKD form exactly when they share an NFKC form, and every list word is its own NFKC form (pinned by `every_list_word_is_its_own_nfkc_form` in `tests/compat_bip39_nfkd.rs`), so this is BIP-39's NFKD comparison at a byte compare's cost. The four non-ASCII files are NFC, and their NFKD form is upstream's lists byte for byte;
+- `to_seed` hashes the NFKD phrase and the NFKD passphrase.
 
-For ASCII passphrases (recommended), all SDKs produce identical seeds. For non-ASCII passphrases, this implementation matches Go SDK but may differ from TypeScript SDK.
+The words a `Mnemonic` keeps are the list's own (NFC), so `phrase()` prints the files' form whatever form was read. Before #163 the trait was a pass-through: an NFD phrase was refused, and a phrase or passphrase not already in NFKD seeded other bytes than BIP-39's.
 
-**Recommendation**: For maximum cross-SDK compatibility, use only ASCII characters in passphrases.
+- **TypeScript SDK**: NFKD for the seed (`ts-sdk@9e3ede6` `src/compat/Mnemonic.ts:271-272`); words looked up by bytes after splitting on the list's space (`:219-222`); English only.
+- **Go SDK**: no normalization (`go-sdk@2ca481c` `compat/bip39/bip39.go:256-257`); its lists are NFD, so it refuses the NFC phrase this crate prints.
 
-To add full NFKD Unicode normalization, add the `unicode-normalization` crate:
-```rust
-use unicode_normalization::UnicodeNormalization;
-let normalized: String = input.nfkd().collect();
-```
+Pinned by `tests/compat_bip39_nfkd.rs` and `tests/vectors/bip39_japanese.json`.
 
 ### Wordlists
 
