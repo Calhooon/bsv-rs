@@ -319,15 +319,32 @@ operations allocate infallibly, so an out-of-memory at an arithmetic step would
 be an uncatchable abort (on wasm32 one nobody catches). Before an arithmetic step
 the allocator is asked with `try_reserve_exact`, then released, for the most the
 step holds past its operands (`spend/arithmetic_room.rs`, `STEP_PEAK_*`: a
-multiple of the operands' combined bytes, measured as ceilings on this line's
-`BigNumber` arithmetic — `OP_MUL` ~4.9×, `OP_DIV`/`OP_MOD` ~7.6×, the linear
-kinds ~3.5×); its refusal is a decline (`ScriptResource::ElementSize`), never an
-abort, and never a verdict. An honest (policy-valid) operand is far below the
-64 KiB reservation floor and never reaches the probe. The 0.9 line's reference-read
+multiple of the operands' combined bytes — `OP_MUL` 8×, `OP_DIV`/`OP_MOD` 12×,
+the linear kinds 6× — each a ceiling above the worst peak measured on this
+line's `BigNumber` arithmetic with the probe disabled, `OP_DIV` the tightest at
+~11× of 12×); its refusal is a decline (`ScriptResource::ElementSize`), never an
+abort, and never a verdict. An honest (policy-valid, ≤10 KB) operand's step is
+at most a few hundred kilobytes: the probe may fire but its reservation is
+always granted, so no honest answer moves. The 0.9 line's reference-read
 verdict (a magnitude past 536,870,888 bits judged invalid, bsv-rs#331) does NOT
 travel with the probe. The witnesses are `src/script/spend/arithmetic_room_tests.rs`,
 `src/transaction/beef_stream/arithmetic_room_stream_tests.rs` and
 `tests/memory_profiling.rs`.
+
+Every stack element built fallibly (bsv-rs#331, ported from the 0.9 line).
+Beside the arithmetic probe, the interpreter allocates an element outright on a
+push, a copy (`OP_DUP`/`OP_PICK`/`OP_TUCK`/the multi-dups), `OP_CAT`,
+`OP_SPLIT`, `OP_NUM2BIN`'s padding, the byte shifts and the Chronicle splices;
+each asks the allocator first (`copy_element`, `zeroed_element`,
+`element_with_capacity`, and the stacks' own growth with `try_reserve`), so a
+near-budget element a memory-tight host cannot give is a `ScriptResource::Stack`
+decline, never an abort (on wasm32 one nobody catches). The bitwise logic
+(`OP_INVERT`/`OP_AND`/`OP_OR`/`OP_XOR`) works in place, and an error's stack
+snapshot is made fallibly, left empty when refused. So on a refusing host the
+whole working-room class — arithmetic and element alike — declines cleanly, as
+the 0.9 line does; the 0.9 line's reference-read verdict is still left out. The
+witnesses are in `src/script/spend.rs`'s tests (the refused allocation, the
+snapshot).
 
 ### ScriptFlags / ProtocolEra (`flags.rs`)
 
