@@ -184,7 +184,7 @@ impl Certificate {
         // All-zeros TXID with index 0 is treated as "no outpoint"
         let mut txid = [0u8; 32];
         txid.copy_from_slice(reader.read_bytes(32)?);
-        let vout = reader.read_varint()? as u32;
+        let vout = reader.read_varint_index("revocation outpoint index")?;
 
         // Treat all-zeros TXID with index 0 as "no outpoint"
         let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
@@ -369,6 +369,24 @@ impl<'a> BinaryReader<'a> {
         remaining
     }
 
+    /// Reads a varint carrying an output index; above `u32::MAX` is refused
+    /// with the field named, never truncated to another index (#122), in the
+    /// bound refusal's one form (`integer_refusal`). The reference's reader
+    /// has no words here: it reads the index with `readVarIntNumStrict(false)`
+    /// and no bound (`ts-stack@edf6e03` `Certificate.ts:353`), so the field's
+    /// name is this crate's (#258).
+    fn read_varint_index(&mut self, field: &str) -> Result<u32> {
+        let value = self.read_varint()?;
+        u32::try_from(value).map_err(|_| {
+            Error::CertificateValidationError(crate::wallet::wire::integer_refusal(
+                field,
+                value,
+                0,
+                u32::MAX.into(),
+            ))
+        })
+    }
+
     fn read_varint(&mut self) -> Result<u64> {
         let first = self.read_u8()?;
         match first {
@@ -423,6 +441,43 @@ mod base64_32_bytes {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated() {
+        let certifier = PrivateKey::random();
+        let subject = PrivateKey::random().public_key();
+        let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
+        cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], u32::MAX));
+        cert.sign(&certifier).unwrap();
+        let binary = cert.to_binary(true);
+
+        // u32::MAX reads back, where the pre-fix `as u32` cast would have kept it.
+        let parsed = Certificate::from_binary(&binary).unwrap();
+        assert_eq!(
+            parsed.revocation_outpoint,
+            Some(Outpoint::new([3u8; 32], u32::MAX))
+        );
+        assert!(parsed.verify().unwrap());
+
+        // type(32) serial(32) subject(33) certifier(33) txid(32), then the index.
+        let at = 32 + 32 + 33 + 33 + 32;
+        let mut max = Vec::new();
+        write_varint(&mut max, u32::MAX as u64);
+        assert_eq!(&binary[at..at + 5], &max[..]);
+        let mut over = binary[..at].to_vec();
+        write_varint(&mut over, u32::MAX as u64 + 1);
+        over.extend_from_slice(&binary[at + 5..]);
+
+        // u32::MAX + 1 is refused with the field named (the pre-fix cast read 0).
+        let err = Certificate::from_binary(&over).unwrap_err();
+        assert_eq!(
+            err,
+            Error::CertificateValidationError(
+                "Invalid revocation outpoint index: expected an integer from 0 to 4294967295, received 4294967296"
+                    .to_string()
+            )
+        );
+    }
 
     #[test]
     fn test_sign_and_verify() {
