@@ -97,7 +97,7 @@ snapshot's unless a cell says otherwise.
 | [bsv-overlay-cloudflare](https://github.com/Calhooon/bsv-overlay-cloudflare), crates `bsv-overlay-engine`, `bsv-overlay-discovery` and `bsv-overlay-cloudflare` | `main` `2abcd748` (2026-11-13), read 2026-11-14 `[X]` | `=0.7.2` in the root and in `workers/` `[X]` | 0.7.2 (`Cargo.lock` and `workers/Cargo.lock`); the registry packages of `workers/Cargo.lock` that depend on bsv-rs (`bsv-middleware-core 0.4.0`, `bsv-middleware-cloudflare 0.7.1` and `bsv-tracker 0.7.0`, each requiring `^0.7.0`) resolve to it too `[X]` | default + `overlay`; overlay worker adds `wasm`, app-layer tests add `auth` | Native engine workspace and wasm32 worker workspace; no 0.8 patch reaches it until the whole graph moves to the 0.8 line | `[D]` 0.5.0 with worker 0.1.3 on 2026-10-13; current unknown | Stack keeper until named |
 | rust-message-box (the relay); not on crates.io's reverse-dependency list on 2026-11-12 | `main` `44a63204` (2026-10-21), read 2026-11-12 `[X]` | `=0.6.0` `[X]` | 0.6.0 (`Cargo.lock`) `[X]` | not read on 2026-10-23 or 2026-11-10 | not read | [D] Unknown | Stack keeper until named |
 | [bsv-middleware-rs](https://github.com/Calhooon/bsv-middleware-rs) | `main` `5a1fd275` (2026-10-22), read 2026-11-14 `[X]` | `0.8.0` `[X]` | no lock committed `[X]` | default + `auth,wallet,transaction` | Native with consumer feature `axum`; library and integration tests | [D] Unknown | Stack keeper until named |
-| [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare), crate `bsv-chaintracks-cloudflare` | `main` `eff96cbc` (2026-11-04), read 2026-11-14 `[X]` | `0.8.1` `[X]` | no lock committed `[X]` | `block`, no defaults `[X]` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
+| [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare), crate `bsv-chaintracks-cloudflare` | `main` `54336437` (2026-11-27), read 2026-11-27 `[X]` | `0.8.12` `[X]` | 0.8.12 (`Cargo.lock`, committed since `413f9eec`, 2026-11-17) `[X]` | `block`, no defaults `[X]` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/fdc88960e4ea99f64a8885315c13c6abfb28ef02/Cargo.toml) | `main` `fdc88960` (2026-11-13), read 2026-11-14 `[X]` | `0.8.0` `[X]` | 0.8.9 (`Cargo.lock`) `[X]` | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | bsv-tracker, beta line | `beta` `3cfba165` (2026-11-04), read 2026-11-14 `[X]` | `=0.9.0-beta.7` `[X]` | 0.9.0-beta.7 (`Cargo.lock`) `[X]` | `transaction`, no defaults (read 2026-11-14 `[X]`) | not read | [D] Unknown | Stack keeper until named |
 | [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/2025fcde98664dd69a6305c60e87fa12c3930cde/Cargo.toml), alias `bsv-sdk` | `main` `2025fcde` (2026-10-27), read 2026-11-14 `[X]` | `0.8.1` `[X]` | 0.8.1 (`Cargo.lock`) `[X]` | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
@@ -265,6 +265,23 @@ revision `190a8a78`, where `ring` is the same direct dependency, so the stop is
 the host's and says nothing of either revision. That check is CI's to witness,
 on the `dependents` job's Linux runner. The four moved rows the stable tree
 does not admit (the CLI's and the overlay's three) were read, not built.
+
+## The chaintracks row's move of 2026-11-27
+
+The `chaintracks-cloudflare` row moved to `54336437` (the tip of its `main` on
+2026-11-27), its requirement to `0.8.12` as the manifest at that revision states
+it; no feature, target, manifest or test selection moved. The reason is the
+lock, not the code: the revisions this row named before (`dcfa491a` on the
+stable line, `eff96cbc` here) commit no `Cargo.lock`, so the `dependents` job
+resolved the consumer's graph afresh from the registry on every run. On
+2026-11-27 a dispatch of `ci.yml` on `main`'s tip (run 46060791591) was red at
+that one cell with no change of this crate or of the consumer: between that run
+and the green one of 2026-11-18 (run 44211319788) a release in the registry
+moved one proc-macro crate of the graph, and another crate of it stopped
+compiling. The consumer has committed its lock since `413f9eec` (2026-11-17),
+so at the new revision the job builds what the consumer ships. A row pinned at a
+revision with no committed lock can turn red the same way on any day; the table
+above says which rows those are (`no lock committed`).
 
 ## How the checks work
 
