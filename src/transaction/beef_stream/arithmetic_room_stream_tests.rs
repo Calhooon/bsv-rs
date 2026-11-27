@@ -20,8 +20,8 @@ use crate::script::spend::with_allocator_ceiling;
 use crate::script::{LockingScript, Script, ScriptResource, UnlockingScript};
 use crate::transaction::beef_stream::{Hash32, SpendRefusal};
 use crate::transaction::{
-    MerklePath, MockChainTracker, StreamVerifier, Transaction, TransactionInput,
-    TransactionOutput, Verdict,
+    MerklePath, MockChainTracker, StreamVerifier, Transaction, TransactionInput, TransactionOutput,
+    Verdict,
 };
 
 const HEIGHT: u32 = 800_000;
@@ -116,6 +116,8 @@ fn verify_stream_surfaces_the_arithmetic_rooms_decline_not_an_abort() {
                 "the arithmetic room's decline is element-size, not a stack-budget decline"
             );
         }
-        other => panic!("expected the arithmetic room guard's decline at the stream door: {other:?}"),
+        other => {
+            panic!("expected the arithmetic room guard's decline at the stream door: {other:?}")
+        }
     }
 }

@@ -162,6 +162,24 @@ pub enum Error {
     #[error("transaction error: {0}")]
     TransactionError(String),
 
+    /// `Transaction::verify` stopped an input's script evaluation at a local
+    /// memory or allocator budget: the script was not judged, valid or not (a
+    /// decline, the interpreter's `ScriptResourceLimit`; never to be read as an
+    /// invalid transaction). Until bsv-rs#38 (ported to this line) such a
+    /// decline was folded into [`TransactionError`](Self::TransactionError),
+    /// indistinguishable from an invalid script.
+    #[cfg(feature = "transaction")]
+    #[error(
+        "script evaluation declined for input {input_index}: {} budget {} bytes, attempted {} bytes",
+        limit.resource, limit.limit, limit.attempted
+    )]
+    ScriptEvaluationDeclined {
+        /// The index of the input whose evaluation stopped.
+        input_index: usize,
+        /// The resource, its budget and the attempted usage.
+        limit: crate::script::ScriptResourceLimit,
+    },
+
     /// MerklePath error.
     #[cfg(feature = "transaction")]
     #[error("merkle path error: {0}")]
