@@ -177,9 +177,6 @@ pub fn electrum_encrypt(
 /// ```
 pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) -> Result<Vec<u8>> {
     bounds::electrum_envelope(data)?;
-    if data.len() < 52 {
-        return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
-    }
 
     // Verify magic bytes
     if &data[0..4] != ELECTRUM_MAGIC {
@@ -324,9 +321,6 @@ pub fn bitcore_encrypt(
 /// ```
 pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>> {
     bounds::bitcore_envelope(data)?;
-    if data.len() < 97 {
-        return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
-    }
 
     // Parse components: pubkey (33) || iv || ciphertext || mac (32)
     let from_pubkey = PublicKey::from_bytes(&data[0..33])?;
