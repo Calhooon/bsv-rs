@@ -299,6 +299,8 @@ The stable `dependents` status fails if planning or any selected matrix entry
 fails or is cancelled, so branch protection does not need a changing list of
 consumer check names.
 
+A consumer that fails at its pin without the PR tree too (the same command run once more without the override, after it failed with it) is reported as not judged and never counted against the tree: the captain files an issue on that consumer's tracker the same day and moves its pin by a pull request once the consumer is mended ([RELEASING.md](../RELEASING.md) step 2); `dependents` fails when every eligible consumer came back not judged.
+
 The lock supports exact and caret requirements. Beta entries use an explicit
 exact prerelease; unsupported requirement syntax fails closed for review.
 Run the same check locally in an external consumer checkout with an external

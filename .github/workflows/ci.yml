@@ -79,6 +79,35 @@ jobs:
     needs: dependents-plan
     if: needs.dependents-plan.outputs.count != '0'
     runs-on: ubuntu-latest
+    # Each cell's verdict for `dependents`: `judged <id>`, or `not-judged <id>` for a consumer that
+    # fails at its pin without this tree too (dependents.py, `baseline`). A matrix's outputs are
+    # combined by name, so a cell writes the slot of its own index (strategy.job-index) and every
+    # slot is declared here; test_dependents.py holds the slots at the lock's row count or more.
+    outputs:
+      verdict_0: ${{ steps.check.outputs.verdict_0 }}
+      verdict_1: ${{ steps.check.outputs.verdict_1 }}
+      verdict_2: ${{ steps.check.outputs.verdict_2 }}
+      verdict_3: ${{ steps.check.outputs.verdict_3 }}
+      verdict_4: ${{ steps.check.outputs.verdict_4 }}
+      verdict_5: ${{ steps.check.outputs.verdict_5 }}
+      verdict_6: ${{ steps.check.outputs.verdict_6 }}
+      verdict_7: ${{ steps.check.outputs.verdict_7 }}
+      verdict_8: ${{ steps.check.outputs.verdict_8 }}
+      verdict_9: ${{ steps.check.outputs.verdict_9 }}
+      verdict_10: ${{ steps.check.outputs.verdict_10 }}
+      verdict_11: ${{ steps.check.outputs.verdict_11 }}
+      verdict_12: ${{ steps.check.outputs.verdict_12 }}
+      verdict_13: ${{ steps.check.outputs.verdict_13 }}
+      verdict_14: ${{ steps.check.outputs.verdict_14 }}
+      verdict_15: ${{ steps.check.outputs.verdict_15 }}
+      verdict_16: ${{ steps.check.outputs.verdict_16 }}
+      verdict_17: ${{ steps.check.outputs.verdict_17 }}
+      verdict_18: ${{ steps.check.outputs.verdict_18 }}
+      verdict_19: ${{ steps.check.outputs.verdict_19 }}
+      verdict_20: ${{ steps.check.outputs.verdict_20 }}
+      verdict_21: ${{ steps.check.outputs.verdict_21 }}
+      verdict_22: ${{ steps.check.outputs.verdict_22 }}
+      verdict_23: ${{ steps.check.outputs.verdict_23 }}
     strategy:
       fail-fast: false
       # The fleet's runner cap (#682's second fold, the keeper's word (a) of 2026-11-03; six since
@@ -127,10 +156,15 @@ jobs:
           toolchain: stable
           targets: wasm32-unknown-unknown
 
+      # A command that fails against the PR tree is run once more without it: a consumer that fails
+      # that way too is not judged (a warning, a green job, `not-judged` in its slot), a consumer
+      # that passes without the tree fails here as it always has.
       - name: Check the consumer against the PR tree
+        id: check
         env:
           CONSUMER: ${{ matrix.id }}
-        run: python3 -B sdk/.github/scripts/dependents.py run --sdk "$GITHUB_WORKSPACE/sdk" --checkout "$GITHUB_WORKSPACE/consumer" --consumer "$CONSUMER"
+          SLOT: ${{ strategy.job-index }}
+        run: python3 -B sdk/.github/scripts/dependents.py run --sdk "$GITHUB_WORKSPACE/sdk" --checkout "$GITHUB_WORKSPACE/consumer" --consumer "$CONSUMER" --slot "$SLOT" --output "$GITHUB_OUTPUT" --summary "$GITHUB_STEP_SUMMARY"
 
   dependents:
     name: dependents
@@ -140,21 +174,21 @@ jobs:
       (github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref == 'refs/heads/beta')))
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Red when the plan failed, when a judged consumer failed or was cancelled, when a cell's
+      # verdict did not arrive, and when every eligible consumer came back not judged (an outage of
+      # the toolchain or the registry is not a pass); its summary counts the consumers judged and
+      # names those not judged (dependents.py, `aggregate`).
       - name: Require every eligible consumer check
         env:
           PLAN_RESULT: ${{ needs.dependents-plan.result }}
           CHECK_RESULT: ${{ needs.dependent-check.result }}
           CONSUMER_COUNT: ${{ needs.dependents-plan.outputs.count }}
-        run: |
-          if [ "$PLAN_RESULT" != success ]; then
-            echo '::error::The dependents plan failed or was cancelled.'
-            exit 1
-          fi
-          if [ "$CONSUMER_COUNT" != 0 ] && [ "$CHECK_RESULT" != success ]; then
-            echo '::error::An eligible dependent failed or was cancelled; see the named consumer check.'
-            exit 1
-          fi
-          echo "All $CONSUMER_COUNT eligible consumer checks passed."
+          VERDICTS: ${{ toJSON(needs.dependent-check.outputs) }}
+        run: python3 -B .github/scripts/dependents.py aggregate --sdk "$GITHUB_WORKSPACE" --summary "$GITHUB_STEP_SUMMARY"
 
   # tests/arch_ci_semver_holds_beta_886.rs pins this job's keys beside `steps:` (JOB_HEAD), its
   # steps' opening lines in order (STEP_HEADS) and its checkout (CHECKOUT_STEP), comments aside.
