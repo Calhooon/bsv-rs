@@ -1,0 +1,577 @@
+{
+  "description": "Electrum ECIES envelopes (bsv-rs#109): the reference's envelopes and verdicts for fixed keys, with this crate's envelopes opened by the reference",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk/src/compat/ECIES.ts:545-656), bundled with bun, run under Node v22.18.0, by tests/support/compat_ecies_envelope_109.mjs",
+  "keys": {
+    "recipient": "0101010101010101010101010101010101010101010101010101010101010101",
+    "sender": "0202020202020202020202020202020202020202020202020202020202020202",
+    "other": "0303030303030303030303030303030303030303030303030303030303030303"
+  },
+  "cases": [
+    {
+      "name": "plaintext-1",
+      "plaintext_hex": "01",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766b160ff57350d235e5c1ef7bc972c37af51fcd73e64b3951aa7956d18c79d29c756507dd4d4f09fdbefa042c2fda07aa7",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "01"
+          },
+          "without_sender": {
+            "plaintext_hex": "01"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766b160ff57350d235e5c1ef7bc972c37af51fcd73e64b3951aa7956d18c79d29c756507dd4d4f09fdbefa042c2fda07aa7",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "01"
+          },
+          "without_sender": {
+            "plaintext_hex": "01"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531b160ff57350d235e5c1ef7bc972c37af1d3e1d99bdf0d9e5e4478fe442dfeee8208da4306afcbbb8c9d3cc1515c7e743",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "01"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531b160ff57350d235e5c1ef7bc972c37af1d3e1d99bdf0d9e5e4478fe442dfeee8208da4306afcbbb8c9d3cc1515c7e743",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "01"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-15",
+      "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766add109e110128bae2add95db507b89c8a718866a6b08c506ca8a3cba5fc704dd0614075776dd509ba1352c22300f6fc0",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766add109e110128bae2add95db507b89c8a718866a6b08c506ca8a3cba5fc704dd0614075776dd509ba1352c22300f6fc0",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531add109e110128bae2add95db507b89c8f5c9460e42323beac0f6c1cae3b7e9cceb5782867c746a3ae4f205243a459e8b",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531add109e110128bae2add95db507b89c8f5c9460e42323beac0f6c1cae3b7e9cceb5782867c746a3ae4f205243a459e8b",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "0f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-16",
+      "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076625b0ba7a9375f51142c956454fe7183f3c0d6fab4f4df5292a1a2b76a70f92e9c563804911241916d76bee7a331350e36c679b4be2830beeb8c751b453ab4bc4",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076625b0ba7a9375f51142c956454fe7183f3c0d6fab4f4df5292a1a2b76a70f92e9c563804911241916d76bee7a331350e36c679b4be2830beeb8c751b453ab4bc4",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "4249453125b0ba7a9375f51142c956454fe7183f3c0d6fab4f4df5292a1a2b76a70f92e918d6faa2e9a6f999036b7c5fe0387aae834dd9b81cfa291ea6d6b880ea44e7d4",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "4249453125b0ba7a9375f51142c956454fe7183f3c0d6fab4f4df5292a1a2b76a70f92e918d6faa2e9a6f999036b7c5fe0387aae834dd9b81cfa291ea6d6b880ea44e7d4",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-17",
+      "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766aa59c3d97e441185d216b1bec9f62f53f8da93f3e0a98dcbdd9b2d767c02a8af8a4a649136fd0dc48d8dd31a38c1565cd51958259c601e60318ce8096ff9dcda",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766aa59c3d97e441185d216b1bec9f62f53f8da93f3e0a98dcbdd9b2d767c02a8af8a4a649136fd0dc48d8dd31a38c1565cd51958259c601e60318ce8096ff9dcda",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531aa59c3d97e441185d216b1bec9f62f53f8da93f3e0a98dcbdd9b2d767c02a8afc08345e3ea2686d86c3d9c96d3b1d4253b55ff995282136075e1ec67c58e3c2f",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531aa59c3d97e441185d216b1bec9f62f53f8da93f3e0a98dcbdd9b2d767c02a8afc08345e3ea2686d86c3d9c96d3b1d4253b55ff995282136075e1ec67c58e3c2f",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "11304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-31",
+      "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076692daa9b5a103371b6e1e548acea529440c4322de8fd7a6b90e482a4bd75201a258e0d4a7499be45d210bbbbdc745b3e47498c9fb2c90576c41cdd7d0a7c4cdee",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076692daa9b5a103371b6e1e548acea529440c4322de8fd7a6b90e482a4bd75201a258e0d4a7499be45d210bbbbdc745b3e47498c9fb2c90576c41cdd7d0a7c4cdee",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "4249453192daa9b5a103371b6e1e548acea529440c4322de8fd7a6b90e482a4bd75201a238d8e80ab01a1eb9b6c5bf06fa8a247c727ebd130f35cfde275a1979983b6b45",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "4249453192daa9b5a103371b6e1e548acea529440c4322de8fd7a6b90e482a4bd75201a238d8e80ab01a1eb9b6c5bf06fa8a247c727ebd130f35cfde275a1979983b6b45",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "1f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-32-the-issue-input",
+      "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076679e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b971d3127e53b36edae872e7473bfd74c397140bf56d60e6d0d28b251b890e84a60",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          },
+          "without_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076679e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b971d3127e53b36edae872e7473bfd74c397140bf56d60e6d0d28b251b890e84a60",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          },
+          "without_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "4249453179e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b97e340067ddc4f6ce04def54d32500b820cd721b4b3f211966db5b426112b69486",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "4249453179e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b97e340067ddc4f6ce04def54d32500b820cd721b4b3f211966db5b426112b69486",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-33",
+      "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766f1c14a4d039c233e717f3e50fde2b31694fe38919f14bea5e03fef76cd2f14bc6f904313674400060e21d5402fdd7e94162794ca5fa05e9163a4c9d37d2fd4c791f6e072eeab55f28233d2f64f812e96",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766f1c14a4d039c233e717f3e50fde2b31694fe38919f14bea5e03fef76cd2f14bc6f904313674400060e21d5402fdd7e94162794ca5fa05e9163a4c9d37d2fd4c791f6e072eeab55f28233d2f64f812e96",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531f1c14a4d039c233e717f3e50fde2b31694fe38919f14bea5e03fef76cd2f14bc6f904313674400060e21d5402fdd7e947d5b87b8b9252937e205765fdad4de652625789b60181a56b8e5bdd5959ea095",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531f1c14a4d039c233e717f3e50fde2b31694fe38919f14bea5e03fef76cd2f14bc6f904313674400060e21d5402fdd7e947d5b87b8b9252937e205765fdad4de652625789b60181a56b8e5bdd5959ea095",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "21405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-47",
+      "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766dc3579edfc13ba0808cf733ba70976be98023ccd384847418b17374221636f87efade7f35968e742714f34ca23429eb80d674152541f82edd6b102ced829da4a6b442d5bcf5841e6b9681c721cba2568",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766dc3579edfc13ba0808cf733ba70976be98023ccd384847418b17374221636f87efade7f35968e742714f34ca23429eb80d674152541f82edd6b102ced829da4a6b442d5bcf5841e6b9681c721cba2568",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531dc3579edfc13ba0808cf733ba70976be98023ccd384847418b17374221636f87efade7f35968e742714f34ca23429eb8ae98389cc66544269e2a2d01cffb24317623f1d49225c60405fc7bca889534ec",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531dc3579edfc13ba0808cf733ba70976be98023ccd384847418b17374221636f87efade7f35968e742714f34ca23429eb8ae98389cc66544269e2a2d01cffb24317623f1d49225c60405fc7bca889534ec",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "2f4e6d8cabcae90827466584a3c2e1001f3e5d7c9bbad9f81736557493b2d1f00f2e4d6c8baac9e80726456483a2c1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-48",
+      "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076647bba400c3489f735d8174c3dacc133a89bc2019d689080cf48b884d16ea3d3b07d9bcc5086a66a4d45f7ce12154107fb70e2023d441f9d38a9a99645a27c6cc8c5d3b4245f9674bf0b0d01c81b7293b1d57a2b294f31fc81c193f92f6f9fb40",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076647bba400c3489f735d8174c3dacc133a89bc2019d689080cf48b884d16ea3d3b07d9bcc5086a66a4d45f7ce12154107fb70e2023d441f9d38a9a99645a27c6cc8c5d3b4245f9674bf0b0d01c81b7293b1d57a2b294f31fc81c193f92f6f9fb40",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "4249453147bba400c3489f735d8174c3dacc133a89bc2019d689080cf48b884d16ea3d3b07d9bcc5086a66a4d45f7ce12154107fb70e2023d441f9d38a9a99645a27c6ccd70ab872bdbf36bed023beadf797ddd3a2bfc6505d5d4126c671f402f668bfb0",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "4249453147bba400c3489f735d8174c3dacc133a89bc2019d689080cf48b884d16ea3d3b07d9bcc5086a66a4d45f7ce12154107fb70e2023d441f9d38a9a99645a27c6ccd70ab872bdbf36bed023beadf797ddd3a2bfc6505d5d4126c671f402f668bfb0",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-64",
+      "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766424991422ab5d60878052190fd68d986881bb73883212af268deef6241fa1d6b4bc2964cac374d4e7d1d8748be906f40a01a2f9d78089ce37834fa4afa84dc212c2c23f30b2d96fe201e71397e88d3580ce96453ba9434b658837af4a4b0d788cf9be59fa1f77db689a860c82f145ba8",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766424991422ab5d60878052190fd68d986881bb73883212af268deef6241fa1d6b4bc2964cac374d4e7d1d8748be906f40a01a2f9d78089ce37834fa4afa84dc212c2c23f30b2d96fe201e71397e88d3580ce96453ba9434b658837af4a4b0d788cf9be59fa1f77db689a860c82f145ba8",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531424991422ab5d60878052190fd68d986881bb73883212af268deef6241fa1d6b4bc2964cac374d4e7d1d8748be906f40a01a2f9d78089ce37834fa4afa84dc212c2c23f30b2d96fe201e71397e88d358ec9f064858b38a0f8310dfd76170a70aa179d22971aba9701d1e54512e1bbfff",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531424991422ab5d60878052190fd68d986881bb73883212af268deef6241fa1d6b4bc2964cac374d4e7d1d8748be906f40a01a2f9d78089ce37834fa4afa84dc212c2c23f30b2d96fe201e71397e88d358ec9f064858b38a0f8310dfd76170a70aa179d22971aba9701d1e54512e1bbfff",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    },
+    {
+      "name": "plaintext-96",
+      "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1",
+      "with_key": {
+        "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766a306f4137944392d73bf967f653a606cec0c55858d80e1f4e50feebab8d566acf5970934bd1255a7e0cd636191191913ccad8c260782c8372f5645cd7254720260582aaae1779924065f31e7f1b4ad42624c56ff21d125e01a11a607560379904d8dda03bdd3dc231c422127f6f772d0da4748300c8993d2c96cc96c8e986aad27922b599fa0cfa48a1337a273aed7df",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        },
+        "crate_envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766a306f4137944392d73bf967f653a606cec0c55858d80e1f4e50feebab8d566acf5970934bd1255a7e0cd636191191913ccad8c260782c8372f5645cd7254720260582aaae1779924065f31e7f1b4ad42624c56ff21d125e01a11a607560379904d8dda03bdd3dc231c422127f6f772d0da4748300c8993d2c96cc96c8e986aad27922b599fa0cfa48a1337a273aed7df",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          }
+        }
+      },
+      "no_key": {
+        "envelope_hex": "42494531a306f4137944392d73bf967f653a606cec0c55858d80e1f4e50feebab8d566acf5970934bd1255a7e0cd636191191913ccad8c260782c8372f5645cd7254720260582aaae1779924065f31e7f1b4ad42624c56ff21d125e01a11a607560379904d8dda03bdd3dc231c422127f6f772d0619ee271062f64774c82f43adeaf70bf842615fb8d375c02b30d20c15a4ec23a",
+        "opened": {
+          "with_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        },
+        "crate_envelope_hex": "42494531a306f4137944392d73bf967f653a606cec0c55858d80e1f4e50feebab8d566acf5970934bd1255a7e0cd636191191913ccad8c260782c8372f5645cd7254720260582aaae1779924065f31e7f1b4ad42624c56ff21d125e01a11a607560379904d8dda03bdd3dc231c422127f6f772d0619ee271062f64774c82f43adeaf70bf842615fb8d375c02b30d20c15a4ec23a",
+        "crate_opened": {
+          "with_sender": {
+            "plaintext_hex": "607f9ebddcfb1a39587796b5d4f31231506f8eadcceb0a29486786a5c4e30221405f7e9dbcdbfa1938577695b4d3f211304f6e8daccbea0928476685a4c3e201203f5e7d9cbbdaf91837567594b3d2f1102f4e6d8cabcae90827466584a3c2e1"
+          },
+          "without_sender": {
+            "error": "Sender public key is required"
+          }
+        }
+      }
+    }
+  ],
+  "refusals": [
+    {
+      "name": "embedded-key-beside-another-expected-sender",
+      "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d076679e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b971d3127e53b36edae872e7473bfd74c397140bf56d60e6d0d28b251b890e84a60",
+      "expected": "other",
+      "verdict": {
+        "error": "Embedded sender public key does not match the expected sender"
+      }
+    },
+    {
+      "name": "no-key-envelope-without-a-sender",
+      "envelope_hex": "4249453179e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b97e340067ddc4f6ce04def54d32500b820cd721b4b3f211966db5b426112b69486",
+      "expected": "none",
+      "verdict": {
+        "error": "Sender public key is required"
+      }
+    },
+    {
+      "name": "ciphertext-of-17-bytes",
+      "envelope_hex": "4249453100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "sender",
+      "verdict": {
+        "error": "Invalid Electrum ECIES ciphertext framing"
+      }
+    },
+    {
+      "name": "a-key-and-no-ciphertext",
+      "envelope_hex": "42494531024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d07660000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "sender",
+      "verdict": {
+        "error": "Invalid Electrum ECIES ciphertext framing"
+      }
+    },
+    {
+      "name": "a-flipped-mac-byte",
+      "envelope_hex": "4249453179e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b97e340067ddc4f6ce04def54d32500b820cd721b4b3f211966db5b426112b69487",
+      "expected": "sender",
+      "verdict": {
+        "error": "Invalid checksum"
+      }
+    },
+    {
+      "name": "a-compressed-key-off-the-curve",
+      "envelope_hex": "4249453102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "sender",
+      "verdict": {
+        "error": "Embedded sender public key does not match the expected sender"
+      }
+    },
+    {
+      "name": "a-compressed-key-off-the-curve-without-a-sender",
+      "envelope_hex": "4249453102ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "none",
+      "verdict": {
+        "error": "Invalid checksum"
+      }
+    },
+    {
+      "name": "uncompressed-key-with-the-sender",
+      "envelope_hex": "42494531044d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d07662a3eada2d0fe208b6d257ceb0f064284662e857f57b66b54c198bd310ded36d079e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b9772ef1d5e475f51b132a691a82d3938f9f7256223f2a20c21913815bc8840a3b4",
+      "expected": "sender",
+      "verdict": {
+        "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+      }
+    },
+    {
+      "name": "uncompressed-key-without-a-sender",
+      "envelope_hex": "42494531044d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d07662a3eada2d0fe208b6d257ceb0f064284662e857f57b66b54c198bd310ded36d079e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b9772ef1d5e475f51b132a691a82d3938f9f7256223f2a20c21913815bc8840a3b4",
+      "expected": "none",
+      "verdict": {
+        "plaintext_hex": "afaf209f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9fbdcfc2"
+      }
+    },
+    {
+      "name": "uncompressed-key-beside-another-expected-sender",
+      "envelope_hex": "42494531044d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d07662a3eada2d0fe208b6d257ceb0f064284662e857f57b66b54c198bd310ded36d079e688321c12cc244d25883302882ee340c125d5196019c5abe717ca704e7a05b8b1da0ba39e03d3b7281fc954748b9772ef1d5e475f51b132a691a82d3938f9f7256223f2a20c21913815bc8840a3b4",
+      "expected": "other",
+      "verdict": {
+        "error": "Embedded sender public key does not match the expected sender"
+      }
+    }
+  ]
+}
