@@ -208,7 +208,6 @@ impl LookupResolver {
         // Query all available hosts in parallel
         let mut all_outputs: Vec<OutputListItem> = Vec::new();
         let mut seen_outputs: HashSet<String> = HashSet::new();
-        let mut first_freeform: Option<LookupAnswer> = None;
 
         let futures: Vec<_> = available
             .iter()
@@ -257,14 +256,13 @@ impl LookupResolver {
                                 // Skip outputs with invalid BEEF (can't parse)
                             }
                         }
-                        LookupAnswer::Freeform { .. } => {
-                            if first_freeform.is_none() {
-                                first_freeform = Some(answer);
-                            }
-                        }
-                        LookupAnswer::Formula { .. } => {
-                            // Formula responses are not aggregated
-                        }
+                        // A freeform answer is counted by the reference's
+                        // session and never answered (`ts-stack@edf6e03`
+                        // `LookupResolver.ts:1085-1087`, `:1445-1450`), so it
+                        // contributes nothing to the result here (#815; until
+                        // then the earliest freeform answer was returned over
+                        // the aggregate). A formula answer is not aggregated.
+                        LookupAnswer::Freeform { .. } | LookupAnswer::Formula { .. } => {}
                     }
                 }
                 Err(e) => {
@@ -274,14 +272,12 @@ impl LookupResolver {
             }
         }
 
-        // Return freeform if we got one, otherwise aggregated output list
-        if let Some(freeform) = first_freeform {
-            Ok(freeform)
-        } else {
-            Ok(LookupAnswer::OutputList {
-                outputs: all_outputs,
-            })
-        }
+        // The merged output list, empty when no host answered one: no path
+        // of the reference's `query` answers freeform (`ts-stack@edf6e03`
+        // `LookupResolver.ts:1369-1375`, `:1445-1450`; #815).
+        Ok(LookupAnswer::OutputList {
+            outputs: all_outputs,
+        })
     }
 
     /// Get competent hosts for a service with caching and request coalescing.

@@ -136,7 +136,7 @@ impl LookupResolver {
 2. Hosts are ranked by reputation and filtered for backoff status
 3. All available hosts are queried in parallel
 4. `OutputList` responses are deduplicated via TX memoization (`txId.outputIndex` as key)
-5. `Freeform` responses return the first successful one; `Formula` responses are not aggregated
+5. The answer is always the merged output list, empty when no host answered one (#815, as the reference's `query` answers, `ts-stack@edf6e03` `LookupResolver.ts:1369-1375`, `:1445-1450`): a `Freeform` answer contributes nothing to the result and a `Formula` answer is not aggregated; until #815 the earliest freeform answer was returned over the aggregate, so one host answering freeform could substitute its own JSON or discard the honest hosts' aggregated outputs
 6. Success/failure is recorded in the reputation tracker for each host
 
 ### Key Behaviors
