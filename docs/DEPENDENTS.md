@@ -26,17 +26,17 @@ features; the current messagebox manifest requests auth/wallet/transaction/wasm.
 
 | Consumer and remote manifest `[X]` | bsv-rs requirement `[X]` | Features and slice `[X]` | Target; hermetic test selection | Production bsv-rs | Captain `[D]` |
 |---|---|---|---|---|---|
-| [bsv-wallet-cli](https://github.com/Calhooon/bsv-wallet-cli/blob/5e0dbb06ccfa5c237bce22a445fce3613db4da92/Cargo.toml), alias `bsv-sdk` | `=0.8.1` | default + `full` | Native, CLI and MCP workspace; excluded at 0.8.2 by the exact pin | [D] Unknown | CLI captain |
-| [bsv-wallet-toolbox-rs](https://github.com/Calhooon/bsv-wallet-toolbox-rs/blob/e9857b8b7494b56c6b44abce7bdff1de9f952d1b/Cargo.toml) | `0.8.0` | default + `full,http` | Native, `sqlite`; library and integration tests | [D] Unknown | Toolbox captain, stack keeper |
-| [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/c127bccd983a1f4c32f92c1ef637c1ac0d24c838/Cargo.toml) | `0.8.0` | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
-| [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/d0dba8d2ef4d956614a7cf99787dec951dadb813/Cargo.toml), alias `bsv-sdk` | `0.8.1` | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
+| [bsv-wallet-cli](https://github.com/Calhooon/bsv-wallet-cli/blob/9358665d1aed14147f9aa31e0a9eb001ec4ca372/Cargo.toml), alias `bsv-sdk` | `=0.8.13` | default + `full` | Native, CLI and MCP workspace; excluded at 0.8.14 by the exact pin | [D] Unknown | CLI captain |
+| [bsv-wallet-toolbox-rs](https://github.com/Calhooon/bsv-wallet-toolbox-rs/blob/baaf7c90cb4ea974f7695f481a28b5e44362b171/Cargo.toml) | `0.8.13` (no `Cargo.lock` committed) | default + `full,http` | Native, `sqlite`; library and integration tests | [D] Unknown | Toolbox captain, stack keeper |
+| [bsv-tracker](https://github.com/Calhooon/bsv-tracker/blob/96a55b5be5af5b2eecc88d3ac2cf36edcb8ddd06/Cargo.toml) | `0.8.0` | `transaction`, no defaults; wasm adds `wasm` | Native and wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
+| [bsv-wallet-infra-cloudflare](https://github.com/Calhooon/bsv-wallet-infra-cloudflare/blob/7f430ccd3e1a7cb861ac4b5ced7987c91578a64c/Cargo.toml), alias `bsv-sdk` | `0.8.11` | default + `auth,wallet,transaction,wasm` | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
 | [chaintracks-cloudflare](https://github.com/Calhooon/chaintracks-cloudflare/blob/54336437beab04f6878fe71cbbe338130cf96e78/Cargo.toml), crate `bsv-chaintracks-cloudflare` | `0.8.12` (2026-11-27; `Cargo.lock` committed) | `block`, no defaults | wasm32; native library and integration tests | [D] Unknown | Stack keeper until named |
-| [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/190a8a78f99733af47b3c789e88112257f13c8ed/Cargo.toml) | `0.8.1` | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard pins bsv-rs 0.8.1 in the lock and is excluded until the row re-pins; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
-| [bsv-middleware-rs](https://github.com/Calhooon/bsv-middleware-rs/blob/5a1fd275e0fc5cb2fc3982aa157769d44f0729bf/Cargo.toml) | `0.8.0` | default + `auth,wallet,transaction` | Native with consumer feature `axum`; library and integration tests | [D] Unknown | Stack keeper until named |
-| [bsv-middleware-cloudflare](https://github.com/Calhooon/bsv-middleware-cloudflare/blob/d7ccb6c1a56708687c6d044989f9ff06ea024823/Cargo.toml), alias `bsv-sdk` | `0.8` | default + `auth,wallet,transaction,wasm`; workspace `core` takes the same slice without `wasm` | wasm32 with consumer features `refund,d1-claims`; native workspace library and integration tests | [D] Unknown; see Zanaadu's historical embedded worker below | Stack keeper until named |
-| [bsv-overlay-cloudflare](https://github.com/Calhooon/bsv-overlay-cloudflare/blob/a10ada00a00c6d8f0333010c6231b216951e03c7/Cargo.toml) | `=0.7.2` in both workspaces | default + `overlay`; overlay worker adds `wasm`, app-layer tests add `auth` | Native engine workspace and wasm32 worker workspace; excluded at 0.8.2 | `[D]` 0.5.0 with worker 0.1.3 on 2026-10-13; current unknown | Stack keeper until named |
-| [bsv-agent-template](https://github.com/Calhooon/bsv-agent-template/blob/b1dcbdbfa9d8beab6783dc515789f5690968f462/Cargo.toml), alias `bsv-sdk` | `0.6.0` | default + `auth,wallet,transaction,wasm` | wasm32; excluded at 0.8.2 | [D] Unknown | Stack keeper until named |
-| [bsv-storage-cloudflare](https://github.com/Calhooon/bsv-storage-cloudflare/blob/2563293557849a29007fa1c1b5d2001a3fc8a17d/Cargo.toml) | `=0.4.5` | default + `auth,wallet,transaction,script,wasm`; parity member adds `auth,http,overlay` | wasm32 worker; native parity client is live and excluded | `[D]` 0.4.5 with worker 0.2.1 on 2026-10-13; current unknown | Stack keeper until named |
+| [bsv-messagebox-cloudflare](https://github.com/Calhooon/bsv-messagebox-cloudflare/blob/9e9082e40171efe7a98e8effdc57aa2a7f4aaa1c/Cargo.toml) | `0.8.12` | default + `auth,wallet,transaction,wasm` | wasm32; native library tests; the integration suite's version guard asserts the resolved bsv-rs is 0.8.12 and is excluded, as any later patch fails it; `tests/load_gen` is a separate live client, excluded | [D] Unknown | Stack keeper until named |
+| [bsv-middleware-rs](https://github.com/Calhooon/bsv-middleware-rs/blob/97d003bbfd327838ff7ef06ddee567d2b8f831eb/Cargo.toml) | `0.8.12` (no `Cargo.lock` committed) | default + `auth,wallet,transaction` | Native with consumer feature `axum`; library and integration tests but `payment_core::tests::the_door_verifies_against_the_sdks_dispatched_signing_digest` (below) | [D] Unknown | Stack keeper until named |
+| [bsv-middleware-cloudflare](https://github.com/Calhooon/bsv-middleware-cloudflare/blob/751e4877205663ce272f11896a916bff29cc9f98/Cargo.toml), alias `bsv-sdk` | `0.8.12` in the root and in `core/` (no `Cargo.lock` committed) | default + `auth,wallet,transaction,wasm`; workspace `core` takes the same slice without `wasm` | wasm32 with consumer features `refund,d1-claims`; native workspace library and integration tests | [D] Unknown; see Zanaadu's historical embedded worker below | Stack keeper until named |
+| [bsv-overlay-cloudflare](https://github.com/Calhooon/bsv-overlay-cloudflare/blob/a2f8c7bcae969f4b28c279604f2986513eac9001/Cargo.toml) | `0.8.12` in both workspaces (a caret requirement since 2026-11-17; `=0.7.2` before) | default + `overlay`; overlay worker adds `wasm`, app-layer tests add `auth` | Native engine workspace and wasm32 worker workspace | `[D]` 0.5.0 with worker 0.1.3 on 2026-10-13; current unknown | Stack keeper until named |
+| [bsv-agent-template](https://github.com/Calhooon/bsv-agent-template/blob/b1dcbdbfa9d8beab6783dc515789f5690968f462/Cargo.toml), alias `bsv-sdk` | `0.6.0` | default + `auth,wallet,transaction,wasm` | wasm32; excluded at 0.8.14 | [D] Unknown | Stack keeper until named |
+| [bsv-storage-cloudflare](https://github.com/Calhooon/bsv-storage-cloudflare/blob/b5f569449b2cfaf975bfd49c85164d7805e87cfd/Cargo.toml) | `0.8.13` in the root and in `tests/parity/` | default + `auth,wallet,transaction,script,overlay,wasm`; parity member `auth,http,overlay` | wasm32 worker; native parity client is live and excluded | `[D]` 0.4.5 with worker 0.2.1 on 2026-10-13; current unknown | Stack keeper until named |
 
 The selected native suites use in-memory data, local databases or local mocks;
 their existing ignored live tests remain ignored. No `--ignored`, load
@@ -44,9 +44,10 @@ generator, wallet, broadcaster example or deployment command is run. The
 toolbox's test rules identify its ignored network tests explicitly. The wasm
 checks exclude host-only dev dependencies such as SQLite.
 
-The CLI's exact pin does **not** admit 0.8.2. It is recorded and reported as
-skipped, rather than silently compiled against its registry copy. Seven public
-Rust repositories currently admit this tree. A stable caret does not admit a
+The CLI's exact pin does **not** admit 0.8.14 (it is `=0.8.13` on 2026-11-28).
+It is recorded and reported as skipped, rather than silently compiled against
+its registry copy. At 0.8.14 the lock admits twelve rows of nine public Rust
+repositories. A stable caret does not admit a
 beta prerelease either. The planner prints every exclusion and builds all
 admitted rows without a best-effort or continue-on-error path.
 
@@ -93,6 +94,52 @@ Other admitted workers and LOW re-pin by their captains after the CLI gate,
 as [RELEASING.md](../RELEASING.md) describes. Re-pin PRs update the exact remote
 revision, requirement, manifests, features, targets and test selection in the
 lock; new feature/target shapes also update the architecture lane's matrix.
+
+## The lock at the dependents' lines of 2026-11-28
+
+[dependents.lock](dependents.lock) was the snapshot of 2026-10-23 but for the
+chaintracks row (the section below). On 2026-11-28 every row was read at its
+consumer's `main` tip with `gh api` (the tip, the row's manifests and the
+`Cargo.lock` at it), and twelve rows of nine repositories moved to it; the
+chaintracks and template rows were already there. Every row's requirement and
+features are its tip's manifest's, as the job's reader (`declared_dependency`)
+finds them, all fourteen rows. Two facts asked for it: 0.8.14 was held by two
+consumers' unit tests at their old revisions that asserted verdicts it corrects
+(left out by name since #1086), and at `=0.7.2` the plan skipped the overlay's
+three rows, where both of its workspaces have required `0.8.12` by caret since
+2026-11-17, so this check had not built the overlay since then.
+
+| Lock rows | Revision until 2026-11-28 | Revision since (the tip of `main`) | Lock at the tip |
+|---|---|---|---|
+| `bsv-wallet-cli` | `5e0dbb06`, `=0.8.1` | `9358665d`, `=0.8.13` | 0.8.13 |
+| `bsv-wallet-toolbox-rs` | `e9857b8b`, `0.8.0` | `baaf7c90`, `0.8.13` | none |
+| `bsv-tracker` | `c127bccd`, `0.8.0` | `96a55b5b`, `0.8.0` | 0.8.13 |
+| `bsv-wallet-infra-cloudflare` | `d0dba8d2`, `0.8.1` | `7f430ccd`, `0.8.11` | 0.8.11 |
+| `chaintracks-cloudflare` | `54336437`, `0.8.12` | the same | 0.8.12 |
+| `bsv-messagebox-cloudflare` | `190a8a78`, `0.8.1` | `9e9082e4`, `0.8.12` | 0.8.12 |
+| `bsv-middleware-rs` | `5a1fd275`, `0.8.0` | `97d003bb`, `0.8.12` | none |
+| `bsv-middleware-cloudflare` | `d7ccb6c1`, `0.8` | `751e4877`, `0.8.12` | none |
+| `bsv-overlay-cloudflare`, `bsv-overlay-worker`, `bsv-overlay-app-layer` | `a10ada00`, `=0.7.2` | `a2f8c7bc`, `0.8.12` | 0.8.13 (both workspaces) |
+| `bsv-agent-template` | `b1dcbdbf`, `0.6.0` | the same | 0.6.0 |
+| `bsv-storage-cloudflare`, `bsv-storage-parity` | `25632935`, `=0.4.5` | `b5f56944`, `0.8.13` | 0.8.13 |
+
+The toolbox's test left out by #1086 (`tsc_proof::tests::test_hex_roundtrip`)
+runs again: at `baaf7c90` its fixture's index lies inside its tree (the
+consumer's pull request #873), and `sqlite` is the row's `features` again.
+`bsv-middleware-rs` keeps its one test left out
+(`payment_core::tests::the_door_verifies_against_the_sdks_dispatched_signing_digest`,
+a `SIGHASH_CHRONICLE` spend at transaction version 1 that 0.8.14 refuses in the
+default mode): its mend is the consumer's pull request #36, open and not on its
+`main` on 2026-11-28. The storage worker's features add `overlay`, as its
+manifest does; the message box's version guard now asserts 0.8.12, and its row
+keeps its library tests alone. Three tips commit no `Cargo.lock` (the toolbox,
+`bsv-middleware-rs`, `bsv-middleware-cloudflare`): those rows are resolved
+afresh on every run, as the section below describes.
+
+At 0.8.14 the plan (`dependents.py plan`) admits twelve rows, the overlay's
+three and the storage worker's two among them, and skips two (the CLI's
+`=0.8.13`, the template's `0.6.0`). No consumer's build was run for this move:
+the pull request that carries it is the witness.
 
 ## The chaintracks row's move of 2026-11-27
 
