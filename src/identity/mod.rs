@@ -81,6 +81,11 @@ pub mod client;
 pub mod contacts;
 pub mod types;
 
+// The subject-revelation authentication the `ls_identity` parsers run
+// (#544), crate-internal. `token_envelope` is standalone; the `client_token`
+// submodule is declared inside `client` (it reads the client's configuration).
+mod token_envelope;
+
 // Re-exports
 pub use client::IdentityClient;
 pub use contacts::ContactsManager;
