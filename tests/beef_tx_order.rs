@@ -1073,8 +1073,10 @@ fn the_property_corpora_hold_the_measured_counts() {
     }
     assert_eq!(
         (one.divergent, one.misordered, one.stable),
-        (156, 128, 44),
-        "mode 1: the finding's population, the sweep's counts"
+        (156, 126, 44),
+        "mode 1: the finding's population, the sweep's counts (two graphs carry a \
+         64-byte entry whose sort position moves under the CVE-2017-12842 rule: \
+         the entry is judged as unproven, so it is no longer a root)"
     );
     assert_eq!(
         (zero.divergent, zero.misordered, zero.stable),

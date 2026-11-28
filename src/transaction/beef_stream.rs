@@ -112,6 +112,7 @@ use crate::primitives::{to_hex, Reader, Writer};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError};
+use super::proof_ambiguity::is_ambiguous_merkle_leaf;
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
 /// node; its display form is the bytes reversed, in hex).
@@ -2014,9 +2015,23 @@ impl BeefIndex {
                 bump_index,
                 body,
             } => {
+                // CVE-2017-12842 (the fourth way): a transaction whose
+                // serialized length equals a merkle inner node's (two
+                // concatenated child hashes) has a txid that cannot be told
+                // from one, so its BUMP is not used as proof
+                // (`proof_ambiguity::is_ambiguous_merkle_leaf`, the shared
+                // rule). The entry is judged as an unproven transaction,
+                // exactly as if it carried no BUMP index: its inputs must name
+                // transactions of this BEEF (held until they are in, refused at
+                // the end if they never are) and its spends are checked. The
+                // structure reader applies the same rule, so both readers agree.
+                let bump_index: Option<u64> = match bump_index {
+                    Some(index) if !is_ambiguous_merkle_leaf(body.raw.len()) => Some(*index),
+                    _ => None,
+                };
                 // Hand-built elements obey the decoder's mining byte checks
                 // in the same order, even when the index has seen this txid.
-                check_transaction(*offset, &body.inputs, &body.outputs, *bump_index)?;
+                check_transaction(*offset, &body.inputs, &body.outputs, bump_index)?;
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
                 // each input names a transaction of this BEEF, folded in
@@ -2024,21 +2039,13 @@ impl BeefIndex {
                 // until the parent is in, and refused at the end if it never
                 // is).
                 match bump_index {
-                    Some(index) => self.check_bump_index(*offset, txid, *index)?,
+                    Some(index) => self.check_bump_index(*offset, txid, index)?,
                     None if self.held_for_a_parent(*offset, txid, body) => return Ok(Folded::Held),
                     None => {}
                 }
                 let coinbase = is_coinbase(&body.inputs);
                 self.fold_tx(
-                    *offset,
-                    txid,
-                    *bump_index,
-                    coinbase,
-                    body,
-                    from,
-                    spent,
-                    evaluation,
-                    tip,
+                    *offset, txid, bump_index, coinbase, body, from, spent, evaluation, tip,
                 )
             }
         }

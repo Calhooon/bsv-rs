@@ -650,7 +650,10 @@ impl Beef {
     pub fn sort_txs(&mut self) -> SortResult {
         self.refresh_mutated();
         for tx in &mut self.txs {
-            tx.is_valid = Some(tx.has_proof());
+            // A 64-byte proven entry's proof does not vouch (CVE-2017-12842,
+            // `proof_vouches`): it is judged as unproven, its validity decided
+            // by its inputs below, not by its path.
+            tx.is_valid = Some(tx.proof_vouches());
         }
         let (new_order, result) = {
             let inputs: Vec<&[String]> = self
@@ -809,7 +812,11 @@ fn dependency_order(txs: &[BeefTx], inputs: &[&[String]]) -> (Vec<usize>, SortRe
     let mut queue: Vec<usize> = Vec::new();
 
     for (i, tx) in txs.iter().enumerate() {
-        if tx.has_proof() {
+        // CVE-2017-12842 (the fourth way): a 64-byte proven entry's proof does
+        // not vouch (`proof_vouches`); it is judged as an unproven transaction,
+        // so it joins the `queue` and its inputs (its populated `input_txids`)
+        // are required below like any unproven entry's.
+        if tx.proof_vouches() {
             valid_txids.insert(txids[i].clone(), true);
             with_proof.push(i);
         } else if tx.is_txid_only() && inputs[i].is_empty() {
