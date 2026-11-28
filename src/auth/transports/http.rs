@@ -762,8 +762,8 @@ impl Transport for SimplifiedFetchTransport {
                         .map_err(|e| Error::AuthError(format!("Failed to read response: {}", e)))?
                         .to_vec();
 
-                    // Note: Auth headers on response are optional - not all servers return them
-                    // The caller can verify response authenticity if headers are present
+                    // Note: Auth headers on response are optional - not all servers return them.
+                    // The Peer verifies the delivered message before a listener sees it (`Peer::start`); a forged response is refused there.
 
                     // Extract request ID from response
                     let response_request_id: [u8; 32] =

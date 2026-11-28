@@ -204,8 +204,8 @@ pub type CertificateRequestCallback = Box<dyn Fn(PublicKey, RequestedCertificate
 ```rust
 impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self
-    pub fn start(&self)                      // Sets up client-side transport callback (ignores InitialRequest)
-    pub fn start_server(self: &Arc<Self>)    // Sets up server-side transport callback (handles ALL message types)
+    pub fn start(&self)                      // Verifying receive callback for both roles (routes through handle_incoming_message)
+    pub fn start_server(self: &Arc<Self>)    // Same as start(), kept for Arc-held callers
 
     // Sending messages
     pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
@@ -317,7 +317,7 @@ let peer = Peer::new(PeerOptions {
     auto_persist_last_session: false,
     originator: Some("myapp.com".into()),
 });
-peer.start(); // Client-side: handles responses but not incoming InitialRequest
+peer.start(); // Verifies every received message before a listener or handshake sees it
 peer.to_peer(b"Hello, world!", None, None).await?;
 ```
 
