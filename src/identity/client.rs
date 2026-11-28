@@ -26,6 +26,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::badge;
 use super::contacts::ContactsManager;
 #[cfg(test)]
 use super::types::BroadcastSuccess;
@@ -218,6 +219,18 @@ impl<W: WalletInterface> IdentityClient<W> {
                 Self::try_parse_generic_identity(decrypted, certifier_info)
             }
         };
+
+        // bsv-rs#1118s: a certifier-claiming type's badge (label, icon, click
+        // URL) is a vouching claim; show it only for an anchored certifier (set
+        // at Step 9), else the neutral badge, so no part of it — the per-type
+        // click URL included — points to an authority no check stood behind.
+        let (badge_label, badge_icon_url, badge_click_url) = badge::displayed_badge_triple(
+            known_type,
+            certifier_info,
+            badge_label,
+            badge_icon_url,
+            badge_click_url,
+        );
 
         // Build abbreviated key
         let subject = cert.subject_hex();
@@ -616,46 +629,29 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         };
 
-        if outputs.is_empty() {
-            return Err(Error::IdentityError(
-                "No revelation found for this certificate".to_string(),
-            ));
-        }
-
-        let output = &outputs[0];
-
-        // Step 2: Parse BEEF to get the transaction
-        let beef = Beef::from_binary(&output.beef).map_err(|e| {
-            Error::IdentityError(format!("Failed to parse BEEF for revelation: {}", e))
-        })?;
-
-        // Get the transaction from BEEF
-        let tx = beef
-            .txs
-            .first()
-            .ok_or_else(|| Error::IdentityError("BEEF contains no transactions".to_string()))?;
-
-        let raw_tx = tx.raw_tx().ok_or_else(|| {
-            Error::IdentityError("Failed to get raw transaction from BEEF".to_string())
-        })?;
-
-        let txid = tx.txid();
-
-        // Get the locking script from the revelation output
-        let parsed_tx = parse_transaction(raw_tx)
-            .map_err(|e| Error::IdentityError(format!("Failed to parse transaction: {}", e)))?;
-
+        // bsv-rs#1118s: consult every revelation output, not only the first, so
+        // a non-usable output at position 0 (unparsable BEEF or transaction, or
+        // one without the configured output index) cannot mask a usable
+        // revelation at a later index (availability).
         let output_index = self.config.output_index as usize;
-        if output_index >= parsed_tx.outputs.len() {
-            return Err(Error::IdentityError(format!(
-                "Output index {} out of range (tx has {} outputs)",
-                output_index,
-                parsed_tx.outputs.len()
-            )));
-        }
-
-        let locking_script = &parsed_tx.outputs[output_index].script;
-        let source_satoshis = parsed_tx.outputs[output_index].satoshis;
+        let (txid, locking_script, source_satoshis, input_beef) = outputs
+            .iter()
+            .find_map(|output| {
+                let beef = Beef::from_binary(&output.beef).ok()?;
+                let tx = beef.txs.first()?;
+                let raw_tx = tx.raw_tx()?;
+                let parsed_tx = parse_transaction(raw_tx).ok()?;
+                let out = parsed_tx.outputs.get(output_index)?;
+                Some((
+                    tx.txid(),
+                    out.script.clone(),
+                    out.satoshis,
+                    output.beef.clone(),
+                ))
+            })
+            .ok_or_else(|| {
+                Error::IdentityError("No revelation found for this certificate".to_string())
+            })?;
 
         // Create the outpoint string
         let outpoint_str = format!("{}.{}", txid, output_index);
@@ -667,7 +663,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .create_action(
                 CreateActionArgs {
                     description: "Spend certificate revelation token".to_string(),
-                    input_beef: Some(output.beef.clone()),
+                    input_beef: Some(input_beef),
                     inputs: Some(vec![CreateActionInput {
                         outpoint,
                         input_description: "Revelation token".to_string(),
@@ -718,7 +714,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             outputs: &partial_parsed.outputs,
             locktime: partial_parsed.locktime,
             input_index: 0, // We're signing the first (and only) input
-            subscript: locking_script,
+            subscript: &locking_script,
             satoshis: source_satoshis,
             scope,
         };
@@ -862,14 +858,17 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         match answer {
             LookupAnswer::OutputList { outputs } => {
-                if outputs.is_empty() {
-                    return Ok(None);
-                }
-
-                // Process the first output
-                if let Some(cert) = self.parse_output_to_certificate(&outputs[0]).await? {
-                    let identity = Self::parse_identity(&cert);
-                    return Ok(Some(identity));
+                // bsv-rs#1118s: read every output, not only the first, so a
+                // non-parsing output at position 0 cannot mask an honest record
+                // at a later index (availability); and return only a record
+                // whose subject is the asked key, so a dishonest lookup host
+                // cannot bind the query to another key's record (integrity).
+                for output in &outputs {
+                    if let Some(cert) = self.parse_output_to_certificate(output).await? {
+                        if cert.subject_hex() == identity_key {
+                            return Ok(Some(Self::parse_identity(&cert)));
+                        }
+                    }
                 }
 
                 Ok(None)
@@ -1274,13 +1273,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .await
             .unwrap_or_default();
 
-        // Step 9: Build certifier info (default for now, could be enhanced via registry lookup)
-        let certifier_info = CertifierInfo {
-            name: "SocialCert".to_string(),
-            icon_url: "https://socialcert.net/favicon.ico".to_string(),
-            description: "Social identity verification".to_string(),
-            trust: 5,
-        };
+        // Step 9: name the SocialCert certifier only when the verified
+        // certificate's certifier IS the anchored key (Step 7's verify() has
+        // shown it signed, so an author cannot name it without its key); every
+        // other record carries no vouching label, the neutral default (#1118s).
+        let certifier_info = badge::certifier_info_for(&verifiable_cert.certifier().to_hex());
 
         // Step 10: Create and return the IdentityCertificate
         Ok(Some(IdentityCertificate {

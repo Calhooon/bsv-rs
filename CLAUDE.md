@@ -69,6 +69,7 @@ dhat-profiling = ["dep:dhat"]
 
 ## Known cross-SDK divergences (keep this list honest)
 
+- The identity resolve doors name a certifier only where a check of this crate stands behind it (Unreleased, bsv-rs#1118s): `resolve_by_identity_key`, `resolve_by_attributes` and `query` show a certifier's vouching badge on a looked-up record only when its certifier is the one key this crate anchors on (`DEFAULT_SOCIALCERT_CERTIFIER`) and the certificate verifies as that key's; every other record is shown with the neutral `Not verified by anyone you trust.` badge, trust 0, so a party holding a fresh key cannot wear a trusted-authority badge through a dishonest lookup host. The reference SDKs resolve identities through the user's trusted wallet, which labels the certifier from that user's own trust settings; this crate holds no such settings and anchors on its single known certifier, a truthful under-claim for an honest record of any other real certifier until a caller names it. Ours: a verified anchor, or no vouching label. Theirs: the wallet's trust settings (the witness: tests/identity_certifier_anchor_1118s.rs).
 - Raw base58 rejects empty input and surrounding whitespace, as TS does;
   bitcoin-sv@6504a3af `src/base58.cpp:25-79` accepts them. The node's checksum
   and 50 key vectors pass in `tests/chain_encoding.rs`.
