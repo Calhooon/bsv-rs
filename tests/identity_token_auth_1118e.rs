@@ -310,3 +310,25 @@ async fn c_the_authenticated_token_is_read_and_badged_1118e() {
     );
     assert!(id.badge_icon_url.contains("socialcert.net"));
 }
+
+// ===========================================================================
+// D. The evidence check (#730): a well-formed authenticated token in an
+//    unproven transaction with no inputs is refused as invalid evidence.
+// ===========================================================================
+
+#[tokio::test]
+async fn d_a_token_in_unproven_evidence_is_refused_1118e() {
+    let subject = PrivateKey::random();
+    let certifier = PrivateKey::random();
+    let subject_hex = subject.public_key().to_hex();
+
+    let out = support::unproven_output_of(honest_token(&subject, &certifier));
+    let c = client(support::answering("ls_identity", "d-ev", vec![out]));
+    assert!(
+        c.resolve_by_identity_key(&subject_hex, false)
+            .await
+            .unwrap()
+            .is_none(),
+        "an unproven transaction with no inputs is not admitted as evidence"
+    );
+}

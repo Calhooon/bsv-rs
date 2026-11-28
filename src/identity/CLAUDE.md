@@ -485,6 +485,31 @@ Key compatibility points:
 - Same overlay service/topic names
 - Compatible JSON serialization format with camelCase
 
+### Reading a resolve answer
+
+The two `ls_identity` parsers (`parse_output_to_certificate`,
+`parse_output_to_verifiable_certificate`) run two reader checks before they
+read a lookup output's certificate, so an untrusted lookup host cannot present
+another key's certificate as a vouched-for identity:
+
+- **Token authentication** (`client_token.rs`, `token_envelope.rs`): the output
+  must be the subject's signed revelation — a canonical two-field lock-before
+  PushDrop, locked with the subject's anyone-wallet key under the client's
+  protocol and key ID, its second field the subject's signature over the first
+  (`IdentityClient.ts:773-815`, `identityUtils.ts:497-559`). A token that fails
+  is skipped.
+- **Transaction-evidence admission** (`evidence.rs`): the output's BEEF must
+  pass the reference's `parseEvidence` and unconfirmed-graph walk with its
+  resource limits (`TransactionEvidence.ts:93-201`); invalid evidence skips the
+  output, a limit refuses the discovery.
+
+The writer agrees with the reader: `publicly_reveal_attributes` builds its
+token through `reveal::identity_token` (`IdentityClient.ts:501-509`, #310) as
+the same signed two-field PushDrop the reader authenticates, where it wrote an
+unsigned one-field token. A one-field token published by an earlier version of
+this crate's writer is refused by this reader (and the 0.9 line's and the
+reference's); a publisher republishes through this writer for it to be read.
+
 ## Related Documentation
 
 - `../auth/CLAUDE.md` - Authentication module with certificate types
