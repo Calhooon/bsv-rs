@@ -67,6 +67,7 @@ pub mod op;
 // dead code (`ci.yml`'s clippy on each slice alone).
 #[cfg(feature = "transaction")]
 pub(crate) mod p2sh_redeem;
+mod push_bounds;
 #[allow(clippy::module_inception)]
 pub mod script;
 pub mod script_num;
