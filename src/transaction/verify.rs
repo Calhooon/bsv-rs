@@ -9,6 +9,7 @@ use crate::script::Spend;
 use crate::{Error, Result};
 
 use super::amount::{add_amount, require_satoshi_amount};
+use super::proof_ambiguity::is_ambiguous_merkle_leaf;
 use super::source_link::source_named_otherwise;
 use super::spending::{judge_input, sighash_of, InputRules};
 use super::transaction::refuse_no_transaction;
@@ -243,6 +244,15 @@ async fn proven(tx: &Transaction, txid: &str, tracker: &dyn ChainTracker) -> Res
     let Some(path) = &tx.merkle_path else {
         return Ok(false);
     };
+    // CVE-2017-12842 (the fourth way): a transaction whose serialized length
+    // equals a merkle inner node's (two concatenated child hashes) has a txid
+    // that cannot be told from one, so its merkle path is NOT used as proof
+    // (`proof_ambiguity::is_ambiguous_merkle_leaf`, the shared rule). It is not
+    // proven by that path; the walk judges it as an unproven transaction, its
+    // inputs' sources required the way any unproven transaction's are.
+    if is_ambiguous_merkle_leaf(tx.to_binary().len()) {
+        return Ok(false);
+    }
     // The reference's `MerklePath.verify` (`MerklePath.ts:476-500`, #734): an
     // offset-0 proof under 100 blocks deep is not proven.
     if path.verify(txid, tracker).await? {

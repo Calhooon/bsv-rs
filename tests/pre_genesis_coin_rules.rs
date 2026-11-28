@@ -122,7 +122,17 @@ fn signed(name: &'static str, lock: Vec<u8>, version: u32, below: Vec<u8>) -> Ce
 fn parent(lock: &[u8], height: u32) -> Transaction {
     let mut tx = Transaction::new();
     let mut input = TransactionInput::new("ab".repeat(32), 0);
-    input.set_unlocking_script(UnlockingScript::new());
+    // These fixtures need a PROVEN parent coin. The CVE-2017-12842 rule judges
+    // a 64-byte proven entry as unproven (its path is not used), so keep the
+    // parent off exactly 64 bytes: with an empty input script it serializes to
+    // `60 + lock.len()`, so a 4-byte lock would be 64. A proven entry's input
+    // script is not executed, so a byte here changes nothing the era rules see.
+    let unlocking = if 60 + lock.len() == 64 {
+        vec![0x00]
+    } else {
+        Vec::new()
+    };
+    input.set_unlocking_script(UnlockingScript::from_binary(&unlocking).unwrap());
     tx.add_input(input).unwrap();
     tx.add_output(TransactionOutput::new(
         COIN_VALUE,

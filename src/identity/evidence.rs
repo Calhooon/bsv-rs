@@ -66,6 +66,7 @@
 //! whose subject is the hint.
 
 use crate::overlay::OutputListItem;
+use crate::transaction::proof_ambiguity::is_ambiguous_merkle_leaf;
 use crate::transaction::{Beef, BeefTx, Transaction};
 use crate::wallet::WalletInterface;
 use crate::Error;
@@ -279,7 +280,17 @@ fn assert_unconfirmed_graph(beef: &Beef, subject: &Transaction) -> Result<(), Re
         if inputs > INPUTS || script_bytes > SCRIPT_BYTES {
             return Err(limit("TransactionEvidence.ts:170-171"));
         }
-        if beef.find_bump(&id).is_some() {
+        // CVE-2017-12842 (the fourth way), at the evidence door: a transaction
+        // whose serialized length equals a merkle inner node's (two
+        // concatenated 32-byte child hashes) has a txid that cannot be told
+        // from one, so a BUMP naming it is not taken as proof here either —
+        // the same shared rule the transaction proof doors read
+        // (`proof_ambiguity::is_ambiguous_merkle_leaf`). Such an entry is
+        // judged as unproven: its parents are required like any unconfirmed
+        // transaction's, so the walk does not stop at it. An honest holder of
+        // a genuine 64-byte confirmed ancestor supplies that ancestor's own
+        // parents in the evidence BEEF, as any unconfirmed transaction's are.
+        if beef.find_bump(&id).is_some() && !is_ambiguous_merkle_leaf(current.to_binary().len()) {
             continue;
         }
         if current.inputs().is_empty() {
@@ -339,3 +350,7 @@ mod tests_731;
 #[cfg(test)]
 #[path = "evidence_818_tests.rs"]
 mod tests_818;
+
+#[cfg(test)]
+#[path = "evidence_sixty_four_byte_bump_tests.rs"]
+mod tests_sixty_four_byte_bump;

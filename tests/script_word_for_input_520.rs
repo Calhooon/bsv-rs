@@ -210,6 +210,13 @@ mod streaming {
         input.set_unlocking_script(UnlockingScript::new());
         tx.add_input(input).unwrap();
         tx.add_output(TransactionOutput::new(1_000, lock)).unwrap();
+        // CVE-2017-12842 (the fourth way): a 64-byte PROVEN entry is judged as
+        // unproven (its path is not used). This fixture needs a proven parent
+        // coin, so keep it off exactly 64 bytes; a proven entry's input script
+        // is not executed, so a byte here changes nothing the era rules see.
+        if proven.is_some() && tx.to_binary().len() == 64 {
+            tx.inputs_mut()[0].set_unlocking_script(UnlockingScript::from_binary(&[0x00]).unwrap());
+        }
         tx.merkle_path = proven.map(|height| MerklePath::from_coinbase_txid(&tx.id(), height));
         tx
     }
