@@ -2103,6 +2103,26 @@ impl Spend {
             }
         }
 
+        // The default mode (no word) refuses the CHRONICLE bit at a transaction
+        // version of 1 or below, as the reference does: `#isRelaxed()` is
+        // `transactionVersion > 1` (`Spend.ts:319-321`, `:338-341`, `:586-591`
+        // at `ts-stack@edf6e03`), so the bit is legal only at version > 1
+        // (public issue #397). The gate is thrown inside `#checkSignatureEncoding`'s
+        // DER-enforcing `try` whose `catch` rethrows the DER wrapper's words (the
+        // default always enforces DER, `:376-386`), so the caller sees `The
+        // signature format is invalid.` The node refuses the bit outside the
+        // Chronicle era under STRICTENC (`interpreter.cpp:296-303`,
+        // `SCRIPT_ERR_ILLEGAL_CHRONICLE`). Read signed as 0.8.13 reads the
+        // version: at or above 2^31 the gate still refuses (safe-direction; the
+        // reference relaxes there under #418's unsigned read, carried by the 0.9
+        // line alone — not this security patch).
+        if self.flags.is_none()
+            && (tx_sig.scope & SIGHASH_CHRONICLE) != 0
+            && self.transaction_version <= 1
+        {
+            return Err(self.error("The signature format is invalid."));
+        }
+
         if !tx_sig.has_forkid() {
             return Err(self.error("The signature must use SIGHASH_FORKID."));
         }
