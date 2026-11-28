@@ -114,6 +114,18 @@ The rule is the reference's, read from the offset; two cells where it is stricte
 - **Pinned by.** `tests/compat_ecies_bounds_333.rs` (eight tests): one byte over each bound refused before work for Electrum and Bitcore, envelope and plaintext; a framed oversized Electrum envelope refused before its MAC; the exact bounds still read and round-trip. RED on a scratch copy of the tip with the guards removed.
 - **Migration.** Additive. `Error` is `#[non_exhaustive]`, so the new `EciesInvalidPlaintext` variant is semver-additive; a dependent that matches ECIES errors by text sees the bounded-array words only for an input past the bound, which no honest caller reaches. An honest encrypt or decrypt within the bounds is unchanged.
 
+### Fixed: short ECIES envelopes refuse in the reference's bounded words (#463)
+
+- **What changed.** The minimum envelope lengths (`4 + 16 + 32 = 52` for Electrum, `33 + 16 + 16 + 32 = 97` for Bitcore) now share the guard in `ecies_bounds.rs`, before parsing a key, deriving a secret or hashing. The separate minimum checks returned `Data too short`, where the reference's same bounded-array check refuses both edges with its bounded words. The minimum lengths and accepted inputs do not change; framing and MAC checks after the guard stay as before.
+
+| Reader | Minimum bytes | Old refusal payload | New refusal payload |
+| --- | --- | --- | --- |
+| `electrum_decrypt` | 52 | `Data too short` | `Electrum ECIES envelope must be a bounded dense byte array` |
+| `bitcore_decrypt` | 97 | `Data too short` | `Bitcore ECIES envelope must be a bounded dense byte array` |
+
+- **Pinned by.** `tests/compat_ecies_short_envelope_463.rs` (four tests): a 51-byte Electrum and a 96-byte Bitcore envelope refuse with the bounded words; the exact minimums (52, 97) still decrypt a writer's envelope and reach the MAC on a flipped byte. RED on a scratch copy of the tip with the minimum folded back to `Data too short`.
+- **Migration.** Both refusals stay `Error::EciesDecryptionFailed`; its Display still prefixes `ECIES decryption failed: `. A downstream caller that matched the text `Data too short` (or `ECIES decryption failed: Data too short`) for a short envelope must match the new bounded-array payload instead. No honest in-range input changes.
+
 ### Fixed: electrum_decrypt finds an embedded key the reference's way, so a no-key envelope of any length opens (#109)
 
 - **What was reachable.** `electrum_decrypt` decided whether an envelope embedded a sender's public key from the envelope length alone (`data.len() > 69`), and when it judged one present it read the ciphertext from byte 37. An Electrum ECIES envelope sealed with no embedded key (`"BIE1" || ciphertext || mac`) over a plaintext of 32 bytes or more is longer than 69 bytes, so its first 33 ciphertext bytes were taken for a key: the MAC still verified, then AES unpadding failed and a valid envelope would not open. With no expected sender, the 33 bytes after the magic were read as a public key whatever they were. Reachable from the envelope bytes a decrypting caller is handed.
