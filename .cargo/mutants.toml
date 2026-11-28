@@ -99,10 +99,10 @@ exclude_re = [
   # corpora (all nine, road, million, xsig-144) moved under any of the four; every pair of size
   # bytes checked exhaustively, 0 differences; tests/script_script_603_b.rs green under each.
   # The lane's own reads; the ensemble's three independent reads are pending.
-  '^src/script/script\.rs:186:30: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:31: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:43: replace \| with \^ in Script::parse_chunks$',
-  '^src/script/script\.rs:209:56: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:187:30: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:210:31: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:210:43: replace \| with \^ in Script::parse_chunks$',
+  '^src/script/script\.rs:210:56: replace \| with \^ in Script::parse_chunks$',
   # src/script/script.rs:702:45 (`>` to `>=`), 715:41, 723:17, 724:17, 725:17 (`|` to `^`), all in
   # truncated_push_index (#603, PR #638). The size bytes each sit in their own lane: every operand
   # of the four `|` sites is a `u8` zero-extended by `as usize` and shifted by 0, 8, 16 or 24, no
@@ -113,9 +113,9 @@ exclude_re = [
   # (Machine.lean:32,49). Three reads: the cold read (MERGE, 0.93), the adversarial read with
   # 1,068,663 observations byte-identical on the tree and each mutant (EQUIVALENT x5, 0.97), the
   # rule read (EQUIVALENT x5, 0.97).
-  '^src/script/script\.rs:702:45: replace > with >= in truncated_push_index$',
-  '^src/script/script\.rs:715:41: replace \| with \^ in truncated_push_index$',
-  '^src/script/script\.rs:723:17: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:703:45: replace > with >= in truncated_push_index$',
+  '^src/script/script\.rs:716:41: replace \| with \^ in truncated_push_index$',
+  '^src/script/script\.rs:726:17: replace \| with \^ in truncated_push_index$',
   '^src/script/script\.rs:724:17: replace \| with \^ in truncated_push_index$',
   '^src/script/script\.rs:725:17: replace \| with \^ in truncated_push_index$',
   # src/script/script.rs:363:23 `<` to `<=` in write_bin, 407:29 `<` to `<=` in write_number,
@@ -137,12 +137,12 @@ exclude_re = [
   # b5e3f7d1: the cold read (accepts the six; FIX at 0.85 on other points), the adversarial read
   # with push lengths 0 to 65537 and the i64 edges probed through the writers, from_asm and
   # OP_NUM2BIN, all six diffs empty (EQUIVALENT x6, 0.97), the rule read (EQUIVALENT x6, 0.97).
-  '^src/script/script\.rs:363:23: replace < with <= in Script::write_bin$',
-  '^src/script/script\.rs:407:29: replace < with <= in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with == in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with > in Script::write_number$',
-  '^src/script/script\.rs:409:27: replace < with <= in Script::write_number$',
-  '^src/script/script\.rs:428:28: replace < with <= in Script::encode_script_number$',
+  '^src/script/script\.rs:364:23: replace < with <= in Script::write_bin$',
+  '^src/script/script\.rs:408:29: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:410:27: replace < with == in Script::write_number$',
+  '^src/script/script\.rs:410:27: replace < with > in Script::write_number$',
+  '^src/script/script\.rs:410:27: replace < with <= in Script::write_number$',
+  '^src/script/script\.rs:429:28: replace < with <= in Script::encode_script_number$',
   # src/script/script_asm.rs:73:37, `<` to `<=` in Script::from_asm (#603 shard A, PR #639;
   # 71:37 before #723's comment, script.rs:91:37 before #634 moved the ASM code, 94:33 before
   # #639's fold). The comparison
