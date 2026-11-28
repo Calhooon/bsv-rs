@@ -1144,19 +1144,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<IdentityCertificate>> {
-        // Step 1: Parse BEEF to get the transaction
-        let beef = match Beef::from_binary(&output.beef) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Failed to parse BEEF
-        };
-
-        // Get the transaction from the BEEF
-        let tx = match beef.txs.first() {
-            Some(beef_tx) => match beef_tx.tx() {
-                Some(t) => t,
-                None => return Ok(None), // No transaction data in BEEF
-            },
-            None => return Ok(None), // No transactions in BEEF
+        // Step 1: The BEEF's subject under the reference's evidence check; a
+        // refused one is skipped, a limit is the discovery's refusal
+        // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730).
+        let Some(tx) = super::evidence::admit(output)? else {
+            return Ok(None);
         };
 
         // Step 2: Get the output at the specified index
@@ -1307,19 +1299,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         &self,
         output: &OutputListItem,
     ) -> Result<Option<VerifiableCertificate>> {
-        // Step 1: Parse BEEF to get the transaction
-        let beef = match Beef::from_binary(&output.beef) {
-            Ok(b) => b,
-            Err(_) => return Ok(None), // Failed to parse BEEF
-        };
-
-        // Get the transaction from the BEEF
-        let tx = match beef.txs.first() {
-            Some(beef_tx) => match beef_tx.tx() {
-                Some(t) => t,
-                None => return Ok(None), // No transaction data in BEEF
-            },
-            None => return Ok(None), // No transactions in BEEF
+        // Step 1: The BEEF's subject under the reference's evidence check; a
+        // refused one is skipped, a limit is the discovery's refusal
+        // (TransactionEvidence.ts:93-201, identityUtils.ts:600-634, #730).
+        let Some(tx) = super::evidence::admit(output)? else {
+            return Ok(None);
         };
 
         // Step 2: Get the output at the specified index
