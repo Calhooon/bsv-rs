@@ -314,6 +314,21 @@ start without it, `src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
 whose `resource_limit` is `Some`: never read it as invalid. The witnesses are
 `tests/script_stack_memory_witness.rs`.
 
+The arithmetic step's room (bsv-rs#374, ported from the 0.9 line). `BigNumber`'s
+operations allocate infallibly, so an out-of-memory at an arithmetic step would
+be an uncatchable abort (on wasm32 one nobody catches). Before an arithmetic step
+the allocator is asked with `try_reserve_exact`, then released, for the most the
+step holds past its operands (`spend/arithmetic_room.rs`, `STEP_PEAK_*`: a
+multiple of the operands' combined bytes, measured as ceilings on this line's
+`BigNumber` arithmetic — `OP_MUL` ~4.9×, `OP_DIV`/`OP_MOD` ~7.6×, the linear
+kinds ~3.5×); its refusal is a decline (`ScriptResource::ElementSize`), never an
+abort, and never a verdict. An honest (policy-valid) operand is far below the
+64 KiB reservation floor and never reaches the probe. The 0.9 line's reference-read
+verdict (a magnitude past 536,870,888 bits judged invalid, bsv-rs#331) does NOT
+travel with the probe. The witnesses are `src/script/spend/arithmetic_room_tests.rs`,
+`src/transaction/beef_stream/arithmetic_room_stream_tests.rs` and
+`tests/memory_profiling.rs`.
+
 ### ScriptFlags / ProtocolEra (`flags.rs`)
 
 ```rust
