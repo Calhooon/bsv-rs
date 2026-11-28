@@ -1788,17 +1788,14 @@ impl Transaction {
             };
             refuse_no_transaction(tx, &txid)?;
 
-            // If the transaction has a merkle path, verify it
+            // If the transaction has a merkle path, verify it. The reference's
+            // `MerklePath.verify` (`MerklePath.ts:476-500`, #734) asks the
+            // tracker's current height at level-0 offset 0 alone and answers
+            // false when `block_height + 100 > height`, before the root is
+            // asked, so an offset-0 proof under 100 blocks deep (a coinbase's
+            // maturity) is not proven; `proven` asked the root alone.
             if let Some(ref merkle_path) = tx.merkle_path {
-                let root = merkle_path.compute_root(Some(&txid))?;
-                let is_valid = chain_tracker
-                    .is_valid_root_for_height(&root, merkle_path.block_height)
-                    .await
-                    .map_err(|e| {
-                        crate::Error::TransactionError(format!("Chain tracker error: {}", e))
-                    })?;
-
-                if is_valid {
+                if merkle_path.verify(&txid, chain_tracker).await? {
                     continue;
                 } else {
                     return Err(crate::Error::TransactionError(format!(
