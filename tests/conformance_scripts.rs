@@ -1317,9 +1317,17 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
         "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
         319,
     ),
+    // 2026-11-18 repin (strict-DER 54 -> 55, legacy-signature 36 -> 35; net 0,
+    // zero new mismatches): #397 adds the default-mode Chronicle version gate,
+    // so a no-FORKID signature that also carries the Chronicle bit at version 1
+    // is now refused by that gate ("The signature format is invalid.") before
+    // the FORKID requirement it used to hit ("must use SIGHASH_FORKID"). The
+    // fixture is unchanged and still unsupported; its refusal MESSAGE moved it
+    // from the FORKID bucket to the signature-format bucket. One fixture, the
+    // total unsupported and the pass count unchanged.
     (
         "strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)",
-        54,
+        55,
     ),
     (
         "bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)",
@@ -1327,7 +1335,7 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ),
     (
         "bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)",
-        36,
+        35,
     ),
     (
         "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
