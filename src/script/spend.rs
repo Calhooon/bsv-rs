@@ -122,6 +122,11 @@ mod num;
 mod pre_genesis;
 /// The scriptCode a signature check commits to, built from the script's bytes (#654).
 mod script_code;
+
+/// Fallible element allocation: every outright element the interpreter builds
+/// asks the allocator first, so an out-of-memory is a decline, not an abort
+/// (bsv-rs#331, ported from the 0.9 line).
+mod fallible;
 #[cfg(feature = "transaction")]
 pub(crate) use pre_genesis::PreGenesis;
 
@@ -829,7 +834,7 @@ impl Spend {
                     self.program_counter
                 )));
             }
-            let data = operation.data.clone().unwrap_or_default();
+            let data = self.copy_element(operation.data.as_deref().unwrap_or_default())?;
             self.push_stack(data)?;
         } else if is_executing || (OP_IF..=OP_ENDIF).contains(&current_opcode) {
             // Execute the opcode
@@ -1067,8 +1072,8 @@ impl Spend {
                         self.error("OP_2DUP requires at least two items to be on the stack.")
                     );
                 }
-                let buf1 = self.stack_top_n(2)?.to_vec();
-                let buf2 = self.stack_top()?.to_vec();
+                let buf1 = self.copy_element(self.stack_top_n(2)?)?;
+                let buf2 = self.copy_element(self.stack_top()?)?;
                 self.push_stack(buf1)?;
                 self.push_stack(buf2)?;
             }
@@ -1078,9 +1083,9 @@ impl Spend {
                         self.error("OP_3DUP requires at least three items to be on the stack.")
                     );
                 }
-                let buf1 = self.stack_top_n(3)?.to_vec();
-                let buf2 = self.stack_top_n(2)?.to_vec();
-                let buf3 = self.stack_top()?.to_vec();
+                let buf1 = self.copy_element(self.stack_top_n(3)?)?;
+                let buf2 = self.copy_element(self.stack_top_n(2)?)?;
+                let buf3 = self.copy_element(self.stack_top()?)?;
                 self.push_stack(buf1)?;
                 self.push_stack(buf2)?;
                 self.push_stack(buf3)?;
@@ -1091,8 +1096,8 @@ impl Spend {
                         self.error("OP_2OVER requires at least four items to be on the stack.")
                     );
                 }
-                let buf1 = self.stack_top_n(4)?.to_vec();
-                let buf2 = self.stack_top_n(3)?.to_vec();
+                let buf1 = self.copy_element(self.stack_top_n(4)?)?;
+                let buf2 = self.copy_element(self.stack_top_n(3)?)?;
                 self.push_stack(buf1)?;
                 self.push_stack(buf2)?;
             }
@@ -1136,7 +1141,7 @@ impl Spend {
                         self.error("OP_IFDUP requires at least one item to be on the stack.")
                     );
                 }
-                let top = self.stack_top()?.to_vec();
+                let top = self.copy_element(self.stack_top()?)?;
                 if ScriptNum::cast_to_bool(&top) {
                     self.push_stack(top)?;
                 }
@@ -1157,7 +1162,7 @@ impl Spend {
                 if self.stack.is_empty() {
                     return Err(self.error("OP_DUP requires at least one item to be on the stack."));
                 }
-                let top = self.stack_top()?.to_vec();
+                let top = self.copy_element(self.stack_top()?)?;
                 self.push_stack(top)?;
             }
             OP_NIP => {
@@ -1176,7 +1181,7 @@ impl Spend {
                         self.error("OP_OVER requires at least two items to be on the stack.")
                     );
                 }
-                let second = self.stack_top_n(2)?.to_vec();
+                let second = self.copy_element(self.stack_top_n(2)?)?;
                 self.push_stack(second)?;
             }
             OP_PICK | OP_ROLL => {
@@ -1198,7 +1203,7 @@ impl Spend {
                 }
 
                 let n_idx = n as usize;
-                let item = self.stack[self.stack.len() - 1 - n_idx].clone();
+                let item = self.copy_element(&self.stack[self.stack.len() - 1 - n_idx])?;
 
                 if opcode == OP_ROLL {
                     let remove_idx = self.stack.len() - 1 - n_idx;
@@ -1241,11 +1246,15 @@ impl Spend {
                         self.error("OP_TUCK requires at least two items to be on the stack.")
                     );
                 }
-                let top = self.stack_top()?.to_vec();
-                self.reserve_stack(top.len())?;
+                let top = self.copy_element(self.stack_top()?)?;
+                let len = top.len();
+                self.stack
+                    .try_reserve(1)
+                    .map_err(|_| self.allocation_declined(len))?;
+                self.reserve_stack(len)?;
                 let insert_idx = self.stack.len() - 2;
-                self.stack.insert(insert_idx, top.clone());
-                self.stack_mem += top.len();
+                self.stack.insert(insert_idx, top);
+                self.stack_mem += len;
             }
             OP_SIZE => {
                 if self.stack.is_empty() {
@@ -1273,6 +1282,9 @@ impl Spend {
                     i64::try_from(buf1.len() + buf2.len()).unwrap_or(i64::MAX),
                 )?;
                 let mut result = buf1;
+                result
+                    .try_reserve_exact(buf2.len())
+                    .map_err(|_| self.allocation_declined(buf2.len()))?;
                 result.extend(buf2);
                 // The default mode's 1 GiB element bound; under a word an element
                 // after Genesis is bounded by the stack memory budget alone
@@ -1296,8 +1308,8 @@ impl Spend {
 
                 let pos_bn = self.read_number(&pos_bytes)?;
                 let split_idx = self.split_position(&pos_bn, data.len())?;
-                let left = data[..split_idx].to_vec();
-                let right = data[split_idx..].to_vec();
+                let left = self.copy_element(&data[..split_idx])?;
+                let right = self.copy_element(&data[split_idx..])?;
                 self.push_stack(left)?;
                 self.push_stack(right)?;
             }
@@ -1369,22 +1381,13 @@ impl Spend {
                 if minimal.len() == size {
                     self.push_stack(minimal)?;
                 } else {
-                    // Pad to size, preserving sign
-                    let mut result = vec![0u8; size];
-                    let mut signbit = 0u8;
-
-                    if !minimal.is_empty() {
-                        signbit = minimal[minimal.len() - 1] & 0x80;
-                        let mut minimal_copy = minimal.clone();
-                        if let Some(last) = minimal_copy.last_mut() {
-                            *last &= 0x7f;
-                        }
-                        result[..minimal_copy.len()].copy_from_slice(&minimal_copy);
-                    }
-
-                    if signbit != 0 {
-                        result[size - 1] |= 0x80;
-                    }
+                    // Pad to size, preserving sign. The zero bytes are asked of
+                    // the allocator first (`zeroed_element`, bsv-rs#331), then
+                    // `minimal` is written into them (`fallible::pad_into`): a
+                    // size within the budget the host cannot give is a decline,
+                    // not an abort.
+                    let mut result = self.zeroed_element(size)?;
+                    fallible::pad_into(&minimal, &mut result);
                     self.push_stack(result)?;
                 }
             }
@@ -1424,9 +1427,9 @@ impl Spend {
                         self.error("OP_INVERT requires at least one item to be on the stack.")
                     );
                 }
-                let buf = self.pop_stack()?;
-                let result: Vec<u8> = buf.iter().map(|&b| !b).collect();
-                self.push_stack(result)?;
+                let mut buf = self.pop_stack()?;
+                buf.iter_mut().for_each(|b| *b = !*b);
+                self.push_stack(buf)?;
             }
             OP_AND | OP_OR | OP_XOR => {
                 if self.stack.len() < 2 {
@@ -1436,23 +1439,23 @@ impl Spend {
                     )));
                 }
                 let buf2 = self.pop_stack()?;
-                let buf1 = self.pop_stack()?;
+                let mut buf1 = self.pop_stack()?;
                 if buf1.len() != buf2.len() {
                     return Err(self.error(&format!(
                         "{} requires the top two stack items to be the same size.",
                         opcode_to_name(opcode).unwrap_or("OP")
                     )));
                 }
-                let result: Vec<u8> = buf1
-                    .iter()
-                    .zip(buf2.iter())
-                    .map(|(&a, &b)| match opcode {
-                        OP_AND => a & b,
-                        OP_OR => a | b,
-                        _ => a ^ b, // OP_XOR
-                    })
-                    .collect();
-                self.push_stack(result)?;
+                // The result is written in place over `buf1`, no new allocation
+                // (bsv-rs#331).
+                for (a, &b) in buf1.iter_mut().zip(buf2.iter()) {
+                    *a = match opcode {
+                        OP_AND => *a & b,
+                        OP_OR => *a | b,
+                        _ => *a ^ b, // OP_XOR
+                    };
+                }
+                self.push_stack(buf1)?;
             }
             OP_EQUAL | OP_EQUALVERIFY => {
                 if self.stack.len() < 2 {
@@ -1506,48 +1509,12 @@ impl Spend {
                     // overflow ("BigNumber requires N bytes") and clamped the
                     // shift count to 63 bits (conformance vectors
                     // lshift-truncation.0001/.0003).
-                    let len = buf.len();
-                    let result: Vec<u8> = if (n as u128) >= (len as u128) * 8 {
-                        vec![0u8; len]
-                    } else {
-                        let byte_shift = (n as usize) / 8;
-                        let bit_shift = (n as usize) % 8;
-                        let mut out = vec![0u8; len];
-                        #[allow(clippy::needless_range_loop)]
-                        for i in 0..len {
-                            if opcode == OP_LSHIFT {
-                                let src = i + byte_shift;
-                                let hi = if src < len { buf[src] } else { 0 };
-                                let lo = if bit_shift > 0 && src + 1 < len {
-                                    buf[src + 1]
-                                } else {
-                                    0
-                                };
-                                out[i] = if bit_shift == 0 {
-                                    hi
-                                } else {
-                                    (hi << bit_shift) | (lo >> (8 - bit_shift))
-                                };
-                            } else {
-                                // OP_RSHIFT
-                                if i >= byte_shift {
-                                    let src = i - byte_shift;
-                                    let hi = buf[src];
-                                    let carry = if bit_shift > 0 && src >= 1 {
-                                        buf[src - 1]
-                                    } else {
-                                        0
-                                    };
-                                    out[i] = if bit_shift == 0 {
-                                        hi
-                                    } else {
-                                        (hi >> bit_shift) | (carry << (8 - bit_shift))
-                                    };
-                                }
-                            }
-                        }
-                        out
-                    };
+                    // The width-preserving result is asked of the allocator
+                    // first (`zeroed_element`, bsv-rs#331), then the shift writes
+                    // into it in place (`fallible::shift_into`), so an
+                    // out-of-memory is a decline, not an abort.
+                    let mut result = self.zeroed_element(buf.len())?;
+                    fallible::shift_into(&buf, n, opcode, &mut result);
                     self.push_stack(result)?;
                 }
             }
@@ -1858,11 +1825,11 @@ impl Spend {
             // ================================================================
             0x01..=0x4b => {
                 // Direct push opcodes - should have data
-                let data = chunk.data.clone().unwrap_or_default();
+                let data = self.copy_element(chunk.data.as_deref().unwrap_or_default())?;
                 self.push_stack(data)?;
             }
             OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => {
-                let data = chunk.data.clone().unwrap_or_default();
+                let data = self.copy_element(chunk.data.as_deref().unwrap_or_default())?;
                 self.push_stack(data)?;
             }
 
@@ -2216,7 +2183,8 @@ impl Spend {
                     )));
                 }
                 let (o, l) = (offset as usize, len as usize);
-                self.push_stack(data[o..o + l].to_vec())?;
+                let out = self.copy_element(&data[o..o + l])?;
+                self.push_stack(out)?;
             }
             OP_NOP5 | OP_NOP6 => {
                 // (data len -- the first / last len bytes)
@@ -2231,9 +2199,9 @@ impl Spend {
                 }
                 let l = len as usize;
                 let out = if opcode == OP_NOP5 {
-                    data[..l].to_vec()
+                    self.copy_element(&data[..l])?
                 } else {
-                    data[data.len() - l..].to_vec()
+                    self.copy_element(&data[data.len() - l..])?
                 };
                 self.push_stack(out)?;
             }
@@ -2302,11 +2270,24 @@ impl Spend {
                         x.shl_bits(n)
                     } else {
                         // the default mode: the result's size, before allocating
-                        // it, against the LOCAL budget
+                        // it, against the LOCAL budget, then the 1 GiB element
+                        // bound (OP_CAT's and OP_NUM2BIN's, the only bound an
+                        // uncapped budget leaves, bsv-rs#331; the exact length is
+                        // the word branch's). Kept in u64 so a result past
+                        // `usize` on a 32-bit target cannot wrap below the budget.
                         let bits = (x.bit_length() as u64).saturating_add(n);
-                        let bytes = (bits / 8 + 2) as usize;
-                        if bytes > self.memory_limit() {
-                            return Err(self.resource_error(ScriptResource::ElementSize, bytes));
+                        let bytes = bits / 8 + 2;
+                        if bytes > self.memory_limit() as u64 {
+                            return Err(self.resource_error(
+                                ScriptResource::ElementSize,
+                                usize::try_from(bytes).unwrap_or(usize::MAX),
+                            ));
+                        }
+                        if bits / 8 + 1 > MAX_SCRIPT_ELEMENT_SIZE as u64 {
+                            return Err(self.error(&format!(
+                                "It's not currently possible to push data larger than {} bytes.",
+                                MAX_SCRIPT_ELEMENT_SIZE
+                            )));
                         }
                         x.shl_bits(n)
                     }
@@ -2414,6 +2395,9 @@ impl Spend {
     // ========================================================================
 
     fn push_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
+        self.stack
+            .try_reserve(1)
+            .map_err(|_| self.allocation_declined(item.len()))?;
         self.reserve_stack(item.len())?;
         self.stack_mem += item.len();
         self.stack.push(item);
@@ -2421,7 +2405,8 @@ impl Spend {
     }
 
     fn push_stack_copy(&mut self, item: &[u8]) -> Result<(), ScriptEvaluationError> {
-        self.push_stack(item.to_vec())
+        let copy = self.copy_element(item)?;
+        self.push_stack(copy)
     }
 
     fn pop_stack(&mut self) -> Result<Vec<u8>, ScriptEvaluationError> {
@@ -2452,6 +2437,9 @@ impl Spend {
     }
 
     fn push_alt_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
+        self.alt_stack
+            .try_reserve(1)
+            .map_err(|_| self.allocation_declined(item.len()))?;
         self.reserve_alt_stack(item.len())?;
         self.alt_stack_mem += item.len();
         self.alt_stack.push(item);
@@ -2538,17 +2526,17 @@ impl Spend {
     }
 
     fn ensure_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
-        if self.stack_mem + additional > self.memory_limit() {
-            return Err(self.resource_error(ScriptResource::Stack, self.stack_mem + additional));
+        let attempted = self.stack_mem.saturating_add(additional);
+        if attempted > self.memory_limit() {
+            return Err(self.resource_error(ScriptResource::Stack, attempted));
         }
         Ok(())
     }
 
     fn ensure_alt_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
-        if self.alt_stack_mem + additional > self.memory_limit() {
-            return Err(
-                self.resource_error(ScriptResource::AltStack, self.alt_stack_mem + additional)
-            );
+        let attempted = self.alt_stack_mem.saturating_add(additional);
+        if attempted > self.memory_limit() {
+            return Err(self.resource_error(ScriptResource::AltStack, attempted));
         }
         Ok(())
     }
@@ -2621,8 +2609,8 @@ impl Spend {
             self.source_output_index,
             self.context,
             self.program_counter,
-            self.stack.clone(),
-            self.alt_stack.clone(),
+            fallible::snapshot(&self.stack),
+            fallible::snapshot(&self.alt_stack),
             self.if_stack.clone(),
             self.stack_mem,
             self.alt_stack_mem,

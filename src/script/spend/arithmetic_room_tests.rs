@@ -139,6 +139,52 @@ fn a_decline_carries_the_sizes_and_the_budget_not_a_script_verdict() {
     assert_eq!(error.resource_limit.unwrap().limit, 32_000_000);
 }
 
+/// Ruling 2 (fold-m1118b): each `STEP_PEAK_*` ceiling is pinned so a reduction
+/// turns this RED by name. The modelled allocator refuses one byte below the
+/// room the SHIPPED multiple reserves (`shipped * operands - 1`), so the step
+/// declines only while the ceiling reserves at or above the shipped multiple.
+/// A reduction of `STEP_PEAK_*` (e.g. the suite-passing `OP_MUL` 8->2,
+/// `OP_DIV` 12->4, the linear 6->4 a read showed reintroduced the uncatchable
+/// abort) drops the probe below this ceiling: the step then proceeds and the
+/// real arithmetic completes with a verdict, where this asserts a decline. The
+/// shipped multiples are proven at or above the measured true peak (worst-case
+/// operands, probe disabled) by `tests/memory_profiling.rs`, so the pin holds
+/// the ceiling between the true cost and the shipped value, both ways.
+fn pinned_at_shipped(opcode: u8, operands: &[Vec<u8>], shipped: usize) {
+    let sum: usize = operands.iter().map(Vec::len).sum();
+    declined(run(operands, &then_true(opcode), shipped * sum - 1));
+}
+
+#[test]
+fn op_mul_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_MUL, &[widest(BIG), widest(BIG)], 8);
+}
+
+#[test]
+fn op_div_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_DIV, &[widest(BIG), widest(64)], 12);
+}
+
+#[test]
+fn op_mod_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_MOD, &[widest(BIG), widest(64)], 12);
+}
+
+#[test]
+fn op_add_linear_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_ADD, &[widest(BIG), widest(BIG)], 6);
+}
+
+#[test]
+fn op_1add_linear_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_1ADD, &[widest(BIG)], 6);
+}
+
+#[test]
+fn op_bin2num_linear_ceiling_is_pinned_a_reduction_turns_this_red() {
+    pinned_at_shipped(OP_BIN2NUM, &[widest(BIG)], 6);
+}
+
 #[test]
 fn an_operand_below_the_floor_is_not_probed_so_an_honest_script_is_untouched() {
     // Two tiny operands multiplied: step peak far below the reservation floor,
