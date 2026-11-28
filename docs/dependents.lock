@@ -71,9 +71,11 @@ manifests = ["Cargo.toml"]
 targets = ["wasm32-unknown-unknown"]
 features = []
 check_args = ["--workspace", "--lib"]
-# One test is not run until this row re-pins: `door::beef_measure::tests::the_counts_are_the_parses` builds a BEEF whose
-# BUMP places leaves outside its one-level tree and expects it to parse; 0.8.14's reader refuses such a BUMP.
-test_args = ["--workspace", "--lib", "--tests", "--", "--skip", "door::beef_measure::tests::the_counts_are_the_parses"]
+# Three tests are not run until this row re-pins: each builds a BEEF whose BUMP places leaves outside its one-level tree
+# (the unit test `door::beef_measure::tests::the_counts_are_the_parses`, and the "one BUMP of many leaves" case of
+# `the_estimate_bounds_the_parse` and `the_inline_door_holds_its_request_under_the_ceiling` in `tests/beef_measure.rs`)
+# and expects it to parse; 0.8.14's reader refuses such a BUMP.
+test_args = ["--workspace", "--lib", "--tests", "--", "--skip", "door::beef_measure::tests::the_counts_are_the_parses", "--skip", "the_estimate_bounds_the_parse", "--skip", "the_inline_door_holds_its_request_under_the_ceiling"]
 
 [[consumer]]
 id = "chaintracks-cloudflare"
