@@ -21,6 +21,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::badge;
 use super::contacts::ContactsManager;
 #[cfg(test)]
 use super::types::BroadcastSuccess;
@@ -216,6 +217,18 @@ impl<W: WalletInterface> IdentityClient<W> {
                 Self::try_parse_generic_identity(decrypted, certifier_info)
             }
         };
+
+        // bsv-rs#1118s: a certifier-claiming type's badge (label, icon, click
+        // URL) is a vouching claim; show it only for an anchored certifier (set
+        // at Step 9), else the neutral badge, so no part of it — the per-type
+        // click URL included — points to an authority no check stood behind.
+        let (badge_label, badge_icon_url, badge_click_url) = badge::displayed_badge_triple(
+            known_type,
+            certifier_info,
+            badge_label,
+            badge_icon_url,
+            badge_click_url,
+        );
 
         // Build abbreviated key
         let subject = cert.subject_hex();
@@ -1054,13 +1067,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .await
             .unwrap_or_default();
 
-        // Step 9: Build certifier info (default for now, could be enhanced via registry lookup)
-        let certifier_info = CertifierInfo {
-            name: "SocialCert".to_string(),
-            icon_url: "https://socialcert.net/favicon.ico".to_string(),
-            description: "Social identity verification".to_string(),
-            trust: 5,
-        };
+        // Step 9: name the SocialCert certifier only when the verified
+        // certificate's certifier IS the anchored key (Step 7's verify() has
+        // shown it signed, so an author cannot name it without its key); every
+        // other record carries no vouching label, the neutral default (#1118s).
+        let certifier_info = badge::certifier_info_for(&verifiable_cert.certifier().to_hex());
 
         // Step 10: Create and return the IdentityCertificate
         Ok(Some(IdentityCertificate {
