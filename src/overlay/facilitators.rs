@@ -306,8 +306,12 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
                                 }
                             })?;
 
-                            let output_index =
-                                item.get("outputIndex").and_then(|v| v.as_u64())? as u32;
+                            // outputIndex above u32::MAX drops the item rather
+                            // than casting to its low 32 bits
+                            let output_index = item
+                                .get("outputIndex")
+                                .and_then(|v| v.as_u64())
+                                .and_then(|n| u32::try_from(n).ok())?;
 
                             let context = item.get("context").and_then(|v| {
                                 v.as_array().map(|arr| {
@@ -374,11 +378,13 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
             .map_err(|e| Error::OverlayError(format!("Failed to read txid: {}", e)))?;
         let txid = to_hex(txid_bytes);
 
-        // Read output index
+        // Read output index: a value above u32::MAX is refused, not cast to
+        // its low 32 bits
         let output_index = reader
             .read_var_int()
-            .map_err(|e| Error::OverlayError(format!("Failed to read output index: {}", e)))?
-            as u32;
+            .map_err(|e| Error::OverlayError(format!("Failed to read output index: {}", e)))?;
+        let output_index = u32::try_from(output_index)
+            .map_err(|_| Error::OverlayError("Overlay output index is out of range.".into()))?;
 
         // Read context length and data
         let context_len = reader
@@ -466,6 +472,76 @@ mod tests {
                 assert_eq!(outputs.len(), 1);
                 assert_eq!(outputs[0].beef, vec![1, 2, 3, 4]);
                 assert_eq!(outputs[0].output_index, 0);
+            }
+            _ => panic!("Expected OutputList"),
+        }
+    }
+
+    #[cfg(feature = "http")]
+    #[test]
+    fn an_output_list_item_output_index_above_u32_max_is_dropped_not_truncated() {
+        // outputIndex 2^32 (one past u32::MAX): the pre-fix cast reduced it to
+        // 0 and kept the item; the bound drops the item instead of admitting a
+        // wrong index.
+        let json = serde_json::json!({
+            "type": "output-list",
+            "outputs": [
+                { "beef": [1, 2, 3, 4], "outputIndex": 4_294_967_296u64 }
+            ]
+        });
+        let answer = parse_json_lookup_answer(json).unwrap();
+        match answer {
+            LookupAnswer::OutputList { outputs } => assert!(
+                outputs.is_empty(),
+                "an out-of-range outputIndex must drop the item, not truncate it"
+            ),
+            _ => panic!("Expected OutputList"),
+        }
+
+        // u32::MAX is in range and kept with its exact value (the bound is not
+        // over-tight).
+        let json = serde_json::json!({
+            "type": "output-list",
+            "outputs": [
+                { "beef": [1, 2, 3, 4], "outputIndex": 4_294_967_295u64 }
+            ]
+        });
+        let answer = parse_json_lookup_answer(json).unwrap();
+        match answer {
+            LookupAnswer::OutputList { outputs } => {
+                assert_eq!(outputs.len(), 1);
+                assert_eq!(outputs[0].output_index, u32::MAX);
+            }
+            _ => panic!("Expected OutputList"),
+        }
+    }
+
+    #[cfg(feature = "http")]
+    #[test]
+    fn a_binary_lookup_output_index_above_u32_max_is_refused_not_truncated() {
+        // One outpoint whose output index is 2^32 (one past u32::MAX): the
+        // pre-fix cast reduced it to 0; the bound refuses the whole answer.
+        let mut frame = varint_encode(1); // one outpoint
+        frame.extend_from_slice(&[0xAAu8; 32]); // txid
+        frame.extend_from_slice(&varint_encode(0x1_0000_0000)); // output index > u32::MAX
+        frame.extend_from_slice(&varint_encode(0)); // context length 0
+        let err = parse_binary_lookup_response(&frame).unwrap_err();
+        assert!(
+            matches!(&err, Error::OverlayError(m) if m == "Overlay output index is out of range."),
+            "expected an out-of-range refusal, got {err:?}"
+        );
+
+        // u32::MAX is in range and read back exactly (the bound is not
+        // over-tight).
+        let mut ok_frame = varint_encode(1);
+        ok_frame.extend_from_slice(&[0xAAu8; 32]);
+        ok_frame.extend_from_slice(&varint_encode(u32::MAX as u64));
+        ok_frame.extend_from_slice(&varint_encode(0));
+        let answer = parse_binary_lookup_response(&ok_frame).unwrap();
+        match answer {
+            LookupAnswer::OutputList { outputs } => {
+                assert_eq!(outputs.len(), 1);
+                assert_eq!(outputs[0].output_index, u32::MAX);
             }
             _ => panic!("Expected OutputList"),
         }
