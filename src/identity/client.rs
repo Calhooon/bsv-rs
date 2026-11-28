@@ -462,38 +462,20 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let cert_json = serde_json::to_vec(&cert_with_keyring)
             .map_err(|e| Error::IdentityError(format!("Failed to serialize certificate: {}", e)))?;
 
-        // Get the wallet's public key for PushDrop locking
-        let protocol = crate::wallet::Protocol::from_tuple((
-            self.config.protocol_id.0,
-            &self.config.protocol_id.1,
-        ))
-        .ok_or_else(|| {
-            Error::IdentityError(format!(
-                "Invalid protocol ID: ({}, {})",
-                self.config.protocol_id.0, self.config.protocol_id.1
-            ))
-        })?;
-
-        let wallet_pubkey = self
-            .wallet
-            .get_public_key(
-                crate::wallet::GetPublicKeyArgs {
-                    identity_key: false,
-                    protocol_id: Some(protocol),
-                    key_id: Some(self.config.key_id.clone()),
-                    counterparty: Some(crate::wallet::Counterparty::Anyone),
-                    for_self: Some(false),
-                },
-                originator,
-            )
-            .await?;
-
-        // Parse the public key from hex
-        let locking_pubkey = PublicKey::from_hex(&wallet_pubkey.public_key)?;
-
-        // Create PushDrop locking script with the certificate JSON
-        let pushdrop = PushDrop::new(locking_pubkey, vec![cert_json]);
-        let locking_script = pushdrop.lock();
+        // The identity token the subject signs, the canonical signed two-field
+        // PushDrop the reference publishes and the overlay reads (#310): the
+        // certificate JSON and the subject's signature over it, locked with
+        // the subject's key for anyone. Until now the token was one unsigned
+        // field under the key for anyone with forSelf false, which the
+        // reference's reader and this release's reader refuse.
+        let locking_script = super::reveal::identity_token(
+            &self.wallet,
+            originator,
+            (self.config.protocol_id.0, &self.config.protocol_id.1),
+            &self.config.key_id,
+            cert_json,
+        )
+        .await?;
 
         // Create the transaction using wallet's createAction
         let create_result = self

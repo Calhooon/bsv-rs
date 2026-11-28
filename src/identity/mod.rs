@@ -86,6 +86,10 @@ pub mod types;
 // submodule is declared inside `client` (it reads the client's configuration).
 mod token_envelope;
 
+// The signed two-field identity token `publicly_reveal_attributes` writes
+// (#310), crate-internal, so the writer and the reader agree.
+mod reveal;
+
 // Re-exports
 pub use client::IdentityClient;
 pub use contacts::ContactsManager;
