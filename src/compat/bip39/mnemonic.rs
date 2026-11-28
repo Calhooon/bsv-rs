@@ -2,6 +2,7 @@
 
 use crate::primitives::hash::{pbkdf2_sha512, sha256};
 use crate::{Error, Result};
+use unicode_normalization::UnicodeNormalization;
 
 use super::wordlists;
 
@@ -111,8 +112,14 @@ impl Language {
         }
     }
 
-    /// Finds the index of a word in the wordlist.
+    /// Finds the index of a word in the wordlist, the two compared as BIP-39
+    /// compares them, in NFKD (`bip-0039.mediawiki:86-87`; the files here are
+    /// NFC, and their NFKD form is upstream's lists byte for byte). Two strings
+    /// have one NFKD form exactly when they have one NFKC form, and every list
+    /// word is its own NFKC form (`every_list_word_is_its_own_nfkc_form`), so
+    /// the word's NFKC form is compared with the list's bytes.
     fn word_index(&self, word: &str) -> Option<usize> {
+        let word: String = word.nfkc().collect();
         let wordlist = self.wordlist();
         wordlist.iter().position(|&w| w == word)
     }
@@ -269,9 +276,16 @@ impl Mnemonic {
     }
 
     /// Parses a mnemonic phrase with a specific language.
+    ///
+    /// The phrase is NFKD-normalized before it is split and its words looked
+    /// up, so it reads the same in any normal form (NFC, NFD, NFKC, NFKD), and
+    /// Japanese reads with the ideographic space U+3000 or an ASCII space (NFKD
+    /// maps the one to the other). The words kept, and so [`Mnemonic::phrase`],
+    /// are the wordlist's own (NFC), whatever form the phrase was read in.
     pub fn from_phrase_with_language(phrase: &str, language: Language) -> Result<Self> {
         // Split into words, handling multiple spaces
         let words: Vec<String> = phrase
+            .nfkd_normalize()
             .split_whitespace()
             .map(|s| s.to_lowercase())
             .collect();
@@ -298,6 +312,8 @@ impl Mnemonic {
                 None => return Err(Error::InvalidMnemonicWord(word.clone())),
             }
         }
+        let wordlist = language.wordlist();
+        let words: Vec<String> = indices.iter().map(|&i| wordlist[i].to_string()).collect();
 
         let mnemonic = Self { words, language };
 
@@ -602,38 +618,20 @@ impl std::fmt::Display for Mnemonic {
 
 /// Extension trait for NFKD normalization of strings.
 ///
-/// BIP-39 requires NFKD normalization for both the mnemonic and passphrase.
-/// This implementation passes through strings unchanged, matching the Go SDK behavior.
-///
-/// ## Compatibility Notes
-///
-/// - **Go SDK**: Does NOT perform NFKD normalization (passes raw UTF-8 bytes)
-/// - **TypeScript SDK**: DOES perform NFKD normalization via `String.normalize('NFKD')`
-/// - **This implementation**: Matches Go SDK (no normalization)
-///
-/// For ASCII passphrases (recommended), all SDKs produce identical seeds.
-/// For non-ASCII passphrases, this implementation matches Go SDK but may
-/// differ from TypeScript SDK.
-///
-/// ## Recommendation
-///
-/// For maximum cross-SDK compatibility, use only ASCII characters in passphrases.
+/// BIP-39 requires NFKD for the mnemonic sentence and the passphrase that seed
+/// PBKDF2 (`bip-0039.mediawiki:94-96` at `bitcoin/bips@100ba872`), as the
+/// TypeScript SDK applies it (`String.normalize('NFKD')`, `ts-sdk@9e3ede6`
+/// `src/compat/Mnemonic.ts:271-272`); the Go SDK passes the raw bytes
+/// (`go-sdk@2ca481c` `compat/bip39/bip39.go:256-257`). Before #163 this was a
+/// pass-through, so a phrase or passphrase not already in NFKD seeded other
+/// bytes than BIP-39's.
 trait NfkdNormalize {
     fn nfkd_normalize(&self) -> String;
 }
 
 impl NfkdNormalize for str {
     fn nfkd_normalize(&self) -> String {
-        // Pass through unchanged to match Go SDK behavior.
-        // The BIP-39 English wordlist contains only ASCII characters, so the
-        // mnemonic phrase itself doesn't need normalization.
-        //
-        // For full NFKD Unicode normalization, add the `unicode-normalization` crate:
-        // ```
-        // use unicode_normalization::UnicodeNormalization;
-        // self.nfkd().collect()
-        // ```
-        self.to_string()
+        self.nfkd().collect()
     }
 }
 
