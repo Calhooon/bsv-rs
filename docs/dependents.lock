@@ -1,8 +1,8 @@
-# Remote default-branch snapshots: every row read at its branch tip on 2026-11-14 (the nine rows of
-# seven repositories that had moved since the 2026-10-23 snapshot re-pinned that day, five rows
-# still at their tips). Pin-move PRs refresh these records.
-# The chaintracks-cloudflare row moved again on 2026-11-27, to the tip of its main, which commits
-# its Cargo.lock (docs/DEPENDENTS.md, "The chaintracks row's move of 2026-11-27").
+# Remote default-branch snapshots: every row read at its branch tip on 2026-11-28 (twelve rows of
+# nine repositories moved that day; the chaintracks and template rows were already at their tips),
+# docs/DEPENDENTS.md, "The lock at the dependents' lines of 2026-11-28". Pin-move PRs refresh these records.
+# Three rows' revisions commit no Cargo.lock (the toolbox, bsv-middleware-rs, bsv-middleware-cloudflare):
+# the job resolves their graphs afresh on every run.
 # Version requirements belong to the consumers; this lock never widens one.
 schema = 1
 # The private app trees (the agents, Zanaadu, Teragun, the-composer) are not rows here: their
@@ -15,9 +15,9 @@ schema = 1
 id = "bsv-wallet-cli"
 repository = "Calhooon/bsv-wallet-cli"
 branch = "main"
-rev = "2cc76c9d50bac627f7eb8a44cb60adedbec5f82e"
+rev = "9358665d1aed14147f9aa31e0a9eb001ec4ca372"
 private = false
-requirement = "=0.8.3"
+requirement = "=0.8.13"
 sdk_features = ["full"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
@@ -30,24 +30,22 @@ test_args = ["--workspace", "--tests"]
 id = "bsv-wallet-toolbox-rs"
 repository = "Calhooon/bsv-wallet-toolbox-rs"
 branch = "main"
-rev = "3ddf48dbba0437c8429ff5c4c880e3b03105aaae"
+rev = "baaf7c90cb4ea974f7695f481a28b5e44362b171"
 private = false
-requirement = "0.8.0"
+requirement = "0.8.13"
 sdk_features = ["full", "http"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["native"]
-features = []  # "sqlite" is named in the two argument lists below, so that nothing follows the test names after `--`
-check_args = ["--workspace", "--all-targets", "--features", "sqlite"]
-# One test is not run until this row re-pins: `tsc_proof::tests::test_hex_roundtrip` builds a BUMP whose offset lies
-# outside its tree and expects it to parse; the stable line's next security patch refuses such a BUMP at the reader.
-test_args = ["--workspace", "--lib", "--tests", "--features", "sqlite", "--", "--skip", "tsc_proof::tests::test_hex_roundtrip"]
+features = ["sqlite"]
+check_args = ["--workspace", "--all-targets"]
+test_args = ["--workspace", "--lib", "--tests"]
 
 [[consumer]]
 id = "bsv-tracker"
 repository = "Calhooon/bsv-tracker"
 branch = "main"
-rev = "fdc88960e4ea99f64a8885315c13c6abfb28ef02"
+rev = "96a55b5be5af5b2eecc88d3ac2cf36edcb8ddd06"
 private = false
 requirement = "0.8.0"
 sdk_features = ["transaction"]
@@ -64,9 +62,9 @@ wasm_check_args = ["--workspace", "--lib"]
 id = "bsv-wallet-infra-cloudflare"
 repository = "Calhooon/bsv-wallet-infra-cloudflare"
 branch = "main"
-rev = "2025fcde98664dd69a6305c60e87fa12c3930cde"
+rev = "7f430ccd3e1a7cb861ac4b5ced7987c91578a64c"
 private = false
-requirement = "0.8.1"
+requirement = "0.8.11"
 sdk_features = ["auth", "wallet", "transaction", "wasm"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
@@ -94,42 +92,43 @@ test_args = ["--workspace", "--lib", "--tests"]
 id = "bsv-messagebox-cloudflare"
 repository = "Calhooon/bsv-messagebox-cloudflare"
 branch = "main"
-rev = "32afeeed9ad4cebf484b04c481442174b6bcfb26"
+rev = "9e9082e40171efe7a98e8effdc57aa2a7f4aaa1c"
 private = false
-requirement = "0.8.2"
+requirement = "0.8.12"
 sdk_features = ["auth", "wallet", "transaction", "wasm"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["wasm32-unknown-unknown"]
 features = []
 check_args = ["--workspace", "--lib"]
-test_args = ["--workspace", "--lib"]  # its integration suite's version guard (tests/middleware_version_guard.rs) asserts the resolved bsv-rs is 0.8.3; excluded, as any later patch fails it
+test_args = ["--workspace", "--lib"]  # its integration suite's version guard (tests/middleware_version_guard.rs) asserts the resolved bsv-rs is 0.8.12; excluded, as any later patch fails it
 
 [[consumer]]
 id = "bsv-middleware-rs"
 repository = "Calhooon/bsv-middleware-rs"
 branch = "main"
-rev = "5a1fd275e0fc5cb2fc3982aa157769d44f0729bf"
+rev = "97d003bbfd327838ff7ef06ddee567d2b8f831eb"
 private = false
-requirement = "0.8.0"
+requirement = "0.8.12"
 sdk_features = ["auth", "wallet", "transaction"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["native"]
 features = []  # "axum" is named in the two argument lists below, so that nothing follows the test names after `--`
 check_args = ["--workspace", "--all-targets", "--features", "axum"]
-# One test is not run until this row re-pins: `the_door_verifies_against_the_sdks_dispatched_signing_digest` spends at
-# transaction version 1 with a SIGHASH_CHRONICLE signature and expects it verified; the stable line's next security
-# patch refuses that signature at version 1 in the default mode, as the 0.9 line already does.
+# One test is not run until the consumer's main mends it (its pull request #36, open on 2026-11-28, builds the spend at
+# version 2): `the_door_verifies_against_the_sdks_dispatched_signing_digest` spends at transaction version 1 with a
+# SIGHASH_CHRONICLE signature and expects it verified; 0.8.14 refuses that signature at version 1 in the default mode,
+# as the 0.9 line already does.
 test_args = ["--workspace", "--lib", "--tests", "--features", "axum", "--", "--skip", "payment_core::tests::the_door_verifies_against_the_sdks_dispatched_signing_digest"]
 
 [[consumer]]
 id = "bsv-middleware-cloudflare"
 repository = "Calhooon/bsv-middleware-cloudflare"
 branch = "main"
-rev = "d7ccb6c1a56708687c6d044989f9ff06ea024823"
+rev = "751e4877205663ce272f11896a916bff29cc9f98"
 private = false
-requirement = "0.8"
+requirement = "0.8.12"
 sdk_features = ["auth", "wallet", "transaction", "wasm"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
@@ -142,9 +141,9 @@ test_args = ["--workspace", "--lib", "--tests"]
 id = "bsv-overlay-cloudflare"
 repository = "Calhooon/bsv-overlay-cloudflare"
 branch = "main"
-rev = "2abcd7489a044f052163ef465b4f1ac2b2f2258a"
+rev = "a2f8c7bcae969f4b28c279604f2986513eac9001"
 private = false
-requirement = "=0.7.2"
+requirement = "0.8.12"
 sdk_features = ["overlay"]
 sdk_default_features = true
 manifests = ["crates/overlay-engine/Cargo.toml"]
@@ -172,10 +171,10 @@ test_args = []
 id = "bsv-storage-cloudflare"
 repository = "Calhooon/bsv-storage-cloudflare"
 branch = "main"
-rev = "2563293557849a29007fa1c1b5d2001a3fc8a17d"
+rev = "b5f569449b2cfaf975bfd49c85164d7805e87cfd"
 private = false
-requirement = "=0.4.5"
-sdk_features = ["auth", "wallet", "transaction", "script", "wasm"]
+requirement = "0.8.13"
+sdk_features = ["auth", "wallet", "transaction", "script", "overlay", "wasm"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
 targets = ["wasm32-unknown-unknown"]
@@ -187,9 +186,9 @@ test_args = []
 id = "bsv-storage-parity"
 repository = "Calhooon/bsv-storage-cloudflare"
 branch = "main"
-rev = "2563293557849a29007fa1c1b5d2001a3fc8a17d"
+rev = "b5f569449b2cfaf975bfd49c85164d7805e87cfd"
 private = false
-requirement = "=0.4.5"
+requirement = "0.8.13"
 sdk_features = ["auth", "http", "overlay"]
 sdk_default_features = true
 manifests = ["tests/parity/Cargo.toml"]
@@ -202,9 +201,9 @@ test_args = []
 id = "bsv-overlay-worker"
 repository = "Calhooon/bsv-overlay-cloudflare"
 branch = "main"
-rev = "2abcd7489a044f052163ef465b4f1ac2b2f2258a"
+rev = "a2f8c7bcae969f4b28c279604f2986513eac9001"
 private = false
-requirement = "=0.7.2"
+requirement = "0.8.12"
 sdk_features = ["overlay", "wasm"]
 sdk_default_features = true
 manifests = ["crates/overlay-cloudflare/Cargo.toml"]
@@ -217,9 +216,9 @@ test_args = []
 id = "bsv-overlay-app-layer"
 repository = "Calhooon/bsv-overlay-cloudflare"
 branch = "main"
-rev = "2abcd7489a044f052163ef465b4f1ac2b2f2258a"
+rev = "a2f8c7bcae969f4b28c279604f2986513eac9001"
 private = false
-requirement = "=0.7.2"
+requirement = "0.8.12"
 sdk_features = ["overlay"]
 sdk_default_features = true
 manifests = ["crates/low-app-layer/Cargo.toml"]

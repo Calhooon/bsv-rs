@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI: the `dependents` lock at the dependents' lines of 2026-11-28
+
+- **What changed.** `docs/dependents.lock`: every row read at its consumer's `main` tip on 2026-11-28, twelve rows of nine repositories moved to it (`rev`, and `requirement` where the tip's manifest states another), `chaintracks-cloudflare` and `bsv-agent-template` already there. The overlay's three rows go from `=0.7.2` to `0.8.12`, the caret requirement both of its workspaces have stated since 2026-11-17; the storage worker's two from `=0.4.5` to `0.8.13`, the worker's features with `overlay`, as its manifest states them. The toolbox's row moves to `baaf7c90`, where its `tsc_proof::tests::test_hex_roundtrip` holds on both sides of 0.8.14 (the consumer's pull request #873), so the test left out by #1085 runs again and `sqlite` is the row's `features` again. `bsv-middleware-rs` moves to its tip and keeps its one test left out: the mend of `payment_core::tests::the_door_verifies_against_the_sdks_dispatched_signing_digest` is the consumer's pull request #36, not on its `main` on 2026-11-28. `docs/DEPENDENTS.md`'s table follows, with a dated section, "The lock at the dependents' lines of 2026-11-28".
+- **Why.** The lock was the snapshot of 2026-11-14 but for one row, and the stable release 0.8.14 was held by two consumers' tests at those revisions that asserted verdicts it corrects; and at `=0.7.2` the plan skipped the overlay, so the `dependents` check on `main` had not built it since the overlay moved to the 0.8 line (#1083). At the stable line's version the plan now admits twelve rows, the overlay's three and the storage worker's two among them, and skips two (the CLI's `=0.8.13`, the template's `0.6.0`); on this line it admits none, by design. Three rows' revisions commit no `Cargo.lock` (the toolbox, `bsv-middleware-rs`, `bsv-middleware-cloudflare`) and stay resolved afresh on every run.
+- **Migration.** None. CI data and documents only; no code, test or type change.
+
 ### CI: the `dependents` pin of chaintracks-cloudflare moves to a revision that commits its lock
 
 - **What changed.** The `chaintracks-cloudflare` row of `docs/dependents.lock`: `rev` to `54336437` (the tip of its `main` on 2026-11-27; it was `eff96cbc` on this line and `dcfa491a` on the stable line), `requirement` to `0.8.12`, as its manifest states it. `docs/DEPENDENTS.md`'s row follows, with a dated note.
