@@ -1,7 +1,9 @@
 //! Hermetic support for the identity token-authentication regression
 //! (bsv-rs#1118e): an in-process `ls_identity` resolver on an `.invalid`
-//! host (never dialled), and a lookup output carrying a token in a
-//! transaction proven by a block of its own (a lone leaf at offset 0).
+//! host (never dialled), and the two BEEF shapes the identity parsers'
+//! evidence check reads — a transaction proven by a block of its own (a
+//! lone leaf at offset 0, admitted without a parent) and an unproven
+//! transaction with no inputs (refused as invalid evidence).
 #![allow(dead_code)]
 
 use bsv_rs::overlay::{
@@ -33,6 +35,21 @@ pub fn output_of(script: LockingScript) -> OutputListItem {
     let mut beef = Beef::new();
     let index = beef.merge_bump(MerklePath::new(900, vec![vec![leaf]]).unwrap());
     beef.merge_raw_tx(tx.to_binary(), Some(index));
+    OutputListItem {
+        beef: beef.to_binary(),
+        output_index: 0,
+        context: None,
+    }
+}
+
+/// A lookup output carrying `script` at index 0 in an UNPROVEN transaction
+/// with no inputs: the evidence check refuses it (an unproven transaction
+/// without inputs, `TransactionEvidence.ts:174`).
+pub fn unproven_output_of(script: LockingScript) -> OutputListItem {
+    let mut tx = Transaction::new();
+    tx.add_output(TransactionOutput::new(1, script)).unwrap();
+    let mut beef = Beef::new();
+    beef.merge_raw_tx(tx.to_binary(), None);
     OutputListItem {
         beef: beef.to_binary(),
         output_index: 0,
