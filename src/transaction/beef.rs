@@ -607,6 +607,14 @@ impl Beef {
 
         for tx in &self.txs {
             if let Some(bump_idx) = tx.bump_index() {
+                // CVE-2017-12842 (the fourth way): a 64-byte proven entry's
+                // proof is not used (`proof_vouches`); the entry is judged as
+                // unproven, so its BUMP is not consulted here and it is not
+                // marked valid — the dependency-order check below requires its
+                // inputs, like any unproven transaction's.
+                if !tx.proof_vouches() {
+                    continue;
+                }
                 if bump_idx >= self.bumps.len() {
                     return Err(Kind::BumpIndexNamesNoBump);
                 }
@@ -699,10 +707,14 @@ impl Beef {
         let mut not_valid: Vec<usize> = Vec::new();
 
         for (i, tx) in self.txs.iter_mut().enumerate() {
-            tx.is_valid = Some(tx.has_proof() && !held[i]);
+            // CVE-2017-12842 (the fourth way): a 64-byte proven entry's proof
+            // does not vouch (`proof_vouches`); it is judged as an unproven
+            // transaction, so it joins the `queue` and its inputs are required
+            // below like any unproven entry's (its `input_txids` is populated).
+            tx.is_valid = Some(tx.proof_vouches() && !held[i]);
             if held[i] {
                 not_valid.push(i);
-            } else if tx.has_proof() {
+            } else if tx.proof_vouches() {
                 valid_txids.insert(txids[i].clone(), true);
                 with_proof.push(i);
             } else if tx.is_txid_only() && tx.input_txids.is_empty() {

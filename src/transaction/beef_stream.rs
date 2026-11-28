@@ -88,6 +88,7 @@ use crate::script::{p2sh_redeem::Redeem, LockingScript, Spend, TxSpendParams, Un
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError};
 use super::merkle_path::{MerklePath, MerklePathLeaf};
+use super::proof_ambiguity::is_ambiguous_merkle_leaf;
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
 /// node; its display form is the bytes reversed, in hex).
@@ -2088,28 +2089,40 @@ impl BeefIndex {
                 bump_index,
                 body,
             } => {
+                // CVE-2017-12842 (the fourth way): a transaction whose
+                // serialized length equals a merkle inner node's (two
+                // concatenated child hashes) has a txid that cannot be told
+                // from one, so its BUMP is not used as proof
+                // (`proof_ambiguity::is_ambiguous_merkle_leaf`, the shared
+                // rule). The entry is judged as an unproven transaction,
+                // exactly as if it carried no BUMP index: its inputs must name
+                // earlier transactions of this BEEF and its spends are checked.
+                // The path offered for it is simply not used. The structure
+                // readers (`verify_stream_structure`, `Beef::verify_structure`)
+                // apply the same rule, so both readers still agree.
+                let bump_index: Option<u64> = match bump_index {
+                    Some(index) if !is_ambiguous_merkle_leaf(body.raw.len()) => Some(*index),
+                    _ => None,
+                };
                 // Hand-built elements obey the decoder's mining byte checks
                 // in the same order, even when the index has seen this txid.
-                check_transaction(*offset, &body.inputs, &body.outputs, *bump_index)?;
+                check_transaction(*offset, &body.inputs, &body.outputs, bump_index)?;
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
                 // each input names an earlier transaction of this BEEF.
                 match bump_index {
                     Some(index) => {
-                        if *index >= self.bumps.len() as u64 {
+                        if index >= self.bumps.len() as u64 {
                             return Err(Refusal::new(
                                 *offset,
-                                Reason::BumpIndexNamesNoBump { index: *index },
+                                Reason::BumpIndexNamesNoBump { index },
                             )
                             .into());
                         }
-                        if !self.bump_carries(*index, txid) {
+                        if !self.bump_carries(index, txid) {
                             return Err(Refusal::new(
                                 *offset,
-                                Reason::TxidNotInBump {
-                                    index: *index,
-                                    txid: *txid,
-                                },
+                                Reason::TxidNotInBump { index, txid: *txid },
                             )
                             .into());
                         }
