@@ -365,10 +365,13 @@ fn the_vouching_badge_is_minted_at_one_guarded_place() {
     // The sole production site that mints the SocialCert vouching label is
     // `badge::certifier_info_for`; every door reaches it through that one call,
     // so a new door cannot hand out a vouching badge without the anchor check.
+    // A Windows checkout may hold these files with CRLF line ends; the splits
+    // below are written with LF, so the text is read with LF line ends.
     let badge_src = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/identity/badge.rs"
-    ));
+    ))
+    .replace("\r\n", "\n");
     let badge_production = badge_src
         .split("#[cfg(test)]\nmod tests {")
         .next()
@@ -395,7 +398,8 @@ fn the_vouching_badge_is_minted_at_one_guarded_place() {
     let client_src = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/identity/client.rs"
-    ));
+    ))
+    .replace("\r\n", "\n");
     let client_production = client_src
         .split("#[cfg(test)]\nmod tests {")
         .next()
