@@ -97,6 +97,7 @@ pub mod fee_models;
 pub mod input;
 pub mod merkle_path;
 pub mod output;
+mod source_link;
 #[allow(clippy::module_inception)]
 pub mod transaction;
 mod transaction_reader;
