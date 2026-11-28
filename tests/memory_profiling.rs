@@ -774,26 +774,31 @@ fn arith_step_peak(opcode: u8, lens: &[usize]) -> u64 {
 /// Each guarded arithmetic step's measured heap peak is within the room its
 /// guard asks of the allocator first (`src/script/spend/arithmetic_room.rs`,
 /// `STEP_PEAK_*`): the operands' combined bytes times 8 for `OP_MUL`, 12 for
-/// `OP_DIV`/`OP_MOD`, 6 for the linear kinds. The multiples are ceilings
-/// measured on THIS line's `BigNumber` arithmetic (higher than the 0.9 line's
-/// owned-arithmetic peaks, so the 0.9 line's 6/12/2 are NOT reused): `OP_MUL`
-/// where the shorter operand is just over half the longer (~4.9 times the
-/// operands), `OP_DIV`/`OP_MOD` a dividend just past a power of two over a
-/// small divisor (~7.6 times), the linear kinds ~3.5 times. A step whose peak
-/// ever grew past its declared room — so the probe would pass and the real
-/// allocation abort — shows here as a failure.
+/// `OP_DIV`/`OP_MOD`, 6 for the linear kinds. These multiples are ceilings
+/// above the worst peak measured on THIS line's `BigNumber` arithmetic with the
+/// probe disabled (`OP_MUL` ~6.1 times at a shorter operand just under half the
+/// longer, `OP_DIV`/`OP_MOD` ~11 times at a dividend just past a power of two
+/// over a small divisor, the linear kinds ~4 times at a big-over-tiny operand).
+/// With the probe enabled (as here) the measured peak is the probe's own
+/// reservation (`STEP_PEAK_* * operands`, which dominates the true arithmetic),
+/// so this assertion holds the ceiling at or above the true peak for the
+/// worst-case operands: a step whose true peak grew past its ceiling — so the
+/// probe would pass and the real allocation abort — would show here as the peak
+/// exceeding the room. A reduction of a `STEP_PEAK_*` below the true peak is
+/// caught instead by `arithmetic_room_tests.rs`'s ceiling pins.
 #[test]
 fn test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks() {
     use bsv_rs::script::op::{OP_1ADD, OP_ADD, OP_BIN2NUM, OP_DIV, OP_MOD, OP_MUL};
 
     let _serial = serial();
+    // Worst-case operand shapes per kind (the thinnest margin to the ceiling).
     let cases: [(u8, &str, &[usize], u64); 6] = [
-        (OP_MUL, "OP_MUL", &[262_144, 144_000], 8),
+        (OP_MUL, "OP_MUL", &[2_050_000, 1_050_000], 8),
         (OP_DIV, "OP_DIV", &[2_098_000, 513], 12),
         (OP_MOD, "OP_MOD", &[2_098_000, 513], 12),
-        (OP_ADD, "OP_ADD", &[1 << 20, 1 << 20], 6),
-        (OP_1ADD, "OP_1ADD", &[1 << 20], 6),
-        (OP_BIN2NUM, "OP_BIN2NUM", &[1 << 20], 6),
+        (OP_ADD, "OP_ADD", &[4_194_304, 600], 6),
+        (OP_1ADD, "OP_1ADD", &[2_097_152], 6),
+        (OP_BIN2NUM, "OP_BIN2NUM", &[2_097_152], 6),
     ];
     for (opcode, name, lens, multiple) in cases {
         let operands = lens.iter().sum::<usize>() as u64;

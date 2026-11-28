@@ -19,13 +19,16 @@
 //! are ceilings measured on this line's `BigNumber` arithmetic by
 //! `tests/memory_profiling.rs`
 //! (`test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks`): over
-//! the operands' combined bytes `OP_MUL` holds at most ~4.9 times (num-bigint's
-//! Toom/Karatsuba scratch, the product and its encoding), `OP_DIV`/`OP_MOD`
-//! ~7.6 (Burnikel-Ziegler padding), and the linear kinds ~3.5 (the operands
-//! decoded, the result and its encoding). Each ceiling sits above its measured
-//! peak with margin, so the probe refuses before the step's own allocation
+//! the operands' combined bytes, with the probe disabled and worst-case
+//! operands, `OP_MUL` holds at most ~6.1 times (num-bigint's Toom/Karatsuba
+//! scratch, the product and its encoding), `OP_DIV`/`OP_MOD` ~11 (Burnikel-
+//! Ziegler padding), and the linear kinds ~4 (an unbalanced operand's realloc,
+//! the result and its encoding). Each ceiling (8 / 12 / 6) sits at or above its
+//! measured worst peak, so the probe refuses before the step's own allocation
 //! would abort; a ceiling above the true peak only ever declines earlier, never
-//! aborts later.
+//! aborts later. `arithmetic_room_tests.rs` pins each ceiling so a reduction
+//! turns a test RED (the modelled allocator refuses one byte below the shipped
+//! multiple's room).
 //!
 //! This is the 0.9 line's guard (bsv-rs#374/#348) ported to the stable line's
 //! single interpreter file, probe only: the 0.9 line's reference-read verdict
@@ -51,16 +54,19 @@ pub(super) const RESERVATION_FLOOR: u64 = 1 << 16;
 
 /// `OP_MUL`, `OP_2MUL`: the product's digits (both operands' length together)
 /// and num-bigint's Toom/Karatsuba scratch, the result and its encoding;
-/// measured at most ~4.9 times the operands' combined bytes on this line.
+/// measured at most ~6.1 times the operands' combined bytes on this line (probe
+/// disabled, worst-case operands), under this ceiling of 8.
 pub(super) const STEP_PEAK_MUL: u64 = 8;
 /// `OP_DIV`, `OP_MOD`: num-bigint's Burnikel-Ziegler division, which pads the
 /// dividend to a power of two of digits and recurses on copies of those
-/// blocks; measured at most ~7.6 times the operands' combined bytes.
+/// blocks; measured at most ~11 times the operands' combined bytes (the
+/// tightest kind), under this ceiling of 12.
 pub(super) const STEP_PEAK_DIV: u64 = 12;
 /// Every other guarded step (`OP_ADD`, `OP_SUB`, `OP_1ADD`, `OP_1SUB`,
 /// `OP_2DIV`, `OP_NEGATE`, `OP_ABS`, the comparisons and `OP_BIN2NUM`): the
 /// operands decoded, a result at most one byte longer than the longest, and
-/// its encoding; measured at most ~3.5 times the operands' combined bytes.
+/// its encoding; measured at most ~4 times the operands' combined bytes for an
+/// unbalanced operand, under this ceiling of 6.
 pub(super) const STEP_PEAK_LINEAR: u64 = 6;
 
 impl Spend {
