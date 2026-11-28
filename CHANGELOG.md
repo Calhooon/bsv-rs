@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.15] - 2026-11-28
+
 ### Security: the script chunk walkers bound an `OP_PUSHDATA4` length against the bytes present, closing a 32-bit `wasm32` abort on a crafted script
 
 - **What was reachable.** `Script`'s two chunk walkers — `parse_chunks` (behind `chunks()`, `len()`, `is_empty()`, `to_asm()`, every template decode, and `Spend::new`/`with_transaction`, so behind `Transaction::verify` for each unproven input) and `truncated_push_index` (behind `truncated_push()`) — read an `OP_PUSHDATA4` length as a full 32-bit value (up to `0xffff_ffff`) and formed `pos + len` before clamping it to the script's length. On a 32-bit target (`wasm32`, the production target, where `usize == u32`) that sum wraps for a length near `u32::MAX`: `parse_chunks` sliced a reversed range and `truncated_push_index` over-read, so a crafted five-byte script aborted the process (a panic is an uncatchable abort on `wasm32`) — `parse_chunks` in release and debug, `truncated_push_index` in debug (release returned a wrong index). Reachable from any party that hands untrusted script or transaction bytes to a parse-requiring method, on the default parse/verify path (no feature flag). A 64-bit target never wrapped and was unaffected.
