@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.14] - 2026-11-28
+
 ### Security: the Peer client receive path verifies a message's signature, session and identity before it reaches a caller
 
 - **What was reachable.** `Peer::start` — the documented client-side receive setup — installed a transport callback that handed an incoming `General` message to a `listen_for_general_messages` listener, a `CertificateRequest`/`CertificateResponse` to its listener (the attached certificates not validated), and completed the handshake from an `InitialResponse` (marking the session authenticated with the claimed identity), **without checking the message's signature, its session, the sender's identity or the nonce**. The verifying code existed (`handle_incoming_message`, used by `start_server`), but the documented client path bypassed it, and every transport — `SimplifiedFetchTransport`, the WebSocket and Socket.IO transports — delivers through that callback; the HTTP transport even defaults an unsigned response's identity to the expected server's key. A session's counterparty, or a transport-position attacker, could therefore hand a client forged "authenticated" content attributed to the peer identity the client meant to authenticate — server-identity authentication and message integrity on the receive side were void on this path. Default path, no feature flag; every published stable version through 0.8.13 carries it.
