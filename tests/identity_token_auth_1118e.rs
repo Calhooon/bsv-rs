@@ -273,13 +273,15 @@ async fn b_only_the_subjects_authenticated_token_is_read_1118e() {
 }
 
 // ===========================================================================
-// C. S2: an honest subject-signed token is still read and still badged
-//    "SocialCert, trust 5" (this value is unchanged from 0.8.13; it passes
-//    on both lines).
+// C. S2 + the certifier anchor (bsv-rs#1118s): an honest subject-signed token
+//    is still READ (identity_key = the subject, unchanged from 0.8.13), but
+//    since bsv-rs#1118s closed the certifier-anchor residual this test once
+//    pinned, its certifier being a non-anchored test key, the record now
+//    carries NO SocialCert vouching badge (the neutral "not verified" badge).
 // ===========================================================================
 
 #[tokio::test]
-async fn c_the_authenticated_token_is_read_and_badged_1118e() {
+async fn c_the_authenticated_token_is_read_without_a_false_badge_1118e() {
     let subject = PrivateKey::random();
     let certifier = PrivateKey::random();
     assert_ne!(
@@ -301,14 +303,15 @@ async fn c_the_authenticated_token_is_read_and_badged_1118e() {
         id.identity_key, subject_hex,
         "the subject is the queried key"
     );
-    // The displayed badge value is unchanged from 0.8.13: a subject-authored
-    // token keeps the "SocialCert" label.
+    // bsv-rs#1118s: the certifier-anchor residual this test once pinned is
+    // closed. The token's certifier is a non-anchored test key, so the record
+    // is read but carries no SocialCert vouching badge.
     assert!(
-        id.badge_label.contains("SocialCert"),
-        "the residual badge still reads SocialCert: {}",
+        !id.badge_label.contains("SocialCert"),
+        "the certifier anchor removed the false SocialCert badge: {}",
         id.badge_label
     );
-    assert!(id.badge_icon_url.contains("socialcert.net"));
+    assert!(!id.badge_icon_url.contains("socialcert.net"));
 }
 
 // ===========================================================================

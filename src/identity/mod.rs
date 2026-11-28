@@ -77,6 +77,7 @@
 //!
 //! Certificate type IDs are consistent across all SDK implementations.
 
+mod badge;
 pub mod client;
 pub mod contacts;
 pub mod types;
