@@ -9,10 +9,10 @@
 //! Each test drives the public `Spend` door and asserts that a step whose room
 //! the modelled allocator refuses is a RESOURCE DECLINE
 //! ([`ScriptResource::ElementSize`], `resource_limit` `Some`), never a verdict
-//! and never an abort; and that an operand below [`RESERVATION_FLOOR`] is not
+//! and never an abort; and that an operand below the reservation floor is not
 //! probed at all, so no honest script is touched.
 
-use super::{with_allocator_ceiling, RESERVATION_FLOOR};
+use super::with_allocator_ceiling;
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource};
 use crate::script::op::{OP_1, OP_1ADD, OP_ADD, OP_BIN2NUM, OP_DIV, OP_DROP, OP_MOD, OP_MUL};
 use crate::script::spend::{Spend, SpendParams};
@@ -29,11 +29,7 @@ fn widest(len: usize) -> Vec<u8> {
 /// `operands` pushed by the unlocking script, then `lock` run under the
 /// default mode with the modelled allocator refusing any reservation above
 /// `ceiling`.
-fn run(
-    operands: &[Vec<u8>],
-    lock: &Script,
-    ceiling: usize,
-) -> Result<bool, ScriptEvaluationError> {
+fn run(operands: &[Vec<u8>], lock: &Script, ceiling: usize) -> Result<bool, ScriptEvaluationError> {
     let mut unlock = Script::new();
     for operand in operands {
         unlock.write_bin(operand);
@@ -69,7 +65,9 @@ fn then_true(opcode: u8) -> Script {
 /// verdict (`resource_limit` `None`) and never a panic.
 fn declined(result: Result<bool, ScriptEvaluationError>) -> ScriptEvaluationError {
     let error = result.expect_err("a decline, not a verdict or an abort");
-    let limit = error.resource_limit.expect("a resource limit, not a verdict");
+    let limit = error
+        .resource_limit
+        .expect("a resource limit, not a verdict");
     assert_eq!(
         limit.resource,
         ScriptResource::ElementSize,
@@ -87,7 +85,11 @@ const BIG: usize = 300_000; // ~0.29 MiB, above the 64 KiB floor
 #[test]
 fn op_mul_declines_before_its_product_is_allocated() {
     // sum 600 KB, peak 8x = ~4.8 MB, above the 1 MiB ceiling.
-    declined(run(&[widest(BIG), widest(BIG)], &then_true(OP_MUL), CEILING));
+    declined(run(
+        &[widest(BIG), widest(BIG)],
+        &then_true(OP_MUL),
+        CEILING,
+    ));
 }
 
 #[test]
@@ -103,7 +105,11 @@ fn op_mod_declines_before_its_remainder_is_allocated() {
 
 #[test]
 fn op_add_declines_before_its_sum_is_allocated() {
-    declined(run(&[widest(BIG), widest(BIG)], &then_true(OP_ADD), CEILING));
+    declined(run(
+        &[widest(BIG), widest(BIG)],
+        &then_true(OP_ADD),
+        CEILING,
+    ));
 }
 
 #[test]
@@ -119,7 +125,11 @@ fn op_bin2num_declines_before_its_re_encoding_is_allocated() {
 
 #[test]
 fn a_decline_carries_the_sizes_and_the_budget_not_a_script_verdict() {
-    let error = declined(run(&[widest(BIG), widest(BIG)], &then_true(OP_MUL), CEILING));
+    let error = declined(run(
+        &[widest(BIG), widest(BIG)],
+        &then_true(OP_MUL),
+        CEILING,
+    ));
     assert!(
         error.message.contains("allocation declined") && error.message.contains("OP_MUL"),
         "the decline names the step and that it is an allocation refusal: {}",
@@ -131,15 +141,21 @@ fn a_decline_carries_the_sizes_and_the_budget_not_a_script_verdict() {
 
 #[test]
 fn an_operand_below_the_floor_is_not_probed_so_an_honest_script_is_untouched() {
-    // Two tiny operands multiplied: step peak far below RESERVATION_FLOOR, so
-    // the probe is skipped even under a ceiling of zero bytes. 7 * 6 = 42.
-    assert!(RESERVATION_FLOOR >= 1 << 16);
-    let out = run(&[vec![7], vec![6]], &{
-        let mut lock = Script::new();
-        lock.write_opcode(OP_MUL);
-        lock.write_bin(&[42]);
-        lock.write_opcode(crate::script::op::OP_EQUAL);
-        lock
-    }, 0);
-    assert_eq!(out.expect("an honest multiply is never probed"), true);
+    // Two tiny operands multiplied: step peak far below the reservation floor,
+    // so the probe is skipped even under a ceiling of zero bytes. 7 * 6 = 42.
+    let out = run(
+        &[vec![7], vec![6]],
+        &{
+            let mut lock = Script::new();
+            lock.write_opcode(OP_MUL);
+            lock.write_bin(&[42]);
+            lock.write_opcode(crate::script::op::OP_EQUAL);
+            lock
+        },
+        0,
+    );
+    assert!(
+        out.expect("an honest multiply is never probed"),
+        "an honest multiply must validate"
+    );
 }

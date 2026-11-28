@@ -192,6 +192,10 @@ impl Transaction {
 
     // SPV Verification
     pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>) -> Result<bool>
+    // bsv-rs#374/#38 (ported): a caller's per-stack memory budget for the input scripts;
+    // `None` is `verify`'s 32,000,000-byte default; a budget exhausted or the allocator
+    // refusing a step's room is `Error::ScriptEvaluationDeclined`, a decline, not a verdict.
+    pub async fn verify_with_memory_limit(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>, memory_limit: Option<usize>) -> Result<bool>
 }
 
 pub enum ChangeDistribution { Equal, Random }  // Random the reference's #distributeChange (#868); Equal's remainder stated

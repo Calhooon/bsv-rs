@@ -101,6 +101,9 @@ pub mod output;
 pub mod transaction;
 mod transaction_reader;
 pub mod tx_json;
+/// What `Transaction::verify` answers for a script evaluation's `Err`: a
+/// decline kept as its own class (bsv-rs#38, ported to this line).
+mod verify_refusal;
 
 // Re-exports for convenience
 pub use beef::{

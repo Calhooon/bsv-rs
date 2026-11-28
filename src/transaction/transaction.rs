@@ -1731,6 +1731,26 @@ impl Transaction {
         chain_tracker: &dyn super::ChainTracker,
         fee_model: Option<&dyn super::FeeModel>,
     ) -> Result<bool> {
+        self.verify_with_memory_limit(chain_tracker, fee_model, None)
+            .await
+    }
+
+    /// [`verify`](Self::verify) with a caller's LOCAL per-stack memory budget
+    /// for the input scripts it runs. `None`, the budget the default `verify`
+    /// passes, is this line's 32,000,000-byte default mode; `Some(n)` bounds
+    /// each stack to `n` bytes, so an operand — and so the transient an
+    /// arithmetic step holds (bsv-rs#374) — stays within it, keeping the peak
+    /// under a memory-tight host (a consumer sets a budget at or below a tenth
+    /// of its memory ceiling). A budget exhausted, or the allocator refusing a
+    /// step's room, is `Error::ScriptEvaluationDeclined` — a decline, never read
+    /// as an invalid transaction (bsv-rs#38). Additive: `verify`'s signature is
+    /// unchanged.
+    pub async fn verify_with_memory_limit(
+        &self,
+        chain_tracker: &dyn super::ChainTracker,
+        fee_model: Option<&dyn super::FeeModel>,
+        memory_limit: Option<usize>,
+    ) -> Result<bool> {
         use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
         use crate::script::spend::PreGenesis;
         use crate::script::{p2sh_redeem::Redeem, Spend, TxSpendParams};
@@ -1879,19 +1899,16 @@ impl Transaction {
                     source_satoshis,
                     locking_script: LockingScript::from_binary(&lock)?,
                     unlocking_script: UnlockingScript::from_binary(&unlock)?,
-                    memory_limit: None,
+                    memory_limit,
                     work_limit: None,
                 };
                 let step = Redeem::of(&lock, &unlock, &params, true);
                 let again = PreGenesis::of(&lock, &unlock, &params, height, genesis_height);
                 let spend = Spend::with_transaction(params)?;
                 let judged = PreGenesis::after(again, Redeem::judge(step, spend, |_| {}));
-                judged.0.map_err(|e| {
-                    crate::Error::TransactionError(format!(
-                        "Script validation failed for input {}: {}",
-                        vin, e.message
-                    ))
-                })?;
+                judged
+                    .0
+                    .map_err(|e| super::verify_refusal::script_refusal(vin, e))?;
 
                 // Enqueue unverified source transactions, by txid
                 if !verified_txids.contains(&source_txid) {
