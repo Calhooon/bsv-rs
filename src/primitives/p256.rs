@@ -254,10 +254,6 @@ pub struct P256PublicKey {
 impl P256PublicKey {
     /// Parses a public key from compressed (33 bytes) or uncompressed (65 bytes) format.
     ///
-    /// # Arguments
-    ///
-    /// * `bytes` - The encoded public key
-    ///
     /// # Returns
     ///
     /// The public key, or an error if the encoding is invalid
@@ -274,20 +270,23 @@ impl P256PublicKey {
     /// assert_eq!(pubkey, recovered);
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        // Refuse a SEC 1 tag 05 (the compact form the p256 reader would read as 02 || X) before
+        // the reader, as Secp256r1.pointFromHex refuses every prefix but 02/03/04 (#550's P-256 sibling).
+        if bytes.first() == Some(&0x05) {
+            return Err(Error::InvalidPublicKey(
+                "Invalid public key encoding: unknown point format".to_string(),
+            ));
+        }
         let encoded = p256::Sec1Point::from_bytes(bytes)
             .map_err(|e| Error::InvalidPublicKey(format!("invalid encoded point: {}", e)))?;
-
         let public_key = P256InternalPublicKey::from_sec1_point(&encoded);
-
         if public_key.is_none().into() {
             return Err(Error::InvalidPublicKey(
                 "point not on curve or at infinity".to_string(),
             ));
         }
-
-        let verifying_key = VerifyingKey::from(public_key.unwrap());
         Ok(Self {
-            inner: verifying_key,
+            inner: VerifyingKey::from(public_key.unwrap()),
         })
     }
 
