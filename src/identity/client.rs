@@ -1235,6 +1235,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let subject = PublicKey::from_hex(subject_hex)?;
         let certifier = PublicKey::from_hex(certifier_hex)?;
 
+        // #544: skip a token the subject did not author (see client_token.rs).
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+            return Ok(None);
+        }
+
         // Create the base certificate
         let mut certificate =
             Certificate::new(cert_type, serial_number, subject.clone(), certifier);
@@ -1411,6 +1416,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             Err(_) => return Ok(None), // Invalid certifier pubkey
         };
 
+        // #544: skip a token the subject did not author (see client_token.rs).
+        if !self.is_authenticated_token(&tx_output.locking_script, &pushdrop, &subject) {
+            return Ok(None);
+        }
+
         // Create the base certificate
         let mut certificate = Certificate::new(cert_type, serial_number, subject, certifier);
 
@@ -1462,6 +1472,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
     }
 }
+
+// The subject-revelation authentication the two parsers run (#544). Declared
+// here as a submodule so `is_authenticated_token` reads the client's
+// configuration (its protocol and key ID).
+#[path = "client_token.rs"]
+mod client_token;
 
 #[cfg(test)]
 mod tests {
