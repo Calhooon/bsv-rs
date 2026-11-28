@@ -116,6 +116,7 @@ pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compac
 ### PublicKey.is_valid()
 - Always returns `true` for successfully parsed keys (matches Go `Validate()` / TS `validate()`)
 - Invalid keys fail at parse time (`from_bytes()` / `from_hex()`)
+- `from_bytes` refuses a SEC 1 tag `05` (the compact form k256 reads as `02 || x`) before k256 reads it, as `Point.fromDER` reads only `02`/`03`/`04`/`06`/`07` (#550); the single byte-to-key door, so `PushDrop::decode`, `bitcore_decrypt` and the sibling-module key readers refuse the `05` form through it. Pinned by `tests/primitives_sec1_tag05_witness.rs` (vector `sec1_tag_05_550.json`)
 
 ## Usage Examples
 

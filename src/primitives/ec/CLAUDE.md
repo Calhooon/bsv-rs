@@ -52,7 +52,7 @@ A point on the secp256k1 curve. Supports compressed (33 bytes) and uncompressed 
 ```rust
 pub struct PublicKey {
     // Construction
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self>   // 33 or 65 bytes
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self>   // 33 or 65 bytes; a SEC 1 tag 05 (k256's compact form) refused (#550)
     pub fn from_hex(hex: &str) -> Result<Self>        // Compressed or uncompressed
     pub fn from_private_key(private_key: &PrivateKey) -> Self
     pub fn from_scalar_mul_generator(scalar: &[u8; 32]) -> Result<Self>  // G * scalar

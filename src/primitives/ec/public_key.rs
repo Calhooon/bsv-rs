@@ -35,8 +35,16 @@ impl PublicKey {
     ///
     /// # Returns
     ///
-    /// The parsed public key, or an error if the format is invalid
+    /// The parsed public key, or an error if the format is invalid. A SEC 1
+    /// tag `05` (the compact form k256 reads) is refused, as the reference's
+    /// `Point.fromDER` refuses every prefix but `02`, `03`, `04`, `06` and
+    /// `07` (`ts-stack@edf6e03` `Point.ts:303-325`; #550).
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.first() == Some(&0x05) {
+            return Err(Error::InvalidPublicKey(
+                "Invalid public key encoding: unknown point format".to_string(),
+            ));
+        }
         let encoded = k256::Sec1Point::from_bytes(bytes)
             .map_err(|e| Error::InvalidPublicKey(format!("Invalid public key encoding: {}", e)))?;
 

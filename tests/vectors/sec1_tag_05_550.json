@@ -1,0 +1,107 @@
+{
+  "description": "#550: a SEC 1 tag 05 key at the sites that read a key, each the reference's outcome (ts-stack@edf6e03, Node v22.18.0). Written by tests/support/sec1_tag_05_550.mjs; never by hand.",
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "from_hex",
+      "site": "PublicKey.fromString",
+      "input": "0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "from_bytes",
+      "site": "PublicKey.fromDER",
+      "input": "0579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "pushdrop_lock_before",
+      "site": "PushDrop.decode before",
+      "input": "210579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac0361626375",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "pushdrop_lock_after",
+      "site": "PushDrop.decode after",
+      "input": "0361626375210579be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "kvstore_lock_key",
+      "site": "decodeAndVerifyKVStoreToken",
+      "input": "21053d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "kvstore_controller",
+      "site": "decodeAndVerifyKVStoreToken",
+      "input": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652105acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "signed_sender",
+      "site": "SignedMessage.verify",
+      "input": "42423301055cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc006197125364e8d996d1d59925f93525a4b00456ce2bd70e840e62b3e537570a103044022054c3c10870a33e728543084ce76a31ba2cb1de3779dbb1173727046fd7ce3c0a02206b5507935e5baf23b84ec1e617b0d070d968dca81dfc05e88a135238407e4e90",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "signed_recipient",
+      "site": "SignedMessage.verify",
+      "input": "42423301025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc05acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbea4d21662de0ea0eda64b04eeff246d8f06b12bd6ea1a4a15ba2338ad160bf64c3045022100a0bd74b654dcad331f6f4ab315251ef5c6621ba39b9b2aad5fa1835278e41fa6022023d22f20de12feb6407cfa47ae5ae6220c16ed3a9a523e36d926929af0fcd176",
+      "accepted": false,
+      "words": "The recipient public key is 03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe but the signature requres the recipient to have public key 05acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe"
+    },
+    {
+      "name": "encrypted_sender",
+      "site": "EncryptedMessage.decrypt",
+      "input": "42421033055cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbeec34b05461199a7c90bc7af3dc17bcffd93b24a1f2f396a4fb2c5969b1b097250a3f37c1956fba9f4a7ba6af5df958fd785935cad810d76d399894fc97308acdd089cce3c539ad918401733e4cbf582a069584e03f508544249e",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "encrypted_recipient",
+      "site": "EncryptedMessage.decrypt",
+      "input": "42421033025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc05acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbeec34b05461199a7c90bc7af3dc17bcffd93b24a1f2f396a4fb2c5969b1b097250a3f37c1956fba9f4a7ba6af5df958fd785935cad810d76d399894fc97308acdd089cce3c539ad918401733e4cbf582a069584e03f508544249e",
+      "accepted": false,
+      "words": "The encrypted message expects a recipient public key of 05acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe, but the provided key is 03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe"
+    },
+    {
+      "name": "certificate_subject",
+      "site": "Certificate.fromBinary",
+      "input": "0101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020205acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc00000000000000000000000000000000000000000000000000000000000000030001046e616d6508646d46736457553d304402206d834be2efc91890a387e10f2da9ef21fc7ffd3d6c1065b09a67f2d526b333ef02205d4d1a802536a93506ca3a0e805217812868f68977c759d7703e46b1695e689b",
+      "accepted": false,
+      "words": "Invalid certificate subject: expected a compressed secp256k1 public key"
+    },
+    {
+      "name": "certificate_certifier",
+      "site": "Certificate.fromBinary",
+      "input": "0101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020203acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe055cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc00000000000000000000000000000000000000000000000000000000000000030001046e616d6508646d46736457553d304402206d834be2efc91890a387e10f2da9ef21fc7ffd3d6c1065b09a67f2d526b333ef02205d4d1a802536a93506ca3a0e805217812868f68977c759d7703e46b1695e689b",
+      "accepted": false,
+      "words": "Invalid certificate certifier: expected a compressed secp256k1 public key"
+    },
+    {
+      "name": "ecies_bitcore_sender",
+      "site": "ECIES.bitcoreDecrypt",
+      "input": "055cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc0303030303030303030303030303030376a1406a24e14519f66d674f6a8644a8818f42b0eb74e33ae0eea0c65841dedba6473e52d19064ce7b4e5379f4c1d44c",
+      "accepted": false,
+      "words": "Unknown point format"
+    },
+    {
+      "name": "wire_counterparty",
+      "site": "WalletWireProcessor getPublicKey",
+      "input": "080000020a746573747320666976650131055cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcffffffff",
+      "accepted": false,
+      "words": "Unknown point format",
+      "code": 1,
+      "answer": "0114556e6b6e6f776e20706f696e7420666f726d617400"
+    }
+  ]
+}
