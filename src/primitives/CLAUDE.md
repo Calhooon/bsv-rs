@@ -199,6 +199,9 @@ let data = reader.read_var_bytes()?;
 ```
 
 ### P-256 Operations
+
+`P256PublicKey::from_bytes` refuses a SEC 1 tag `05` (the compact form the `p256` reader would read as `02 || x`) before the reader, as `Secp256r1.pointFromHex` reads only `02`/`03`/`04` and refuses every other prefix; the P-256 sibling of the secp256k1 root door (#550), closed because the parser is a reachable public item. Pinned by `tests/primitives_p256_tag05_witness.rs`.
+
 ```rust
 use bsv_rs::primitives::p256::{P256PrivateKey, P256PublicKey};
 
