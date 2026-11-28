@@ -349,6 +349,36 @@ let callback_id = peer.listen_for_general_messages(|sender, payload| {
 peer.stop_listening_for_general_messages(callback_id).await;
 ```
 
+### What a caller must still do (the receive path verifies; these are yours)
+
+The Peer refuses a forged or unsigned message before any listener or handshake
+sees it (#353). Four things remain the caller's:
+
+- **Name the identity key you were configured with** when you open a session
+  (`to_peer`/`get_authenticated_session`/`request_certificates`): pass the key
+  you already trust for this peer, learned out of band. The handshake then
+  completes only if the far end proves that key.
+- **A session opened with no key named binds to whoever answers.** With `None`,
+  the far end names its own identity and a transport-position party can make it
+  any key. Name the key unless you trust the network to reach only the peer you
+  mean.
+- **Compare a listener's `sender` with that same key.** One general-message
+  listener fires for every session; read the `sender` to tell authenticated
+  peers apart. Ignoring it conflates them.
+- **A key learned from the counterparty's own answer pins nothing** — it is the
+  value under the other party's control, not a trust anchor.
+
+Two further limits of this line (closed on the 0.9 line):
+
+- **Replay**: a message nonce is checked for presence but not claimed, so a
+  validly signed message replayed verbatim is delivered again while its session
+  is live (refused once the session is replaced or removed). Make a listener
+  idempotent. The 0.9 line claims each message nonce once.
+- **`is_authenticated` does not mean certificates were validated.** Setting
+  `certificates_to_request` sets `certificates_required`, but the handshake
+  completes authenticated without the certificate exchange on this line; a
+  caller gating on certificates must check `certificates_validated`.
+
 ### Certificate Exchange
 
 ```rust
@@ -384,9 +414,13 @@ peer.start();
 ### Peer Lifecycle
 
 1. **Create**: `Peer::new(options)` - constructs peer with wallet and transport
-2. **Start**: Choose one:
-   - `peer.start()` - client-side callback (handles InitialResponse, General, Certificate messages; ignores InitialRequest)
-   - `peer.start_server()` - server-side callback (handles ALL message types including InitialRequest). Requires `Arc<Peer>` since it routes through `handle_incoming_message()`.
+2. **Start**: Choose one (both verify every received message through the one
+   path `handle_incoming_message`, #353):
+   - `peer.start()` - installs the verifying receive callback (both roles; an
+     initial request is answered, an initial response, general and certificate
+     messages are verified before a listener or handshake sees them).
+   - `peer.start_server()` - the same as `start()`, kept for callers that hold
+     the Peer in an `Arc`.
 3. **Communicate**: `to_peer()`, `request_certificates()`, etc.
 
 ### Authentication Flow
