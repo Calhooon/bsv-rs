@@ -2368,7 +2368,7 @@ mod merkle_path_reattach_tests {
             matches!(
                 parsed
                     .verify(
-                        &crate::transaction::MockChainTracker::always_valid(800_010),
+                        &crate::transaction::MockChainTracker::always_valid(800_100),
                         None
                     )
                     .await,
@@ -2399,7 +2399,7 @@ mod merkle_path_reattach_tests {
             .expect("a 24-deep diamond of unproven spends must parse and link");
         let verified = parsed
             .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
+                &crate::transaction::MockChainTracker::always_valid(800_100),
                 None,
             )
             .await;
@@ -2439,7 +2439,7 @@ mod merkle_path_reattach_tests {
             .expect("the corrupted chain still parses and links");
         match parsed
             .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
+                &crate::transaction::MockChainTracker::always_valid(800_100),
                 None,
             )
             .await
@@ -2495,7 +2495,7 @@ mod merkle_path_reattach_tests {
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
         let verified = parsed
             .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
+                &crate::transaction::MockChainTracker::always_valid(800_100),
                 None,
             )
             .await;
