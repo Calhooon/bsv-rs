@@ -84,6 +84,49 @@ pub use transceiver::WalletWireTransceiver;
 
 use crate::Error;
 
+// The u32 field readers live here, not in encoding.rs: that file is held at
+// its recorded line limit by the ratchet (docs/RATCHETS.md).
+impl WireReader<'_> {
+    /// Reads an unsigned varint carrying a `u32` field: an output or input
+    /// index, a sequence number, a version, a lock time, a height, a total.
+    ///
+    /// Each is a `u32` by the transaction format or by BRC-100's
+    /// `PositiveIntegerOrZero` (at most `2^32 - 1`), so a value above
+    /// `u32::MAX` is refused, never truncated to another value, in
+    /// `#requireInteger`'s words with the reference's name for the field
+    /// (`ts-stack@edf6e03` `WalletWireTransceiver.ts:2018-2025`;
+    /// bsv-rs#120, #122, #255).
+    pub(crate) fn read_var_int_u32(&mut self, field: &str) -> Result<u32, Error> {
+        let value = self.read_var_int()?;
+        var_int_u32(field, value)
+    }
+
+    /// Reads an optional signed varint (`-1` for absent) carrying a `u32`
+    /// field, refused above `u32::MAX` as [`Self::read_var_int_u32`] is.
+    pub(crate) fn read_optional_var_int_u32(&mut self, field: &str) -> Result<Option<u32>, Error> {
+        self.read_optional_var_int()?
+            .map(|value| var_int_u32(field, value))
+            .transpose()
+    }
+}
+
+fn var_int_u32(field: &str, value: u64) -> Result<u32, Error> {
+    u32::try_from(value)
+        .map_err(|_| Error::WalletError(integer_refusal(field, value, 0, u32::MAX.into())))
+}
+
+/// The words of the reference's `#requireInteger(value, fieldName, minimum,
+/// maximum)` (`ts-stack@edf6e03` `WalletWireTransceiver.ts:2018-2025`), every
+/// integer bound's on this wire.
+pub(crate) fn integer_refusal(
+    field: &str,
+    value: impl std::fmt::Display,
+    minimum: u64,
+    maximum: u64,
+) -> String {
+    format!("Invalid {field}: expected an integer from {minimum} to {maximum}, received {value}")
+}
+
 /// Transport abstraction for wallet wire protocol.
 ///
 /// Implementations of this trait handle the actual transmission of binary
