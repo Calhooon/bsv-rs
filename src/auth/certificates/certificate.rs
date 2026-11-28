@@ -194,16 +194,16 @@ impl Certificate {
         };
 
         // Fields
-        let field_count = reader.read_varint()? as usize;
+        let field_count = reader.read_len()?;
         // Each field is >= 2 bytes (name len varint + value len varint); bound
         // the pre-allocation so a bogus count cannot OOM-abort before any read.
         let mut fields =
             HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
         for _ in 0..field_count {
-            let name_len = reader.read_varint()? as usize;
+            let name_len = reader.read_len()?;
             let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())
                 .map_err(|e| Error::InvalidUtf8(e.to_string()))?;
-            let value_len = reader.read_varint()? as usize;
+            let value_len = reader.read_len()?;
             let value = reader.read_bytes(value_len)?.to_vec();
             fields.insert(name, value);
         }
@@ -344,19 +344,33 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn remaining(&self) -> usize {
-        self.data.len() - self.pos
+        self.data.len().saturating_sub(self.pos)
     }
 
     fn read_bytes(&mut self, n: usize) -> Result<&'a [u8]> {
-        if self.pos + n > self.data.len() {
-            return Err(Error::ReaderUnderflow {
-                needed: n,
-                available: self.remaining(),
-            });
+        // Compared to the bytes remaining, never `pos + n`: a length read
+        // from the input near `usize::MAX` wrapped that sum past the check
+        // (#108).
+        let underflow = Error::ReaderUnderflow {
+            needed: n,
+            available: self.remaining(),
+        };
+        if n > self.remaining() {
+            return Err(underflow);
         }
-        let slice = &self.data[self.pos..self.pos + n];
+        let slice = self.data.get(self.pos..self.pos + n).ok_or(underflow)?;
         self.pos += n;
         Ok(slice)
+    }
+
+    /// Reads a varint length; one that does not fit `usize` (a 32-bit
+    /// target) is refused, never truncated to a shorter length.
+    fn read_len(&mut self) -> Result<usize> {
+        let n = self.read_varint()?;
+        usize::try_from(n).map_err(|_| Error::ReaderUnderflow {
+            needed: usize::MAX,
+            available: self.remaining(),
+        })
     }
 
     fn read_u8(&mut self) -> Result<u8> {
@@ -364,7 +378,7 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn read_remaining(&mut self) -> Vec<u8> {
-        let remaining = self.data[self.pos..].to_vec();
+        let remaining = self.data.get(self.pos..).unwrap_or_default().to_vec();
         self.pos = self.data.len();
         remaining
     }
@@ -570,5 +584,50 @@ mod tests {
             Certificate::get_field_encryption_key_id_verifiable("email", &serial);
         assert!(verifiable_key_id.contains("email"));
         assert!(verifiable_key_id.contains(&crate::primitives::to_base64(&serial)));
+    }
+
+    // The three defensive bounds guards the #108 reader adds (over the all-target
+    // `n > remaining()` check, which `tests/auth_reader_bounds.rs` pins): each is
+    // belt the public API never reaches, since the reader keeps `pos <= len`. A
+    // test reaches each by constructing the reader in the one state the guard is
+    // for — a cursor past the end — and pins that the guard answers gracefully
+    // instead of indexing. Each test panics (fails) if its guard is reverted to
+    // the unchecked form it replaced.
+
+    #[test]
+    fn remaining_saturates_when_the_cursor_is_past_the_end() {
+        // `remaining()` is `len.saturating_sub(pos)`; the reverted `len - pos`
+        // underflow-panics (debug) or wraps to a huge count (release).
+        let reader = BinaryReader {
+            data: &[0u8, 1, 2],
+            pos: 5,
+        };
+        assert_eq!(reader.remaining(), 0);
+    }
+
+    #[test]
+    fn read_remaining_is_empty_when_the_cursor_is_past_the_end() {
+        // `read_remaining()` is `data.get(pos..).unwrap_or_default()`; the
+        // reverted `data[pos..]` panics (range start out of bounds).
+        let mut reader = BinaryReader {
+            data: &[0u8, 1, 2],
+            pos: 5,
+        };
+        assert!(reader.read_remaining().is_empty());
+    }
+
+    #[test]
+    fn read_bytes_errs_and_never_indexes_when_the_cursor_is_past_the_end() {
+        // `read_bytes()` slices through `data.get(pos..pos+n).ok_or(..)`; the
+        // reverted `&data[pos..pos+n]` panics. A zero-length read reaches the
+        // slice (`0 <= remaining() == 0`) with the cursor past the end.
+        let mut reader = BinaryReader {
+            data: &[0u8, 1, 2],
+            pos: 5,
+        };
+        assert!(matches!(
+            reader.read_bytes(0),
+            Err(Error::ReaderUnderflow { .. })
+        ));
     }
 }

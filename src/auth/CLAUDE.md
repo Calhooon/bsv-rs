@@ -261,6 +261,8 @@ See `certificates/CLAUDE.md` for full API details. Key types:
 - **MasterCertificate** - Wraps `Certificate` + `master_keyring`. Methods: `create_certificate_fields()`, `create_keyring_for_verifier()`, `issue_for_subject()`, `decrypt_field()`/`decrypt_fields()`. Derefs to `Certificate`.
 - **VerifiableCertificate** - Wraps `Certificate` + verifier `keyring`. Methods: `decrypt_field()`/`decrypt_fields()`, `revealable_fields()`, `to_json_value()`, accessor methods (`subject()`, `certifier()`, etc.). Derefs to `Certificate`.
 
+Decoding untrusted bytes: `Certificate::from_binary` and the transport readers `HttpRequest::from_payload`/`HttpResponse::from_payload` return `Err` on a malformed or over-declared length and never panic (#108). A caller that decodes bytes from a peer handles the `Err`; it must not `unwrap` an untrusted decode.
+
 ```rust
 pub const CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL: &str = "certificate field encryption";
 pub const CERTIFICATE_SIGNATURE_PROTOCOL: &str = "certificate signature";

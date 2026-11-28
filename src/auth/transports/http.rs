@@ -101,11 +101,10 @@ impl HttpRequest {
         let (method_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let method = if method_len > 0 {
-            let len = method_len as usize;
-            if cursor + len > payload.len() {
-                return Err(Error::AuthError("Payload too short for method".into()));
-            }
-            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
+            let field = take(payload, cursor, method_len)
+                .ok_or_else(|| Error::AuthError("Payload too short for method".into()))?;
+            let len = field.len();
+            let s = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid method UTF-8: {}", e)))?;
             cursor += len;
             s
@@ -116,11 +115,10 @@ impl HttpRequest {
         let (path_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let path = if path_len > 0 {
-            let len = path_len as usize;
-            if cursor + len > payload.len() {
-                return Err(Error::AuthError("Payload too short for path".into()));
-            }
-            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
+            let field = take(payload, cursor, path_len)
+                .ok_or_else(|| Error::AuthError("Payload too short for path".into()))?;
+            let len = field.len();
+            let s = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid path UTF-8: {}", e)))?;
             cursor += len;
             s
@@ -131,11 +129,10 @@ impl HttpRequest {
         let (search_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let search = if search_len > 0 {
-            let len = search_len as usize;
-            if cursor + len > payload.len() {
-                return Err(Error::AuthError("Payload too short for search".into()));
-            }
-            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
+            let field = take(payload, cursor, search_len)
+                .ok_or_else(|| Error::AuthError("Payload too short for search".into()))?;
+            let len = field.len();
+            let s = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid search UTF-8: {}", e)))?;
             cursor += len;
             s
@@ -146,7 +143,8 @@ impl HttpRequest {
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let count = if header_count > 0 {
-            header_count as usize
+            // Saturated, never truncated: a count past `usize` runs out of bytes.
+            usize::try_from(header_count).unwrap_or(usize::MAX)
         } else {
             0
         };
@@ -159,23 +157,19 @@ impl HttpRequest {
         for _ in 0..count {
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            let klen = if key_len > 0 { key_len as usize } else { 0 };
-            if cursor + klen > payload.len() {
-                return Err(Error::AuthError("Payload too short for header key".into()));
-            }
-            let key = String::from_utf8(payload[cursor..cursor + klen].to_vec())
+            let field = take(payload, cursor, key_len.max(0))
+                .ok_or_else(|| Error::AuthError("Payload too short for header key".into()))?;
+            let klen = field.len();
+            let key = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header key UTF-8: {}", e)))?;
             cursor += klen;
 
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            let vlen = if val_len > 0 { val_len as usize } else { 0 };
-            if cursor + vlen > payload.len() {
-                return Err(Error::AuthError(
-                    "Payload too short for header value".into(),
-                ));
-            }
-            let value = String::from_utf8(payload[cursor..cursor + vlen].to_vec())
+            let field = take(payload, cursor, val_len.max(0))
+                .ok_or_else(|| Error::AuthError("Payload too short for header value".into()))?;
+            let vlen = field.len();
+            let value = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header value UTF-8: {}", e)))?;
             cursor += vlen;
 
@@ -185,13 +179,10 @@ impl HttpRequest {
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            let len = body_len as usize;
-            if cursor + len > payload.len() {
-                return Err(Error::AuthError("Payload too short for body".into()));
-            }
-            let body = payload[cursor..cursor + len].to_vec();
-            cursor += len;
-            body
+            let field = take(payload, cursor, body_len)
+                .ok_or_else(|| Error::AuthError("Payload too short for body".into()))?;
+            cursor += field.len();
+            field.to_vec()
         } else {
             Vec::new()
         };
@@ -337,7 +328,8 @@ impl HttpResponse {
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let count = if header_count > 0 {
-            header_count as usize
+            // Saturated, never truncated: a count past `usize` runs out of bytes.
+            usize::try_from(header_count).unwrap_or(usize::MAX)
         } else {
             0
         };
@@ -350,25 +342,21 @@ impl HttpResponse {
         for _ in 0..count {
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            let klen = if key_len > 0 { key_len as usize } else { 0 };
-            if cursor + klen > payload.len() {
-                return Err(Error::AuthError(
-                    "Response payload too short for header key".into(),
-                ));
-            }
-            let key = String::from_utf8(payload[cursor..cursor + klen].to_vec())
+            let field = take(payload, cursor, key_len.max(0)).ok_or_else(|| {
+                Error::AuthError("Response payload too short for header key".into())
+            })?;
+            let klen = field.len();
+            let key = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header key UTF-8: {}", e)))?;
             cursor += klen;
 
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            let vlen = if val_len > 0 { val_len as usize } else { 0 };
-            if cursor + vlen > payload.len() {
-                return Err(Error::AuthError(
-                    "Response payload too short for header value".into(),
-                ));
-            }
-            let value = String::from_utf8(payload[cursor..cursor + vlen].to_vec())
+            let field = take(payload, cursor, val_len.max(0)).ok_or_else(|| {
+                Error::AuthError("Response payload too short for header value".into())
+            })?;
+            let vlen = field.len();
+            let value = String::from_utf8(field.to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header value UTF-8: {}", e)))?;
             cursor += vlen;
 
@@ -378,16 +366,11 @@ impl HttpResponse {
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            let len = body_len as usize;
             // Strict (bsv-rs #843): refuse a body shorter than its length prefix.
-            if cursor + len > payload.len() {
-                return Err(Error::AuthError(
-                    "Response payload too short for body".into(),
-                ));
-            }
-            let body = payload[cursor..cursor + len].to_vec();
-            cursor += len;
-            body
+            let field = take(payload, cursor, body_len)
+                .ok_or_else(|| Error::AuthError("Response payload too short for body".into()))?;
+            cursor += field.len();
+            field.to_vec()
         } else {
             Vec::new()
         };
@@ -406,6 +389,19 @@ impl HttpResponse {
             body,
         })
     }
+}
+
+/// The `len` bytes of `payload` at `cursor`, or `None` when fewer remain.
+///
+/// Compared to the bytes remaining, never `cursor + len`: on a 32-bit target
+/// (wasm32) a length near `u32::MAX` wrapped that sum past the check, and an
+/// `i64` cast to `usize` truncated a longer length to a shorter one (#108).
+fn take(payload: &[u8], cursor: usize, len: i64) -> Option<&[u8]> {
+    let len = usize::try_from(len).ok()?;
+    if len > payload.len().checked_sub(cursor)? {
+        return None;
+    }
+    payload.get(cursor..cursor + len)
 }
 
 /// Reads a varint from the given bytes, returning (value, bytes_consumed).
