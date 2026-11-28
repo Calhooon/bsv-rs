@@ -168,7 +168,7 @@ pub struct DisplayableIdentity {
     pub abbreviated_key: String,
     /// Badge icon URL for the certifier.
     pub badge_icon_url: String,
-    /// Badge label describing the certification.
+    /// Badge label: a recognized certifier's, or the "not verified" default (bsv-rs#1118s).
     pub badge_label: String,
     /// Badge link URL for more information.
     pub badge_click_url: String,
@@ -562,7 +562,8 @@ impl StaticAvatarUrls {
 // Default Certifier
 // ============================================================================
 
-/// Default SocialCert certifier for fallback resolution.
+/// The one certifier this crate anchors on (bsv-rs#1118s): the default a
+/// resolve asks for, and the only one whose verified records show its badge.
 pub const DEFAULT_SOCIALCERT_CERTIFIER: &str =
     "02cf6cdf466951d8dfc9e7c9367511d0007ed6fba35ed42d425cc412fd6cfd4a17";
 
