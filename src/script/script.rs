@@ -8,6 +8,7 @@ use std::cell::RefCell;
 
 use super::chunk::ScriptChunk;
 use super::op::*;
+use super::push_bounds::{push_end, push_overflows};
 use crate::primitives::{from_hex, to_hex};
 use crate::Result;
 
@@ -160,7 +161,7 @@ impl Script {
             // Handle push operations
             if op > 0 && op < OP_PUSHDATA1 {
                 let len = op as usize;
-                let end = (pos + len).min(length);
+                let end = push_end(length, pos, len);
                 let data = bytes[pos..end].to_vec();
                 chunks.push(ScriptChunk::new(op, Some(data)));
                 pos = end;
@@ -172,7 +173,7 @@ impl Script {
                 // must never panic (conformance regression script-012;
                 // PUSHDATA2/4 arms already clamp).
                 pos = (pos + 1).min(length);
-                let end = (pos + len).min(length);
+                let end = push_end(length, pos, len);
                 let data = bytes[pos..end].to_vec();
                 chunks.push(ScriptChunk::new(op, Some(data)));
                 pos = end;
@@ -185,7 +186,7 @@ impl Script {
                 };
                 let len = b0 | (b1 << 8);
                 pos = (pos + 2).min(length);
-                let end = (pos + len).min(length);
+                let end = push_end(length, pos, len);
                 let data = bytes[pos..end].to_vec();
                 chunks.push(ScriptChunk::new(op, Some(data)));
                 pos = end;
@@ -208,7 +209,7 @@ impl Script {
                 };
                 let len = (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) as usize;
                 pos = (pos + 4).min(length);
-                let end = (pos + len).min(length);
+                let end = push_end(length, pos, len);
                 let data = bytes[pos..end].to_vec();
                 chunks.push(ScriptChunk::new(op, Some(data)));
                 pos = end;
@@ -702,21 +703,21 @@ fn truncated_push_index(bytes: &[u8]) -> Option<usize> {
         let declared: Option<usize> = if op > 0 && op < OP_PUSHDATA1 {
             Some(op as usize)
         } else if op == OP_PUSHDATA1 {
-            if pos + 1 > length {
+            if push_overflows(length, pos, 1) {
                 return Some(index);
             }
             let n = bytes[pos] as usize;
             pos += 1;
             Some(n)
         } else if op == OP_PUSHDATA2 {
-            if pos + 2 > length {
+            if push_overflows(length, pos, 2) {
                 return Some(index);
             }
             let n = bytes[pos] as usize | ((bytes[pos + 1] as usize) << 8);
             pos += 2;
             Some(n)
         } else if op == OP_PUSHDATA4 {
-            if pos + 4 > length {
+            if push_overflows(length, pos, 4) {
                 return Some(index);
             }
             let n = bytes[pos] as usize
@@ -729,10 +730,10 @@ fn truncated_push_index(bytes: &[u8]) -> Option<usize> {
             None
         };
         if let Some(n) = declared {
-            if pos + n > length {
+            if push_overflows(length, pos, n) {
                 return Some(index);
             }
-            pos += n;
+            pos = push_end(length, pos, n);
         }
         index += 1;
     }
