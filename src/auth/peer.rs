@@ -293,6 +293,31 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// # Arguments
     /// * `identity_key` - Peer's identity key (hex) or session nonce
     /// * `max_wait_time` - Maximum time to wait for handshake (milliseconds)
+    ///
+    /// # Naming the peer you mean to reach
+    /// Pass the identity key you were configured with — the key you already
+    /// trust for this peer, learned out of band. The session then completes
+    /// only if the far end proves that key; a response proving another key is
+    /// refused and no session is stored. If you pass `None`, the session binds
+    /// to whichever key answers (the far end names its own identity), so a
+    /// transport-position party can make it any key: name the key unless you
+    /// genuinely trust the network to reach only the intended peer. A key you
+    /// take from the counterparty's own answer pins nothing — it is the very
+    /// value under the other party's control.
+    ///
+    /// Whatever you pass here, a message handed to a general-message listener
+    /// (see [`listen_for_general_messages`](Self::listen_for_general_messages))
+    /// carries the authenticated peer's identity as its `sender`; read that
+    /// `sender` to tell the sessions apart — one listener fires for every
+    /// session, so ignoring it conflates authenticated peers.
+    ///
+    /// # Replayed messages
+    /// On this line, a message's own nonce is checked for presence but is not
+    /// claimed, so a validly signed message replayed verbatim is delivered
+    /// again while its session is live (a replay is refused once the session is
+    /// replaced or removed, its nonce no longer naming a session). Treat
+    /// delivery as at-least-once and make a listener idempotent. The 0.9 line
+    /// claims each message nonce once and refuses the replay.
     pub async fn get_authenticated_session(
         &self,
         identity_key: Option<&str>,
