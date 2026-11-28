@@ -17,6 +17,7 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
 | `bsm.rs` | Bitcoin Signed Message (~713 lines) |
 | `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1188 lines) |
+| `ecies_envelope.rs` | The frame of an Electrum envelope read the reference's way (#109): the embedded key found by the byte after the magic and the bytes left over, the expected sender, the ciphertext's 16-byte framing |
 
 ## Submodules
 
