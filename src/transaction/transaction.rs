@@ -13,6 +13,7 @@ use super::beef_tx::{BeefTx, BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
+use super::proof_ambiguity::is_ambiguous_merkle_leaf;
 use crate::primitives::{from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
@@ -1788,20 +1789,28 @@ impl Transaction {
             };
             refuse_no_transaction(tx, &txid)?;
 
-            // If the transaction has a merkle path, verify it. The reference's
+            // If the transaction has a merkle path, verify it — UNLESS its
+            // serialized length collides with a merkle inner node
+            // (CVE-2017-12842, the fourth way): a 64-byte transaction's txid
+            // cannot be told from a merkle inner node, so the path is not used
+            // as proof (`proof_ambiguity::is_ambiguous_merkle_leaf`, the shared
+            // rule). Such a transaction falls through to the unproven path
+            // below, where its inputs' sources must be present and verify, the
+            // way any unproven transaction's are. Otherwise the reference's
             // `MerklePath.verify` (`MerklePath.ts:476-500`, #734) asks the
             // tracker's current height at level-0 offset 0 alone and answers
-            // false when `block_height + 100 > height`, before the root is
-            // asked, so an offset-0 proof under 100 blocks deep (a coinbase's
-            // maturity) is not proven; `proven` asked the root alone.
+            // false when `block_height + 100 > height`, so an offset-0 proof
+            // under 100 blocks deep (a coinbase's maturity) is not proven.
             if let Some(ref merkle_path) = tx.merkle_path {
-                if merkle_path.verify(&txid, chain_tracker).await? {
-                    continue;
-                } else {
-                    return Err(crate::Error::TransactionError(format!(
-                        "Invalid merkle path for transaction {}",
-                        txid
-                    )));
+                if !is_ambiguous_merkle_leaf(tx.to_binary().len()) {
+                    if merkle_path.verify(&txid, chain_tracker).await? {
+                        continue;
+                    } else {
+                        return Err(crate::Error::TransactionError(format!(
+                            "Invalid merkle path for transaction {}",
+                            txid
+                        )));
+                    }
                 }
             }
 

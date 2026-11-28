@@ -124,6 +124,36 @@ impl BeefTx {
         self.bump_index.is_some()
     }
 
+    /// Whether this entry's merkle-path proof vouches for its inputs.
+    ///
+    /// A proof does, UNLESS the transaction serializes to the length that
+    /// collides with a merkle inner node (CVE-2017-12842): such a path cannot
+    /// be told from a path over a shallower tree, so it is not used as proof.
+    /// An entry of that shape is judged as an unproven transaction — its
+    /// inputs are required to be present, like any unproven transaction's —
+    /// through the shared rule
+    /// [`proof_ambiguity::is_ambiguous_merkle_leaf`](super::proof_ambiguity::is_ambiguous_merkle_leaf).
+    pub(crate) fn proof_vouches(&self) -> bool {
+        self.has_proof() && !self.is_ambiguous_merkle_leaf_entry()
+    }
+
+    /// The serialized length of this entry's transaction (its raw bytes when
+    /// present, else its parse), or `None` for a txid-only entry that holds no
+    /// bytes to measure.
+    fn serialized_len(&self) -> Option<usize> {
+        self.raw_tx
+            .as_deref()
+            .map(<[u8]>::len)
+            .or_else(|| self.tx.as_ref().map(|t| t.to_binary().len()))
+    }
+
+    /// True when this entry's transaction serializes to the merkle-inner-node
+    /// length (CVE-2017-12842), so its proof is not used.
+    fn is_ambiguous_merkle_leaf_entry(&self) -> bool {
+        self.serialized_len()
+            .is_some_and(super::proof_ambiguity::is_ambiguous_merkle_leaf)
+    }
+
     /// Returns true if this is a txid-only entry (no transaction data).
     pub fn is_txid_only(&self) -> bool {
         self.txid.is_some() && self.raw_tx.is_none() && self.tx.is_none()
@@ -290,8 +320,11 @@ impl BeefTx {
 
     /// Updates the input_txids list based on transaction data.
     fn update_input_txids(&mut self) {
-        if self.has_proof() {
-            // If we have a proof, we don't need to track input txids
+        if self.proof_vouches() {
+            // A proof that vouches for the inputs means we need not track
+            // them. A 64-byte proven entry's proof does NOT vouch
+            // (CVE-2017-12842, `proof_ambiguity`): it is judged as unproven,
+            // so its input txids are tracked here like any unproven entry's.
             self.input_txids = Vec::new();
             return;
         }

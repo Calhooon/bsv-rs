@@ -99,6 +99,7 @@ pub mod merkle_path;
 mod merkle_path_read;
 mod merkle_path_verify;
 pub mod output;
+pub(crate) mod proof_ambiguity;
 mod source_link;
 #[allow(clippy::module_inception)]
 pub mod transaction;
