@@ -43,9 +43,9 @@ use crate::Result;
 /// The most levels a path may have. Offsets are `u64`, so a path of 64 levels
 /// shifts an offset by at most 63; a tree-height byte over this is refused
 /// before any shift (bsv-stack-lean #57, P0-5c).
-const MAX_TREE_HEIGHT: usize = 64;
+pub(crate) const MAX_TREE_HEIGHT: usize = 64;
 
-fn tree_height_error(height: usize) -> crate::Error {
+pub(crate) fn tree_height_error(height: usize) -> crate::Error {
     crate::Error::MerklePathError(format!(
         "Invalid tree height: {}, over the maximum height {}",
         height, MAX_TREE_HEIGHT
@@ -244,7 +244,16 @@ impl MerklePath {
     /// The parsed MerklePath.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
         let mut reader = Reader::new(bin);
-        Self::from_reader(&mut reader)
+        let path = Self::from_reader(&mut reader)?;
+        // The bytes are one BUMP: a byte after its frame is refused, as the
+        // reference's `fromBinary` refuses one (finding-4's fix).
+        if reader.remaining() != 0 {
+            return Err(crate::Error::MerklePathError(format!(
+                "Serialized BUMP has {} bytes after its frame",
+                reader.remaining()
+            )));
+        }
+        Ok(path)
     }
 
     /// Creates a MerklePath from a hex string.
@@ -261,51 +270,20 @@ impl MerklePath {
         Self::from_binary(&bin)
     }
 
-    /// Creates a MerklePath from a Reader.
+    /// Creates a MerklePath from a Reader: one BUMP, read strictly
+    /// (finding-4's fix). A leaf flag is `00`, `01` or `02` (a byte outside
+    /// its table is refused, where the 0.8.x reader masked it); an offset lies
+    /// within its level and appears once there; every hashed leaf of level 0
+    /// climbs to exactly one root, with no off-path leaf left over and no
+    /// duplicate at an even offset below a node the walk needs (where the
+    /// 0.8.x reader ignored an off-path leaf and self-paired such a
+    /// duplicate); the tree height is 1 to 64. The reader is advanced past the
+    /// BUMP alone, the bytes after it left to the caller, so the non-streaming
+    /// `Beef` reader reads its BUMPs strictly too. The structural refusals an
+    /// honest proof already met (an empty path, a missing sibling, a repeated
+    /// offset, roots that disagree) keep this line's own words, unchanged.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let block_height = reader.read_var_int_num()? as u32;
-        let tree_height = reader.read_u8()? as usize;
-        if tree_height > MAX_TREE_HEIGHT {
-            return Err(tree_height_error(tree_height));
-        }
-
-        let mut path: Vec<Vec<MerklePathLeaf>> = vec![Vec::new(); tree_height];
-
-        #[allow(clippy::needless_range_loop)]
-        for level in 0..tree_height {
-            let n_leaves = reader.read_var_int_num()?;
-
-            for _ in 0..n_leaves {
-                let offset = reader.read_var_int_num()? as u64;
-                let flags = reader.read_u8()?;
-
-                let leaf = if (flags & 1) != 0 {
-                    // Duplicate flag set
-                    MerklePathLeaf::new_duplicate(offset)
-                } else {
-                    // Read 32-byte hash in little-endian
-                    let hash_slice = reader.read_bytes(32)?;
-                    let mut hash_bytes = hash_slice.to_vec();
-                    hash_bytes.reverse(); // Convert from LE to display format
-                    let hash = to_hex(&hash_bytes);
-
-                    let txid = (flags & 2) != 0;
-                    MerklePathLeaf {
-                        offset,
-                        hash: Some(hash),
-                        txid,
-                        duplicate: false,
-                    }
-                };
-
-                path[level].push(leaf);
-            }
-
-            // Sort leaves by offset
-            path[level].sort_by_key(|l| l.offset);
-        }
-
-        Self::new_unchecked(block_height, path)
+        super::merkle_path_read::read_bump(reader)
     }
 
     /// Creates a MerklePath for a coinbase transaction in a block with no other transactions.
@@ -1412,14 +1390,23 @@ mod linear_root_equivalence_tests {
     }
 
     #[test]
-    fn the_parse_matches_the_rescan_except_the_ruled_lone_leaf() {
+    fn the_strict_parse_refuses_a_superset_of_the_legacy_rescan_and_agrees_where_both_accept() {
+        // Before finding-4's fix `from_binary` matched the 0.3.34 lenient
+        // rescan on every shape, damaged or not. The fix makes `from_binary`
+        // read a BUMP through the strict BUMP decoder, so it refuses a
+        // SUPERSET of the malformed shapes the rescan accepted (a bad flag
+        // byte, an off-path or out-of-level leaf, a contradicting interior
+        // node, trailing bytes). Where both still accept, the path, root and
+        // bytes are identical — no honest answer moves — and the strict parse
+        // is NEVER looser than the rescan (it accepts nothing the rescan
+        // refused).
         let mut rng = StdRng::seed_from_u64(0x0335);
-        let mut parsed = 0;
+        let (mut both, mut stricter, mut agree_err) = (0, 0, 0);
         for round in 0..1000 {
             let path = random_path(&mut rng);
             let bytes = MerklePath {
                 block_height: 800_000,
-                path,
+                path: path.clone(),
             }
             .to_binary();
             let new = MerklePath::from_binary(&bytes);
@@ -1454,17 +1441,28 @@ mod linear_root_equivalence_tests {
                 let legacy = legacy_new_internal(800_000, path.clone(), false);
                 expected_after_lone_leaf_ruling(&path, legacy)
             });
-            assert_eq!(outcome(&new), outcome(&old), "round {round}");
-            if let (Ok(new), Ok(old)) = (&new, &old) {
-                assert_eq!(
-                    roots(new, |mp, t| mp.compute_root(t)),
-                    roots(old, legacy_compute_root)
-                );
-                assert_eq!(new.to_binary(), old.to_binary());
-                parsed += 1;
+            match (&new, &old) {
+                (Ok(new), Ok(old)) => {
+                    assert_eq!(
+                        roots(new, |mp, t| mp.compute_root(t)),
+                        roots(old, legacy_compute_root),
+                        "round {round}"
+                    );
+                    assert_eq!(new.to_binary(), old.to_binary(), "round {round}");
+                    both += 1;
+                }
+                // The fix's new refusals: the strict parse refuses a shape the
+                // lenient rescan accepted.
+                (Err(crate::Error::MerklePathError(_)), Ok(_)) => stricter += 1,
+                (Err(_), Err(_)) => agree_err += 1,
+                (Ok(_), Err(_)) => panic!(
+                    "round {round}: the strict parse accepted what the legacy rescan refused: {path:?}"
+                ),
+                (Err(e), Ok(_)) => panic!("round {round}: unexpected error class {e:?}"),
             }
         }
-        println!("parsed {parsed}");
-        assert!(parsed > 250);
+        println!("both {both}, stricter {stricter}, agree_err {agree_err}");
+        assert!(both > 250, "the honest intersection is exercised");
+        assert!(stricter > 0, "the fix refuses shapes the rescan accepted");
     }
 }
